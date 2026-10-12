@@ -1340,16 +1340,18 @@ class client {
      * @return string The formatted time
      */
     protected function formatseconds($milli = 0) {
-        $secs = $milli / 1000;
+        // Whole seconds first: % on a float with a fraction is deprecated since PHP 8.1. Truncating here
+        // gives the same digits the per-part floor() calls gave.
+        $secs = (int) floor($milli / 1000);
 
         if ($secs < MINSECS) {
-            return '0:' . str_pad(floor($secs), 2, "0", STR_PAD_LEFT);
-        } else if ($secs >= MINSECS && $secs < HOURSECS) {
-            return floor($secs / MINSECS) . ':' . str_pad(floor($secs % MINSECS), 2, "0", STR_PAD_LEFT);
+            return '0:' . str_pad((string) $secs, 2, "0", STR_PAD_LEFT);
+        } else if ($secs < HOURSECS) {
+            return intdiv($secs, MINSECS) . ':' . str_pad((string) ($secs % MINSECS), 2, "0", STR_PAD_LEFT);
         } else {
-            return floor($secs / HOURSECS) . ':' .
-                str_pad(floor(($secs % HOURSECS) / MINSECS), 2, "0", STR_PAD_LEFT) . ':' .
-                str_pad(floor(($secs % HOURSECS) % MINSECS), 2, "0", STR_PAD_LEFT);
+            return intdiv($secs, HOURSECS) . ':' .
+                str_pad((string) intdiv($secs % HOURSECS, MINSECS), 2, "0", STR_PAD_LEFT) . ':' .
+                str_pad((string) ($secs % MINSECS), 2, "0", STR_PAD_LEFT);
         }
     }
 

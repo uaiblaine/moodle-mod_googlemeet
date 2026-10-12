@@ -37,6 +37,9 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class process_video_analysis extends adhoc_task {
+    /** @var int Largest video the task downloads and uploads (2 GiB, the Gemini File API limit). */
+    const MAX_VIDEO_BYTES = 2147483648;
+
     /**
      * Get the task name.
      *
@@ -207,7 +210,7 @@ class process_video_analysis extends adhoc_task {
      */
     private function analyze_with_video(gemini_client $client, stdClass $recording): stdClass {
         // Extract file ID from Google Drive URL.
-        $fileid = $this->extract_drive_file_id($recording->webviewlink);
+        $fileid = self::extract_drive_file_id((string) $recording->webviewlink);
         if (!$fileid) {
             throw new \moodle_exception('ai_error', 'googlemeet', '', 'Could not extract file ID from Drive URL');
         }
@@ -271,25 +274,104 @@ class process_video_analysis extends adhoc_task {
     /**
      * Extract the file ID from a Google Drive URL.
      *
+     * Only drive.google.com links count: /file/d/<id>[/...] (the Drive API webViewLink), and
+     * /open?id=<id> or /uc?id=<id>. A matching path or id parameter on any other host, or another
+     * parameter that merely ends in "id=", yields nothing.
+     *
      * @param string $url The Google Drive URL
      * @return string|null The file ID or null if not found
      */
-    private function extract_drive_file_id(string $url): ?string {
-        // Match various Google Drive URL formats.
-        $patterns = [
-            '/\/file\/d\/([a-zA-Z0-9_-]+)/', // Form /file/d/FILE_ID/.
-            '/id=([a-zA-Z0-9_-]+)/', // Form ?id=FILE_ID.
-            '/\/d\/([a-zA-Z0-9_-]+)/', // Form /d/FILE_ID/.
-            '/open\?id=([a-zA-Z0-9_-]+)/', // Form open?id=FILE_ID.
-        ];
+    public static function extract_drive_file_id(string $url): ?string {
+        $parts = parse_url(trim($url));
+        if (!is_array($parts) || !in_array(strtolower($parts['scheme'] ?? ''), ['http', 'https'], true)) {
+            return null;
+        }
+        if (strtolower($parts['host'] ?? '') !== 'drive.google.com' || isset($parts['user']) || isset($parts['port'])) {
+            return null;
+        }
 
-        foreach ($patterns as $pattern) {
-            if (preg_match($pattern, $url, $matches)) {
-                return $matches[1];
+        $path = $parts['path'] ?? '';
+        // Multi-account links carry a /u/<n> prefix before the file path.
+        if (preg_match('~^(?:/u/\d+)?/file/d/([A-Za-z0-9_-]+)(?:/|$)~', $path, $matches)) {
+            return $matches[1];
+        }
+        if ($path === '/open' || $path === '/uc') {
+            parse_str($parts['query'] ?? '', $query);
+            $id = $query['id'] ?? null;
+            if (is_string($id) && preg_match('~^[A-Za-z0-9_-]+$~', $id)) {
+                return $id;
             }
         }
 
         return null;
+    }
+
+    /**
+     * Find the confirm token in Drive's virus-scan interstitial page.
+     *
+     * @param string $html The page Drive served instead of the file.
+     * @return string|null The raw (not URL-encoded) token, or null when the page has none.
+     */
+    public static function extract_confirm_token(string $html): ?string {
+        if (preg_match('/confirm=([^&"\'\s<>]+)/', $html, $matches)) {
+            return $matches[1];
+        }
+        return null;
+    }
+
+    /**
+     * Build the direct-download URL of a Drive file.
+     *
+     * The token comes from a remote page, so it is URL-encoded like the id.
+     *
+     * @param string $fileid The Google Drive file ID.
+     * @param string|null $confirm The interstitial's confirm token, if any.
+     * @return string
+     */
+    public static function build_drive_download_url(string $fileid, ?string $confirm): string {
+        $url = 'https://drive.google.com/uc?export=download';
+        if ($confirm !== null) {
+            $url .= '&confirm=' . rawurlencode($confirm);
+        }
+        return $url . '&id=' . rawurlencode($fileid);
+    }
+
+    /**
+     * The \curl options of a Drive download: timeouts, redirects and the byte cap.
+     *
+     * A huge response is cut early instead of filling the disk before the size check after the
+     * download. CURLOPT_MAXFILESIZE_LARGE refuses a body whose announced length is above
+     * {@see self::MAX_VIDEO_BYTES}; libcurl before 8.4.0 does not apply it to a body of unknown length
+     * (chunked), so the progress callback aborts the transfer once it passes the cap.
+     *
+     * @param int $timeout Total timeout in seconds.
+     * @param int $maxredirs Most redirects to follow.
+     * @return array
+     */
+    public static function download_curl_options(int $timeout, int $maxredirs): array {
+        return [
+            'CURLOPT_CONNECTTIMEOUT' => 60,
+            'CURLOPT_TIMEOUT' => $timeout,
+            'CURLOPT_FOLLOWLOCATION' => true,
+            'CURLOPT_MAXREDIRS' => $maxredirs,
+            'CURLOPT_MAXFILESIZE_LARGE' => self::MAX_VIDEO_BYTES,
+            'CURLOPT_NOPROGRESS' => false,
+            'CURLOPT_PROGRESSFUNCTION' => [self::class, 'download_progress'],
+        ];
+    }
+
+    /**
+     * cURL progress callback of a Drive download: abort once the body passes the byte cap.
+     *
+     * @param mixed $handle The cURL handle (unused).
+     * @param int|float $downloadtotal Bytes expected, 0 when unknown (unused).
+     * @param int|float $downloaded Bytes received so far.
+     * @param int|float $uploadtotal Bytes to send (unused).
+     * @param int|float $uploaded Bytes sent (unused).
+     * @return int Non-zero aborts the transfer with CURLE_ABORTED_BY_CALLBACK.
+     */
+    public static function download_progress($handle, $downloadtotal, $downloaded, $uploadtotal, $uploaded): int {
+        return $downloaded > self::MAX_VIDEO_BYTES ? 1 : 0;
     }
 
     /**
@@ -316,7 +398,7 @@ class process_video_analysis extends adhoc_task {
 
         // Try to download using the direct download URL.
         // This works for files that are shared publicly or with "anyone with the link".
-        $downloadurl = "https://drive.google.com/uc?export=download&id={$fileid}";
+        $downloadurl = self::build_drive_download_url($fileid, null);
 
         mtrace("Attempting download from: {$downloadurl}");
 
@@ -366,16 +448,17 @@ class process_video_analysis extends adhoc_task {
         // Google Drive serves files above its virus-scan limit behind a confirmation interstitial
         // (an HTML page) instead of the file. Probe the URL once: if the response is that page,
         // take its confirm token into the download URL. A direct (small-file) response is
-        // discarded; the real download is the streaming pass below.
+        // discarded; the real download is the streaming pass below. The probe asks for the first
+        // MiB only, so a file Drive serves directly is never buffered whole in memory.
         $probe = new \curl();
-        $probehtml = $probe->get($downloadurl, [], [
-            'CURLOPT_CONNECTTIMEOUT' => 60,
-            'CURLOPT_TIMEOUT' => 120,
-            'CURLOPT_FOLLOWLOCATION' => true,
-            'CURLOPT_MAXREDIRS' => 5,
-        ]);
-        if (is_string($probehtml) && preg_match('/confirm=([^&"]+)/', $probehtml, $matches)) {
-            $downloadurl = "https://drive.google.com/uc?export=download&confirm={$matches[1]}&id={$fileid}";
+        $probehtml = $probe->get(
+            $downloadurl,
+            [],
+            self::download_curl_options(120, 5) + ['CURLOPT_RANGE' => '0-1048575']
+        );
+        $confirm = is_string($probehtml) ? self::extract_confirm_token($probehtml) : null;
+        if ($confirm !== null) {
+            $downloadurl = self::build_drive_download_url($fileid, $confirm);
             mtrace("Large file detected, using confirm token...");
         }
 
@@ -387,13 +470,7 @@ class process_video_analysis extends adhoc_task {
         }
 
         $curl2 = new \curl();
-        $curl2->setopt([
-            'CURLOPT_TIMEOUT' => 1800,
-            'CURLOPT_CONNECTTIMEOUT' => 60,
-            'CURLOPT_FOLLOWLOCATION' => true,
-            'CURLOPT_MAXREDIRS' => 10,
-            'CURLOPT_FILE' => $fp,
-        ]);
+        $curl2->setopt(self::download_curl_options(1800, 10) + ['CURLOPT_FILE' => $fp]);
 
         try {
             $curl2->get($downloadurl);
@@ -402,6 +479,18 @@ class process_video_analysis extends adhoc_task {
             if (is_resource($fp)) {
                 fclose($fp);
             }
+        }
+
+        // A transfer cut by the byte cap (or by a timeout) leaves a truncated file: never upload it.
+        $errno = $curl2->get_errno();
+        if ($errno) {
+            if (file_exists($tempfile)) {
+                unlink($tempfile);
+            }
+            if ($errno === CURLE_FILESIZE_EXCEEDED || $errno === CURLE_ABORTED_BY_CALLBACK) {
+                throw new \moodle_exception('ai_error', 'googlemeet', '', 'Video file exceeds 2GB limit');
+            }
+            throw new \moodle_exception('ai_error', 'googlemeet', '', 'Download failed: ' . $curl2->error);
         }
 
         $info = $curl2->get_info();
@@ -445,7 +534,7 @@ class process_video_analysis extends adhoc_task {
         mtrace("Downloaded {$filesize} bytes (content-type: " . ($contenttype ?: 'unknown') . ")");
 
         // Check file size limit (2GB for Gemini).
-        if ($filesize > 2147483648) {
+        if ($filesize > self::MAX_VIDEO_BYTES) {
             unlink($tempfile);
             throw new \moodle_exception('ai_error', 'googlemeet', '', 'Video file exceeds 2GB limit');
         }
