@@ -24,7 +24,7 @@
 
 use mod_googlemeet\local\room_entry;
 
-require(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/../../config.php');
 
 $id = required_param('id', PARAM_INT);
 
@@ -47,8 +47,9 @@ if ($roomurl === null) {
 }
 
 // Only log requests coming from the activity's own button: a forged cross-site link must not
-// create entries in the user's log. The redirect to the room happens either way.
-if (confirm_sesskey()) {
+// create entries in the user's log. Guests share one account, so their entries are not logged.
+// The redirect to the room happens either way.
+if (confirm_sesskey() && !isguestuser()) {
     room_entry::log($googlemeet, $cm, $context, 'web');
 }
 

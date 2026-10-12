@@ -64,6 +64,11 @@ class log_room_entered extends external_api {
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:view', $context);
+        // Guests share one account, so an entry logged under it says nothing. On error the app opens the
+        // room from the URL it got with the page (mobile_view_page.mustache), so guests still get in.
+        if (isguestuser()) {
+            throw new \moodle_exception('guestsarenotallowed', 'error');
+        }
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
 
         $url = room_entry::room_url($googlemeet);

@@ -26,7 +26,7 @@ use mod_googlemeet\local\attendance\report;
 use mod_googlemeet\local\attendance\scope;
 use mod_googlemeet\local\attendance\service;
 
-require(__DIR__ . '/../../config.php');
+require_once(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
 
 $id = required_param('id', PARAM_INT);
@@ -41,6 +41,8 @@ $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_E
 require_login($course, false, $cm);
 $context = context_module::instance($cm->id);
 require_capability('mod/googlemeet:viewreports', $context);
+// Reading the report is viewreports (given to non-editing teachers); changing it is manageattendance.
+$canmanage = has_capability('mod/googlemeet:manageattendance', $context);
 
 $baseurl = new moodle_url('/mod/googlemeet/attendance.php', ['id' => $cm->id]);
 $PAGE->set_url($baseurl, $sessionid ? ['session' => $sessionid] : []);
@@ -62,14 +64,22 @@ if ($sessionid) {
 if ($action === 'relink') {
     require_sesskey();
     // Only the organiser's link matters for the attendance fetch: nobody else unlinks their account here.
+    // This only forgets the current user's own Google token, so it needs no attendance write capability.
     if (!scope::is_organiser($googlemeet, $USER)) {
         redirect($baseurl);
     }
     scope::reset_link((int)$USER->id);
     redirect($baseurl, get_string('attendance_relink_done', 'googlemeet'), null, \core\output\notification::NOTIFY_INFO);
 }
-if ($action === 'refetch' && $session) {
+if (($action === 'refetch' || $action === 'link') && $session) {
     require_sesskey();
+    require_capability('mod/googlemeet:manageattendance', $context);
+    // Writes are POST only (the controls are forms), on top of the sesskey check.
+    if (!data_submitted()) {
+        redirect(new moodle_url($baseurl, ['session' => $session->id]));
+    }
+}
+if ($action === 'refetch' && $session) {
     service::request_refetch((int)$googlemeet->id, (int)$session->id);
     redirect(
         new moodle_url($baseurl, ['session' => $session->id]),
@@ -79,10 +89,13 @@ if ($action === 'refetch' && $session) {
     );
 }
 if ($action === 'link' && $session) {
-    require_sesskey();
     $attendanceid = required_param('attendanceid', PARAM_INT);
     $userid = required_param('userid', PARAM_INT);
     try {
+        // Only a row this teacher is shown, to a user inside their groups (separate groups fence).
+        if (!report::can_link($googlemeet, (int)$session->id, $attendanceid, $userid, (int)$USER->id)) {
+            throw new moodle_exception('invaliduser');
+        }
         service::link_manually($googlemeet, $attendanceid, $userid);
         $message = get_string($userid ? 'attendance_linked' : 'attendance_unlinked', 'googlemeet');
         $type = \core\output\notification::NOTIFY_SUCCESS;
@@ -93,7 +106,7 @@ if ($action === 'link' && $session) {
     redirect(new moodle_url($baseurl, ['session' => $session->id]), $message, null, $type);
 }
 
-$rows = $session ? report::session_rows($googlemeet, (int)$session->id) : [];
+$rows = $session ? report::session_rows($googlemeet, (int)$session->id, null, (int)$USER->id) : [];
 
 if ($download !== '' && $session) {
     $table = report::export_table($rows, $context);
@@ -181,11 +194,15 @@ if ($session) {
         . ($sync && $sync->status === service::STATUS_ERROR && $sync->message !== null
             ? ' · ' . s(shorten_text($sync->message, 200)) : ''));
 
-    $refetchurl = new moodle_url($baseurl, ['session' => $session->id, 'action' => 'refetch', 'sesskey' => sesskey()]);
-    echo html_writer::div(
-        html_writer::link($refetchurl, get_string('attendance_refetch', 'googlemeet'), ['class' => 'btn btn-secondary me-2']),
-        'mb-3'
-    );
+    if ($canmanage) {
+        // A POST form: single_button adds the sesskey.
+        $refetch = new single_button(
+            new moodle_url($baseurl, ['session' => $session->id, 'action' => 'refetch']),
+            get_string('attendance_refetch', 'googlemeet'),
+            'post'
+        );
+        echo html_writer::div($OUTPUT->render($refetch), 'mb-3');
+    }
 
     if ($rows) {
         echo $OUTPUT->download_dataformat_selector(
@@ -195,7 +212,7 @@ if ($session) {
             ['id' => $cm->id, 'session' => $session->id]
         );
 
-        $candidates = service::get_candidates($googlemeet);
+        $candidates = $canmanage ? report::link_candidates($googlemeet, (int)$USER->id) : [];
         $options = [0 => get_string('attendance_link_choose', 'googlemeet')];
         foreach ($candidates as $user) {
             $options[$user->id] = s(fullname($user));
@@ -214,7 +231,8 @@ if ($session) {
         ];
         foreach ($rows as $row) {
             $name = s($row['name']);
-            if ($row['kind'] === report::ROW_UNMATCHED) {
+            // The link and unlink controls are writes: only for mod/googlemeet:manageattendance.
+            if ($canmanage && $row['kind'] === report::ROW_UNMATCHED) {
                 $form = html_writer::start_tag('form', ['method' => 'post', 'action' => $baseurl->out(false),
                     'class' => 'd-flex flex-wrap gap-1 mt-1 googlemeet-attendance-link']);
                 foreach (
@@ -239,7 +257,7 @@ if ($session) {
                 );
                 $form .= html_writer::end_tag('form');
                 $name .= $form;
-            } else if ($row['kind'] === report::ROW_PRESENT && $row['attendanceid']) {
+            } else if ($canmanage && $row['kind'] === report::ROW_PRESENT && $row['attendanceid']) {
                 // Undo a wrong (automatic or manual) match: the participant goes back to "not matched"
                 // and stays so on later fetches.
                 $form = html_writer::start_tag('form', ['method' => 'post', 'action' => $baseurl->out(false),

@@ -72,14 +72,36 @@ class sync_manager {
     }
 
     /**
+     * Whether a user may ask for a manual sync and follow its status.
+     *
+     * The sync panel belongs to the recordings editing UI (mod/googlemeet:editrecording), and the task
+     * runs googlemeet_sync_recordings() as this user, which requires mod/googlemeet:syncgoogledrive.
+     *
+     * @param \context_module $context Module context.
+     * @param int|null $userid User (defaults to the current user).
+     * @return bool
+     */
+    public static function can_request(\context_module $context, ?int $userid = null): bool {
+        return has_capability('mod/googlemeet:editrecording', $context, $userid)
+            && has_capability('mod/googlemeet:syncgoogledrive', $context, $userid);
+    }
+
+    /**
      * Queue a manual sync unless one is already queued/running for this activity.
+     *
+     * The user must hold mod/googlemeet:syncgoogledrive, which the task's Drive sync requires: checked
+     * here so the request fails at once instead of a queued task failing later.
      *
      * @param stdClass $googlemeet Activity record.
      * @param int $userid Teacher whose Google token is used.
      * @return bool True when a new task was queued, false when one was already pending or the queue
      *     lock was not obtained within 5 seconds.
+     * @throws \required_capability_exception When the user lacks mod/googlemeet:syncgoogledrive.
      */
     public static function request(stdClass $googlemeet, int $userid): bool {
+        $cm = get_coursemodule_from_instance('googlemeet', $googlemeet->id, 0, false, MUST_EXIST);
+        require_capability('mod/googlemeet:syncgoogledrive', \context_module::instance($cm->id), $userid);
+
         // Serialise concurrent clicks (two tabs, double click) on the check-then-insert.
         $lockfactory = \core\lock\lock_config::get_lock_factory('mod_googlemeet');
         $lock = $lockfactory->get_lock('syncqueue_' . $googlemeet->id, 5);

@@ -76,6 +76,8 @@ function googlemeet_handle_view_actions($googlemeet, $cm, $course) {
     $sync = optional_param('sync', 0, PARAM_BOOL);
     // Sync is a write: POST only, on top of the sesskey check.
     if ($sync && confirm_sesskey() && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
+        // The queued task syncs as this user, which requires syncgoogledrive: fail now, not in cron.
+        require_capability('mod/googlemeet:syncgoogledrive', $context);
         // No-JS fallback of the async button. Only queue the background sync (the page polls its
         // status when JS is on); never run Google calls inside the request.
         $redirecturl = new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]);
@@ -1343,6 +1345,7 @@ function googlemeet_print_recordings(
         $loginhtml = '';
         $syncbutton = '';
         $islogged = false;
+        $cansync = \mod_googlemeet\local\sync_manager::can_request($context);
         $isloggedcreatoremail = $client->get_email() === $googlemeet->creatoremail;
         if (!$client->check_login()) {
             $loginhtml = $client->print_login_popup();
@@ -1350,10 +1353,12 @@ function googlemeet_print_recordings(
             $islogged = true;
             $loginhtml = $client->print_user_info('drive');
 
-            $url = new moodle_url($PAGE->url);
-            $url->param('sync', true);
-            $syncbutton = new single_button($url, get_string('syncwithgoogledrive', 'googlemeet'), 'post', true);
-            $syncbutton = $OUTPUT->render($syncbutton);
+            if ($cansync) {
+                $url = new moodle_url($PAGE->url);
+                $url->param('sync', true);
+                $syncbutton = new single_button($url, get_string('syncwithgoogledrive', 'googlemeet'), 'post', true);
+                $syncbutton = $OUTPUT->render($syncbutton);
+            }
         }
 
         $syncstatus = \mod_googlemeet\local\sync_manager::get_status($googlemeet);
@@ -1368,6 +1373,7 @@ function googlemeet_print_recordings(
             'login' => $loginhtml,
             'islogged' => $islogged,
             'syncbutton' => $syncbutton,
+            'cansync' => $cansync,
             'isloggedcreatoremail' => $isloggedcreatoremail,
         ]);
     }
