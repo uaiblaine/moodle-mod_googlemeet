@@ -630,9 +630,13 @@ class mod_googlemeet_external extends external_api {
         $recording = $DB->get_record(
             'googlemeet_recordings',
             ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
-            'id, transcripttext',
-            MUST_EXIST
+            'id, visible, transcripttext',
+            IGNORE_MISSING
         );
+        // A hidden recording is indistinguishable from a missing one for users who cannot edit recordings.
+        if (!$recording || (empty($recording->visible) && !has_capability('mod/googlemeet:editrecording', $context))) {
+            throw new \moodle_exception('recordingnotfound', 'googlemeet');
+        }
 
         $aiservice = new \mod_googlemeet\ai_service();
         $analysis = $aiservice->get_analysis($recordingid);
