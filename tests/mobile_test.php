@@ -107,6 +107,9 @@ final class mobile_test extends \advanced_testcase {
         $this->create_recording(99, 0);
         $DB->insert_record('googlemeet_recording_progress', (object)['recordingid' => $ids[22], 'userid' => $this->student->id,
             'watchedseconds' => 600, 'completed' => 1, 'timecreated' => time(), 'timemodified' => time()]);
+        // Marked as viewed by hand, without measured time: the student still sees it as watched.
+        $DB->insert_record('googlemeet_recording_progress', (object)['recordingid' => $ids[21], 'userid' => $this->student->id,
+            'watchedseconds' => 0, 'completed' => 0, 'markedviewed' => 1, 'timecreated' => time(), 'timemodified' => time()]);
 
         $this->setUser($this->student);
         $result = mobile::mobile_course_view($this->args());
@@ -131,7 +134,8 @@ final class mobile_test extends \advanced_testcase {
         // Newest first: the last created (watched) class leads the list.
         $this->assertSame($ids[22], $page['recordings'][0]['id']);
         $this->assertTrue($page['recordings'][0]['watched']);
-        $this->assertFalse($page['recordings'][1]['watched']);
+        $this->assertTrue($page['recordings'][1]['watched']);
+        $this->assertFalse($page['recordings'][2]['watched']);
         // Titles come from the lesson display-title logic.
         $titles = googlemeet_get_lesson_titles($this->googlemeet, false);
         $this->assertSame(format_string($titles[$ids[22]]['title']), $page['recordings'][0]['title']);

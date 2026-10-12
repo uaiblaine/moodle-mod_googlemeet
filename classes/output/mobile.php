@@ -131,10 +131,10 @@ class mobile {
             [$insql, $inparams] = $DB->get_in_or_equal(array_column($recordings, 'id'), SQL_PARAMS_NAMED);
             $watched = $DB->get_records_select_menu(
                 'googlemeet_recording_progress',
-                "userid = :userid AND completed = 1 AND recordingid $insql",
+                "userid = :userid AND (completed = 1 OR markedviewed = 1) AND recordingid $insql",
                 ['userid' => $USER->id] + $inparams,
                 '',
-                'recordingid, completed'
+                'recordingid, id'
             );
         }
 
@@ -288,9 +288,10 @@ class mobile {
             }
         }
 
-        $watched = (bool)$DB->get_field(
+        // The student's "Viewed" mark: measured completion or their own "Mark as watched".
+        $watched = $DB->record_exists_select(
             'googlemeet_recording_progress',
-            'completed',
+            'recordingid = :recordingid AND userid = :userid AND (completed = 1 OR markedviewed = 1)',
             ['recordingid' => $recording->id, 'userid' => $USER->id]
         );
 

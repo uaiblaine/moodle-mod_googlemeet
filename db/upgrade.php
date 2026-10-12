@@ -753,5 +753,18 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101191, 'googlemeet');
     }
 
+    if ($oldversion < 2026101203) {
+        // From now on the "Mark as viewed" button only sets markedviewed, and completed means
+        // measured viewing time. Existing rows are grandfathered: no data is migrated, so a
+        // completed flag the button set before this step keeps counting and no completion is revoked.
+        $table = new xmldb_table('googlemeet_recording_progress');
+        $field = new xmldb_field('markedviewed', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'completed');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+
+        upgrade_mod_savepoint(true, 2026101203, 'googlemeet');
+    }
+
     return true;
 }

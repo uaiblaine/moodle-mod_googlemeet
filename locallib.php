@@ -755,6 +755,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
                    r.webviewlink,
                    grp.watchedseconds AS userwatchedseconds,
                    grp.completed AS usercompleted,
+                   grp.markedviewed AS usermarkedviewed,
                    a.summary,
                    a.reviewed AS aireviewed
               FROM {googlemeet_recordings} r
@@ -765,6 +766,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
                {$visiblewhere}
                AND grp.userid = :userid
                AND grp.completed = 0
+               AND grp.markedviewed = 0
                AND grp.watchedseconds > 0
           ORDER BY grp.timemodified DESC, r.createdtime DESC";
     $records = $DB->get_records_sql($sql, $params, 0, 1);
@@ -779,6 +781,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
                        r.webviewlink,
                        grp.watchedseconds AS userwatchedseconds,
                        grp.completed AS usercompleted,
+                       grp.markedviewed AS usermarkedviewed,
                        a.summary,
                        a.reviewed AS aireviewed
                   FROM {googlemeet_recordings} r
@@ -788,7 +791,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
                  WHERE r.googlemeetid = :googlemeetid
                    AND r.deleted = 0
                    {$visiblewhere}
-                   AND (grp.id IS NULL OR grp.completed = 0)
+                   AND (grp.id IS NULL OR (grp.completed = 0 AND grp.markedviewed = 0))
               ORDER BY r.createdtime DESC, r.id DESC";
         $records = $DB->get_records_sql($sql, $params, 0, 1);
         $recording = reset($records);
@@ -812,6 +815,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
         $progress = (object) [
             'watchedseconds' => (int)($recording->userwatchedseconds ?? 0),
             'completed' => (int)($recording->usercompleted ?? 0),
+            'markedviewed' => (int)($recording->usermarkedviewed ?? 0),
         ];
     }
     $progressstate = googlemeet_recording_progress_state($recording, $progress);
@@ -848,14 +852,16 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
 /**
  * The current user's viewing progress over the visible recordings of an activity (cached per request).
  *
- * "watched" counts completed recordings and "started" those with viewing time but not completed,
- * the same split as the per-lesson badges of googlemeet_recording_progress_state(), so the hero
- * summary never contradicts them.
+ * "watched" counts the recordings the user sees as viewed (measured completion or their own
+ * "Mark as viewed") and "started" those with viewing time but not viewed, the same split as the
+ * per-lesson badges of googlemeet_recording_progress_state(), so the hero summary never
+ * contradicts them. Activity completion counts measured completion only
+ * ({@see \mod_googlemeet\completion\custom_completion::count_watched()}), so the two may differ.
  *
  * @param stdClass $googlemeet Activity record.
  * @param context_module $context Module context.
  * @return array ['total' => int, 'watched' => int, 'started' => int, 'pending' => int, 'pct' => int,
- *     'startedpct' => int, 'completedids' => int[]]
+ *     'startedpct' => int, 'viewedids' => int[]]
  */
 function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $context): array {
     global $DB, $USER;
@@ -872,19 +878,20 @@ function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $c
           WHERE r.googlemeetid = :googlemeetid AND r.deleted = 0 {$visiblewhere}",
         $params
     );
-    $completedids = array_map('intval', $DB->get_fieldset_sql(
+    $viewedids = array_map('intval', $DB->get_fieldset_sql(
         "SELECT r.id
            FROM {googlemeet_recordings} r
-           JOIN {googlemeet_recording_progress} p ON p.recordingid = r.id AND p.userid = :userid AND p.completed = 1
+           JOIN {googlemeet_recording_progress} p ON p.recordingid = r.id AND p.userid = :userid
+                AND (p.completed = 1 OR p.markedviewed = 1)
           WHERE r.googlemeetid = :googlemeetid AND r.deleted = 0 {$visiblewhere}",
         $params
     ));
-    $watched = count($completedids);
+    $watched = count($viewedids);
     $started = (int)$DB->count_records_sql(
         "SELECT COUNT(1)
            FROM {googlemeet_recordings} r
            JOIN {googlemeet_recording_progress} p ON p.recordingid = r.id AND p.userid = :userid
-                AND p.completed = 0 AND p.watchedseconds > 0
+                AND p.completed = 0 AND p.markedviewed = 0 AND p.watchedseconds > 0
           WHERE r.googlemeetid = :googlemeetid AND r.deleted = 0 {$visiblewhere}",
         $params
     );
@@ -898,7 +905,7 @@ function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $c
         'pct' => $pct,
         // Capped so that both segments of the stacked bar never add up to more than 100%.
         'startedpct' => $total > 0 ? min(100 - $pct, (int)round($started * 100 / $total)) : 0,
-        'completedids' => $completedids,
+        'viewedids' => $viewedids,
     ];
     return $cache[$key];
 }
@@ -997,7 +1004,7 @@ function googlemeet_get_recordings_student_stats(context_module $context, array 
  * @param string|null $orderoverride Optional order override from URL parameter.
  * @param string $query Free-text search.
  * @param string $topic Topic filter.
- * @param bool $pendingonly Only recordings the current user has not completed (ignored with editrecording).
+ * @param bool $pendingonly Only recordings the current user has not viewed (ignored with editrecording).
  * @return void
  */
 function googlemeet_print_recordings(
@@ -1084,9 +1091,9 @@ function googlemeet_print_recordings(
     $showprogresssummary = !$hascapability && $progresssummary['total'] > 0;
     $pendingonly = $pendingonly && $showprogresssummary;
     if ($pendingonly) {
-        $completed = array_flip($progresssummary['completedids']);
-        $allrecordings = array_values(array_filter($allrecordings, static function ($recording) use ($completed) {
-            return !isset($completed[(int)$recording->id]);
+        $viewed = array_flip($progresssummary['viewedids']);
+        $allrecordings = array_values(array_filter($allrecordings, static function ($recording) use ($viewed) {
+            return !isset($viewed[(int)$recording->id]);
         }));
     }
 
@@ -1103,7 +1110,7 @@ function googlemeet_print_recordings(
         }, $recordings);
         [$insql, $inparams] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED, 'progressid');
         $progressbyrecording = $DB->get_records_sql(
-            "SELECT recordingid, watchedseconds, completed
+            "SELECT recordingid, watchedseconds, completed, markedviewed
                FROM {googlemeet_recording_progress}
               WHERE userid = :userid
                 AND recordingid {$insql}",
@@ -1514,7 +1521,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
     $progress = $DB->get_record(
         'googlemeet_recording_progress',
         ['recordingid' => $recording->id, 'userid' => $USER->id],
-        'watchedseconds,completed'
+        'watchedseconds,completed,markedviewed'
     );
     $progressstate = googlemeet_recording_progress_state($recording, $progress ?: null);
     $canembed = googlemeet_recording_can_embed((string)$recording->webviewlink);

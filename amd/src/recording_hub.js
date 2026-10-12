@@ -71,8 +71,12 @@ const stringRequests = [
 let initialised = false;
 let settings = {};
 let strings = {};
+// The completed flag is measured completion only (what activity completion counts) and is the one
+// that stops the heartbeat; markedviewed is the student's own "Mark as viewed". The badge and the
+// button show the recording as viewed when either is set (see isViewed()).
 let progress = {
     completed: false,
+    markedviewed: false,
     watchedseconds: 0,
     thresholdseconds: 480,
     pendingseconds: 0,
@@ -236,6 +240,13 @@ const call = (methodname, args) => Ajax.call([{methodname: methodname, args: arg
 const pageIsVisible = () => !document.visibilityState || document.visibilityState === 'visible';
 
 /**
+ * Whether the student sees the recording as viewed: measured completion or a manual mark.
+ *
+ * @returns {boolean}
+ */
+const isViewed = () => progress.completed || progress.markedviewed;
+
+/**
  * Label and percent for the current progress state.
  *
  * @returns {Object}
@@ -244,7 +255,7 @@ const currentProgressState = () => {
     let label = strings.recording_progress_unseen;
     let percent = 0;
 
-    if (progress.completed) {
+    if (isViewed()) {
         label = strings.recording_progress_completed;
         percent = 100;
     } else if (progress.watchedseconds > 0) {
@@ -269,7 +280,7 @@ const refreshProgressUi = () => {
     const aria = (strings.recording_progress_aria || '{$a}').replace('{$a}', state.label);
 
     let badgeclass = 'googlemeet-progress-badge-unseen';
-    if (progress.completed) {
+    if (isViewed()) {
         badgeclass = 'googlemeet-progress-badge-completed';
     } else if (progress.watchedseconds > 0) {
         badgeclass = 'googlemeet-progress-badge-partial';
@@ -279,12 +290,12 @@ const refreshProgressUi = () => {
         .removeClass('googlemeet-progress-badge-completed googlemeet-progress-badge-partial googlemeet-progress-badge-unseen')
         .addClass(badgeclass)
         .attr('aria-label', aria);
-    badge.find('[aria-hidden="true"]').text(progress.completed ? '\u2713' : '\u25cb');
+    badge.find('[aria-hidden="true"]').text(isViewed() ? '\u2713' : '\u25cb');
     badge.find('.googlemeet-progress-status-text').text(state.label);
     meter.attr('aria-valuenow', state.percent);
     bar.css('width', state.percent + '%');
 
-    if (progress.completed) {
+    if (isViewed()) {
         button.prop('disabled', true).text(strings.recording_progress_completed)
             .removeClass('btn-primary').addClass('btn-outline-success');
     } else {
@@ -317,7 +328,8 @@ const collectVisibleSeconds = () => {
  * Persist one progress heartbeat.
  *
  * @param {number} delta Seconds to add.
- * @param {boolean} completed Whether to mark completed.
+ * @param {boolean} completed Whether the student marks the recording as viewed (the web service's
+ *     completed parameter; it never counts towards activity completion).
  * @param {boolean} silent Whether errors should stay silent.
  * @returns {Promise}
  */
@@ -338,6 +350,7 @@ const sendProgress = (delta, completed, silent) => {
     }])[0].then(response => {
         progress.watchedseconds = parseInt(response.watchedseconds, 10) || 0;
         progress.completed = !!response.completed;
+        progress.markedviewed = !!response.markedviewed;
         refreshProgressUi();
         return;
     }).fail(error => {
@@ -381,7 +394,10 @@ const bindRecordingProgress = () => {
         return;
     }
 
-    progress.completed = !!settings.progresscompleted;
+    progress.completed = !!settings.progressmeasuredcompleted;
+    // The page only says whether the recording shows as viewed; without measured completion that
+    // can only come from a manual mark.
+    progress.markedviewed = !!settings.progresscompleted;
     progress.watchedseconds = Math.max(0, parseInt(settings.progresswatchedseconds, 10) || 0);
     progress.thresholdseconds = Math.max(30, parseInt(settings.progressthresholdseconds, 10) || 480);
     progress.pendingseconds = 0;
@@ -389,7 +405,7 @@ const bindRecordingProgress = () => {
     refreshProgressUi();
 
     $('.googlemeet-mark-viewed').on('click', function() {
-        if (progress.completed) {
+        if (isViewed()) {
             return;
         }
 
@@ -1841,7 +1857,8 @@ const bindKeypointChecklist = () => {
  * @param {boolean} config.caneditrecording Whether recording actions are available.
  * @param {boolean} config.canmanagequestions Whether question management is available.
  * @param {boolean} config.hasquestions Whether questions exist for the recording.
- * @param {boolean} config.progresscompleted Whether this user already completed the recording.
+ * @param {boolean} config.progresscompleted Whether this user sees the recording as viewed (measured or marked).
+ * @param {boolean} config.progressmeasuredcompleted Whether measured viewing time completed the recording.
  * @param {number} config.progresswatchedseconds Accumulated heartbeat seconds.
  * @param {number} config.progressthresholdseconds Completion threshold in seconds.
  * @returns {void}
@@ -1859,6 +1876,7 @@ export const init = config => {
         canmanagequestions: !!config.canmanagequestions,
         hasquestions: !!config.hasquestions,
         progresscompleted: !!config.progresscompleted,
+        progressmeasuredcompleted: !!config.progressmeasuredcompleted,
         progresswatchedseconds: parseInt(config.progresswatchedseconds, 10) || 0,
         progressthresholdseconds: parseInt(config.progressthresholdseconds, 10) || 480,
     };

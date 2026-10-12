@@ -860,14 +860,19 @@ function googlemeet_recording_completion_threshold(?string $duration): int {
 /**
  * Build template fields for one user's progress on a recording.
  *
+ * The student's "Viewed" state (progresscompleted) is measured completion OR the student's own
+ * "Mark as viewed" (markedviewed). Only progressmeasuredcompleted, the measured flag, is what the
+ * completion rules count; the recording hub keeps its heartbeat running until that one is set.
+ *
  * @param stdClass $recording Recording object with at least duration.
- * @param stdClass|null $progress Progress row, if it exists.
+ * @param stdClass|null $progress Progress row with watchedseconds, completed and markedviewed, if it exists.
  * @return array Template-safe progress fields.
  */
 function googlemeet_recording_progress_state(stdClass $recording, ?stdClass $progress): array {
     $threshold = googlemeet_recording_completion_threshold($recording->duration ?? '');
     $watchedseconds = $progress ? max(0, (int)$progress->watchedseconds) : 0;
-    $completed = $progress ? !empty($progress->completed) : false;
+    $measuredcompleted = $progress && !empty($progress->completed);
+    $completed = $measuredcompleted || ($progress && !empty($progress->markedviewed));
     $percent = 0;
 
     if ($completed) {
@@ -894,6 +899,7 @@ function googlemeet_recording_progress_state(stdClass $recording, ?stdClass $pro
         'progressbarstyle' => 'width: ' . $percent . '%;',
         'showprogressbar' => $partial,
         'progresscompleted' => $completed,
+        'progressmeasuredcompleted' => $measuredcompleted,
         'progresspartial' => $partial,
         'progressunseen' => $unseen,
         'progressstatuslabel' => $label,
