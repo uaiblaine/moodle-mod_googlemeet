@@ -39,7 +39,6 @@ require_once($CFG->libdir . '/completionlib.php');
 #[CoversClass(custom_completion::class)]
 #[CoversClass(completion_updater::class)]
 final class custom_completion_test extends \advanced_testcase {
-
     /**
      * Course with completion and an activity with the given rules.
      *
@@ -131,8 +130,10 @@ final class custom_completion_test extends \advanced_testcase {
 
         $completion = new custom_completion($cminfo, (int)get_admin()->id);
         $this->assertEquals(['completionrecordings', 'completionpractice'], $completion->get_available_custom_rules());
-        $this->assertSame(['completionview', 'completionrecordings', 'completionwatchpercent', 'completionpractice'],
-            $completion->get_sort_order());
+        $this->assertSame(
+            ['completionview', 'completionrecordings', 'completionwatchpercent', 'completionpractice'],
+            $completion->get_sort_order()
+        );
         $descriptions = mod_googlemeet_get_completion_active_rule_descriptions($cminfo);
         $this->assertCount(2, $descriptions);
     }
@@ -151,12 +152,16 @@ final class custom_completion_test extends \advanced_testcase {
         $this->watch($trashed, $student->id);
 
         $this->assertSame(1, custom_completion::count_watched($googlemeet->id, $student->id));
-        $this->assertSame(COMPLETION_INCOMPLETE,
-            $this->completion_for($course, $cm, $student->id)->get_state('completionrecordings'));
+        $this->assertSame(
+            COMPLETION_INCOMPLETE,
+            $this->completion_for($course, $cm, $student->id)->get_state('completionrecordings')
+        );
 
         $this->watch($this->create_recording($googlemeet->id), $student->id);
-        $this->assertSame(COMPLETION_COMPLETE,
-            $this->completion_for($course, $cm, $student->id)->get_state('completionrecordings'));
+        $this->assertSame(
+            COMPLETION_COMPLETE,
+            $this->completion_for($course, $cm, $student->id)->get_state('completionrecordings')
+        );
     }
 
     /**
@@ -175,12 +180,16 @@ final class custom_completion_test extends \advanced_testcase {
         $this->create_recording($googlemeet->id, 0); // Hidden: not in the denominator.
 
         $this->watch($ids[0], $student->id);
-        $this->assertSame(COMPLETION_INCOMPLETE,
-            $this->completion_for($course, $cm, $student->id)->get_state('completionwatchpercent'));
+        $this->assertSame(
+            COMPLETION_INCOMPLETE,
+            $this->completion_for($course, $cm, $student->id)->get_state('completionwatchpercent')
+        );
 
         $this->watch($ids[1], $student->id);
-        $this->assertSame(COMPLETION_COMPLETE,
-            $this->completion_for($course, $cm, $student->id)->get_state('completionwatchpercent'));
+        $this->assertSame(
+            COMPLETION_COMPLETE,
+            $this->completion_for($course, $cm, $student->id)->get_state('completionwatchpercent')
+        );
     }
 
     /**
@@ -193,12 +202,16 @@ final class custom_completion_test extends \advanced_testcase {
         practice_attempts::record($googlemeet->id, $recordingid, 101, $student->id, false);
         practice_attempts::record($googlemeet->id, $recordingid, 101, $student->id, true);
         $this->assertSame(1, custom_completion::count_answered_questions($googlemeet->id, $student->id));
-        $this->assertSame(COMPLETION_INCOMPLETE,
-            $this->completion_for($course, $cm, $student->id)->get_state('completionpractice'));
+        $this->assertSame(
+            COMPLETION_INCOMPLETE,
+            $this->completion_for($course, $cm, $student->id)->get_state('completionpractice')
+        );
 
         practice_attempts::record($googlemeet->id, $recordingid, 102, $student->id, false);
-        $this->assertSame(COMPLETION_COMPLETE,
-            $this->completion_for($course, $cm, $student->id)->get_state('completionpractice'));
+        $this->assertSame(
+            COMPLETION_COMPLETE,
+            $this->completion_for($course, $cm, $student->id)->get_state('completionpractice')
+        );
     }
 
     /**

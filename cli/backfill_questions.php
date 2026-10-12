@@ -34,7 +34,7 @@ require_once($CFG->libdir . '/clilib.php');
 /** Seconds to wait before each retry of a transient Gemini failure; one retry per entry. */
 const GOOGLEMEET_BACKFILL_BACKOFF = [30, 120, 300];
 
-list($options, $unrecognized) = cli_get_params([
+[$options, $unrecognized] = cli_get_params([
     'googlemeetid' => 0,
     'recordingid' => 0,
     'limit' => 0,

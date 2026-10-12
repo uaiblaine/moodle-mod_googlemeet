@@ -38,7 +38,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class ai_review {
-
     /** @var string Capability that lets a user see unreviewed content and publish it. */
     const CAPABILITY = 'mod/googlemeet:editrecording';
 
@@ -241,8 +240,11 @@ class ai_review {
             // Version of the content on screen, so publishing never approves a newer rewrite.
             'aireviewseen' => $analysis ? (int)($analysis->timemodified ?? 0) : 0,
             'aistatusisstuck' => $stuck,
-            'aistuckmessage' => $stuck ? get_string('ai_status_stuck', 'googlemeet',
-                (int)round(\mod_googlemeet\ai_service::get_stuck_threshold() / MINSECS)) : '',
+            'aistuckmessage' => $stuck ? get_string(
+                'ai_status_stuck',
+                'googlemeet',
+                (int)round(\mod_googlemeet\ai_service::get_stuck_threshold() / MINSECS)
+            ) : '',
         ];
     }
 

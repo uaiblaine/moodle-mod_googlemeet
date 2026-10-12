@@ -27,7 +27,6 @@
  * Behat data generator for mod_googlemeet entities.
  */
 class behat_mod_googlemeet_generator extends behat_generator_base {
-
     /**
      * Entities the "the following mod_googlemeet ... exist" step can create.
      *

@@ -28,7 +28,6 @@ namespace mod_googlemeet\local;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class ops_status {
-
     /** @var int Look-back window for failures. */
     public const WINDOW_DAYS = 7;
 
@@ -59,11 +58,14 @@ class ops_status {
         $max = max(1, (int)get_config('googlemeet', 'maxsyncattempts'));
 
         $rows = [];
-        $logs = $DB->get_records_select(sync_log::TABLE,
+        $logs = $DB->get_records_select(
+            sync_log::TABLE,
             'kind = :kind AND timequeued >= :since AND status IN (:s1, :s2, :s3)',
             ['kind' => sync_log::KIND_AUTO, 'since' => $since, 's1' => sync_log::STATUS_ERROR,
                 's2' => sync_log::STATUS_EXHAUSTED, 's3' => sync_log::STATUS_RETRY],
-            'id ASC', 'id, googlemeetid, status, timequeued, message');
+            'id ASC',
+            'id, googlemeetid, status, timequeued, message'
+        );
         foreach ($logs as $log) {
             $row = self::row($rows, (int)$log->googlemeetid);
             $row->failedruns++;
@@ -76,7 +78,8 @@ class ops_status {
             "SELECT googlemeetid, COUNT(1) AS n
                FROM {googlemeet_events}
               WHERE autosynced = 0 AND syncattempts > 0
-           GROUP BY googlemeetid");
+           GROUP BY googlemeetid"
+        );
         foreach ($retrying as $r) {
             self::row($rows, (int)$r->googlemeetid)->retrying = (int)$r->n;
         }
@@ -84,7 +87,9 @@ class ops_status {
             "SELECT googlemeetid, COUNT(1) AS n
                FROM {googlemeet_events}
               WHERE autosynced >= :since AND syncattempts >= :max
-           GROUP BY googlemeetid", ['since' => $since, 'max' => $max]);
+           GROUP BY googlemeetid",
+            ['since' => $since, 'max' => $max]
+        );
         foreach ($exhausted as $r) {
             self::row($rows, (int)$r->googlemeetid)->exhausted = (int)$r->n;
         }
@@ -114,9 +119,11 @@ class ops_status {
             return false;
         }
         // Without log history (older runs) trust the events table.
-        return !$DB->record_exists_select(sync_log::TABLE,
+        return !$DB->record_exists_select(
+            sync_log::TABLE,
             'googlemeetid = :id AND kind = :kind AND status = :status AND timequeued >= :since',
-            ['id' => $googlemeetid, 'kind' => sync_log::KIND_AUTO, 'status' => sync_log::STATUS_SUCCESS, 'since' => $since]);
+            ['id' => $googlemeetid, 'kind' => sync_log::KIND_AUTO, 'status' => sync_log::STATUS_SUCCESS, 'since' => $since]
+        );
     }
 
     /**
@@ -153,7 +160,9 @@ class ops_status {
                JOIN {course} c ON c.id = gm.course
                JOIN {modules} m ON m.name = :modname
                JOIN {course_modules} cm ON cm.instance = gm.id AND cm.module = m.id
-              WHERE gm.id {$insql}", $params);
+              WHERE gm.id {$insql}",
+            $params
+        );
         $result = [];
         foreach ($rows as $id => $row) {
             if (!isset($activities[$id])) {
@@ -192,7 +201,9 @@ class ops_status {
            ORDER BY a.timemodified ASC",
             ['modname' => 'googlemeet', 'processing' => 'processing', 'pending' => 'pending',
                 't1' => $now - \mod_googlemeet\ai_service::get_stuck_threshold(), 't2' => $now - self::STUCK_PENDING_SECONDS],
-            0, 200);
+            0,
+            200
+        );
     }
 
     /**
@@ -210,7 +221,10 @@ class ops_status {
                JOIN {modules} m ON m.name = :modname
                JOIN {course_modules} cm ON cm.instance = gm.id AND cm.module = m.id
            ORDER BY COALESCE(gm.lastsync, 0) ASC, gm.id ASC",
-            ['modname' => 'googlemeet'], 0, self::LAST_SYNC_LIMIT);
+            ['modname' => 'googlemeet'],
+            0,
+            self::LAST_SYNC_LIMIT
+        );
         if (!$activities) {
             return [];
         }
@@ -224,7 +238,9 @@ class ops_status {
                JOIN (SELECT googlemeetid, kind, MAX(id) AS maxid
                        FROM {" . sync_log::TABLE . "}
                       WHERE googlemeetid {$insql} AND kind IN (:k1, :k2)
-                   GROUP BY googlemeetid, kind) x ON x.maxid = l.id", $params);
+                   GROUP BY googlemeetid, kind) x ON x.maxid = l.id",
+            $params
+        );
         foreach ($activities as $activity) {
             $activity->manualstatus = '';
             $activity->manualtime = 0;
@@ -257,6 +273,10 @@ class ops_status {
               WHERE l.kind IN (:k1, :k2) AND l.status = :status AND l.timequeued >= :since
            ORDER BY l.timequeued DESC",
             ['modname' => 'googlemeet', 'k1' => sync_log::KIND_CALENDAR_UPDATE, 'k2' => sync_log::KIND_CALENDAR_DELETE,
-                'status' => sync_log::STATUS_ERROR, 'since' => $now - self::WINDOW_DAYS * DAYSECS], 0, 200);
+            'status' => sync_log::STATUS_ERROR,
+            'since' => $now - self::WINDOW_DAYS * DAYSECS],
+            0,
+            200
+        );
     }
 }

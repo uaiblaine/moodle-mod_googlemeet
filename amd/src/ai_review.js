@@ -50,23 +50,29 @@ const setBusy = (button, busy) => {
  */
 const publish = (button, cmid, recordingid, seen) => {
     setBusy(button, true);
+    // Set when the server reports a newer rewrite: the alert is followed by a reload.
+    let changed = false;
     return Ajax.call([{
         methodname: 'mod_googlemeet_review_ai_analysis',
         args: {coursemoduleid: cmid, recordingid: recordingid, seen: seen || 0},
     }])[0].then(result => {
         if (result.changed) {
             // A retry or regeneration rewrote the summary after this page was loaded: show the new text.
-            return getString('aireview_publish_changed', 'mod_googlemeet')
-                .then(Notification.alert)
-                .then(() => window.location.reload());
+            changed = true;
+            return getString('aireview_publish_changed', 'mod_googlemeet');
         }
         if (!result.success) {
             setBusy(button, false);
-            return getString('aireview_publish_failed', 'mod_googlemeet').then(Notification.alert);
+            return getString('aireview_publish_failed', 'mod_googlemeet');
         }
         // The page shows (or hides) content according to the review state: reload to reflect it.
         window.location.reload();
-        return result;
+        return null;
+    }).then(message => (message === null ? null : Notification.alert(message))).then(() => {
+        if (changed) {
+            window.location.reload();
+        }
+        return null;
     }).catch(error => {
         setBusy(button, false);
         Notification.exception(error);

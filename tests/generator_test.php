@@ -26,7 +26,6 @@ namespace mod_googlemeet;
  * @covers      \mod_googlemeet_generator
  */
 final class generator_test extends \advanced_testcase {
-
     /**
      * Recordings and AI analyses can be generated and linked.
      */

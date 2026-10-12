@@ -38,7 +38,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 #[CoversFunction('googlemeet_list_recordings')]
 #[CoversFunction('googlemeet_print_recording_hub')]
 final class ai_stuck_test extends \advanced_testcase {
-
     /** @var \stdClass */
     private $course;
     /** @var \stdClass */
@@ -161,7 +160,7 @@ final class ai_stuck_test extends \advanced_testcase {
         $context = \context_module::instance($this->cm->id);
         $recording = $GLOBALS['DB']->get_record('googlemeet_recordings', ['id' => $stuck->recordingid]);
 
-        $render = function() use ($context, $recording) {
+        $render = function () use ($context, $recording) {
             global $PAGE;
             $PAGE = new \moodle_page();
             $PAGE->set_url('/mod/googlemeet/view.php', ['id' => $this->cm->id, 'recording' => $recording->id]);

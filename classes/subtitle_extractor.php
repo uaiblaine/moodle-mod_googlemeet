@@ -16,6 +16,8 @@
 
 namespace mod_googlemeet;
 
+defined('MOODLE_INTERNAL') || die();
+
 // The curl class lives in lib/filelib.php, which is not autoloaded and is not always loaded in task runs.
 global $CFG;
 require_once($CFG->libdir . '/filelib.php');
@@ -34,7 +36,6 @@ require_once($CFG->libdir . '/filelib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class subtitle_extractor {
-
     /** @var string|null Path to the yt-dlp binary */
     private ?string $ytdlppath = null;
 

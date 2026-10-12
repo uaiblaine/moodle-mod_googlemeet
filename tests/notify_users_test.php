@@ -34,7 +34,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversFunction('googlemeet_get_users_to_notify')]
 final class notify_users_test extends \advanced_testcase {
-
     /**
      * Create a course with a googlemeet activity and one future event.
      *

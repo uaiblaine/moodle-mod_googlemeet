@@ -37,7 +37,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 #[CoversClass(notify_new_recordings::class)]
 #[CoversClass(process_autosync::class)]
 final class notify_new_recordings_test extends \advanced_testcase {
-
     /**
      * Course, activity, subscribed student, unsubscribed student and teacher.
      *
@@ -242,7 +241,7 @@ final class notify_new_recordings_test extends \advanced_testcase {
         $enrol = $DB->get_record('enrol', ['courseid' => $course->id, 'enrol' => 'manual']);
         enrol_get_plugin('manual')->unenrol_user($enrol, $teacher->id);
         process_autosync::notify_no_recording($googlemeet, $event, 3);
-        $recipients = array_map(static function($m) {
+        $recipients = array_map(static function ($m) {
             return (int)$m->useridto;
         }, $sink->get_messages());
         $this->assertSame(array_map('intval', array_keys(get_admins())), $recipients);

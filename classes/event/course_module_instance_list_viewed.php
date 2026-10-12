@@ -28,5 +28,4 @@ namespace mod_googlemeet\event;
  * The mod_googlemeet instance list viewed event class.
  */
 class course_module_instance_list_viewed extends \core\event\course_module_instance_list_viewed {
-
 }

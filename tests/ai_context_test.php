@@ -28,7 +28,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
  */
 #[CoversClass(gemini_client::class)]
 final class ai_context_test extends \advanced_testcase {
-
     /**
      * Build the video analysis prompt through reflection.
      *

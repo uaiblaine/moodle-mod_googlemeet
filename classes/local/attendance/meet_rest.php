@@ -24,7 +24,6 @@ namespace mod_googlemeet\local\attendance;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class meet_rest extends \core\oauth2\rest {
-
     /**
      * Define the functions of the rest API.
      *

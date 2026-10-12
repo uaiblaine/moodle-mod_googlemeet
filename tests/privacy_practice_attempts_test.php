@@ -35,7 +35,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
  */
 #[CoversClass(\mod_googlemeet\privacy\provider::class)]
 final class privacy_practice_attempts_test extends \core_privacy\tests\provider_testcase {
-
     /**
      * Two activities, two students with attempts.
      *
@@ -101,8 +100,10 @@ final class privacy_practice_attempts_test extends \core_privacy\tests\provider_
 
         // Export.
         provider::export_user_data(new approved_contextlist($u1, 'mod_googlemeet', [$ctx1->id]));
-        $data = writer::with_context($ctx1)->get_related_data([get_string('privacy:practiceattempts', 'googlemeet')],
-            'recording_' . $recs[$gm1->id]);
+        $data = writer::with_context($ctx1)->get_related_data(
+            [get_string('privacy:practiceattempts', 'googlemeet')],
+            'recording_' . $recs[$gm1->id]
+        );
         $this->assertCount(2, $data->attempts);
         $this->assertEquals(11, $data->attempts[0]['questionid']);
 

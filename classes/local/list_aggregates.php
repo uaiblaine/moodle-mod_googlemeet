@@ -31,7 +31,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class list_aggregates {
-
     /**
      * Number of published (ready) questions per recording, in one grouped query.
      *
@@ -44,8 +43,12 @@ class list_aggregates {
      * @param int[] $recordingids Recordings on the page.
      * @return int[] recordingid => count (missing ids mean 0).
      */
-    public static function published_question_counts(stdClass $googlemeet, stdClass $cm, \context_module $context,
-            array $recordingids): array {
+    public static function published_question_counts(
+        stdClass $googlemeet,
+        stdClass $cm,
+        \context_module $context,
+        array $recordingids
+    ): array {
         global $DB;
 
         if (!$recordingids) {
@@ -79,7 +82,9 @@ class list_aggregates {
                 AND ti.itemtype = :itemtype
                 AND qv.status = :readystatus
                 AND t.name {$insql}
-           GROUP BY t.name", $params);
+           GROUP BY t.name",
+            $params
+        );
 
         $counts = [];
         foreach ($rows as $row) {
@@ -166,12 +171,24 @@ class list_aggregates {
         $where = 'googlemeetid = :googlemeetid AND deleted = 0' . ($visibleonly ? ' AND visible = 1' : '');
         $fields = 'id, googlemeetid, name, createdtime';
 
-        $previous = $DB->get_records_select('googlemeet_recordings',
+        $previous = $DB->get_records_select(
+            'googlemeet_recordings',
             "{$where} AND (createdtime < :created1 OR (createdtime = :created2 AND id < :id))",
-            $params, 'createdtime DESC, id DESC', $fields, 0, 1);
-        $next = $DB->get_records_select('googlemeet_recordings',
+            $params,
+            'createdtime DESC, id DESC',
+            $fields,
+            0,
+            1
+        );
+        $next = $DB->get_records_select(
+            'googlemeet_recordings',
             "{$where} AND (createdtime > :created1 OR (createdtime = :created2 AND id > :id))",
-            $params, 'createdtime ASC, id ASC', $fields, 0, 1);
+            $params,
+            'createdtime ASC, id ASC',
+            $fields,
+            0,
+            1
+        );
 
         return [$previous ? reset($previous) : null, $next ? reset($next) : null];
     }

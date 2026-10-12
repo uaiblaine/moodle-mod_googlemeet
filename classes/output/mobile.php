@@ -42,7 +42,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mobile {
-
     /** @var int Classes per page in the app. */
     public const PERPAGE = 10;
 
@@ -130,9 +129,13 @@ class mobile {
         $watched = [];
         if ($recordings) {
             [$insql, $inparams] = $DB->get_in_or_equal(array_column($recordings, 'id'), SQL_PARAMS_NAMED);
-            $watched = $DB->get_records_select_menu('googlemeet_recording_progress',
+            $watched = $DB->get_records_select_menu(
+                'googlemeet_recording_progress',
                 "userid = :userid AND completed = 1 AND recordingid $insql",
-                ['userid' => $USER->id] + $inparams, '', 'recordingid, completed');
+                ['userid' => $USER->id] + $inparams,
+                '',
+                'recordingid, completed'
+            );
         }
 
         $items = [];
@@ -214,16 +217,28 @@ class mobile {
      * @return array
      */
     public static function materials(\context_module $context, int $recordingid): array {
-        $files = get_file_storage()->get_area_files($context->id, 'mod_googlemeet', 'recordingmaterial', $recordingid,
-            'filename', false);
+        $files = get_file_storage()->get_area_files(
+            $context->id,
+            'mod_googlemeet',
+            'recordingmaterial',
+            $recordingid,
+            'filename',
+            false
+        );
         $out = [];
         foreach ($files as $file) {
             $out[] = [
                 'filename' => $file->get_filename(),
                 'filepath' => $file->get_filepath(),
                 'filesize' => (int)$file->get_filesize(),
-                'fileurl' => \moodle_url::make_webservice_pluginfile_url($context->id, 'mod_googlemeet', 'recordingmaterial',
-                    $recordingid, $file->get_filepath(), $file->get_filename())->out(false),
+                'fileurl' => \moodle_url::make_webservice_pluginfile_url(
+                    $context->id,
+                    'mod_googlemeet',
+                    'recordingmaterial',
+                    $recordingid,
+                    $file->get_filepath(),
+                    $file->get_filename()
+                )->out(false),
                 'timemodified' => (int)$file->get_timemodified(),
                 'mimetype' => $file->get_mimetype(),
             ];
@@ -273,8 +288,11 @@ class mobile {
             }
         }
 
-        $watched = (bool)$DB->get_field('googlemeet_recording_progress', 'completed',
-            ['recordingid' => $recording->id, 'userid' => $USER->id]);
+        $watched = (bool)$DB->get_field(
+            'googlemeet_recording_progress',
+            'completed',
+            ['recordingid' => $recording->id, 'userid' => $USER->id]
+        );
 
         // Practice questions of this class only.
         $practicequestions = [];

@@ -30,7 +30,6 @@ use mod_googlemeet\local\calendar_sync;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class calendar_update_event extends \core\task\adhoc_task {
-
     /**
      * Task name.
      *

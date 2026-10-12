@@ -33,7 +33,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class sync_manager {
-
     /** @var int A queued/running row older than this no longer blocks a new request (lost task, dead cron). */
     public const STALE_SECONDS = 2 * HOURSECS;
 
@@ -94,8 +93,12 @@ class sync_manager {
             }
             $stale = sync_log::latest((int)$googlemeet->id, sync_log::KIND_MANUAL);
             if ($stale && in_array($stale->status, [sync_log::STATUS_QUEUED, sync_log::STATUS_RUNNING], true)) {
-                sync_log::finish((int)$stale->id, sync_log::STATUS_ERROR, null,
-                    get_string('sync_status_stale', 'googlemeet'));
+                sync_log::finish(
+                    (int)$stale->id,
+                    sync_log::STATUS_ERROR,
+                    null,
+                    get_string('sync_status_stale', 'googlemeet')
+                );
             }
 
             $logid = sync_log::start((int)$googlemeet->id, sync_log::KIND_MANUAL, sync_log::STATUS_QUEUED);
@@ -255,8 +258,10 @@ class sync_manager {
 
         $row = sync_log::latest((int)$googlemeet->id, sync_log::KIND_MANUAL);
         $status = $row ? (string)$row->status : 'none';
-        if ($row && in_array($status, [sync_log::STATUS_QUEUED, sync_log::STATUS_RUNNING], true)
-                && !self::get_active((int)$googlemeet->id)) {
+        if (
+            $row && in_array($status, [sync_log::STATUS_QUEUED, sync_log::STATUS_RUNNING], true)
+                && !self::get_active((int)$googlemeet->id)
+        ) {
             $status = sync_log::STATUS_ERROR;
             $row->message = get_string('sync_status_stale', 'googlemeet');
         }

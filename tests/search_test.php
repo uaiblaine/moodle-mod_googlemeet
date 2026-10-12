@@ -36,8 +36,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 #[CoversFunction('googlemeet_filter_recordings_by_topic')]
 #[CoversFunction('googlemeet_list_recordings')]
 #[CoversFunction('googlemeet_load_recording_search_content')]
-class search_test extends \advanced_testcase {
-
+final class search_test extends \advanced_testcase {
     /**
      * Build a minimal recording stdClass for pure filter tests.
      *

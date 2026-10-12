@@ -32,7 +32,7 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\process_ai_analysis',
@@ -41,7 +41,7 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\process_autosync',
@@ -50,7 +50,7 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\check_stale_recurrence',
@@ -59,7 +59,7 @@ $tasks = [
         'hour' => '4',
         'day' => '*',
         'dayofweek' => '1',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\purge_trash',
@@ -68,7 +68,7 @@ $tasks = [
         'hour' => '3',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     // No-op unless googlemeet/attendanceenabled is on.
     [
@@ -78,6 +78,6 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
-    ]
+        'month' => '*',
+    ],
 ];

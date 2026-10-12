@@ -47,9 +47,13 @@
 {{/aistatusisstuck}}
 {{#js}}
 {{#aipendingreview}}
-require(['mod_googlemeet/ai_review'], function(m) { m.init(); });
+require(['mod_googlemeet/ai_review'], function(m) {
+    m.init();
+});
 {{/aipendingreview}}
 {{^aipendingreview}}{{#aistatusisstuck}}
-require(['mod_googlemeet/ai_review'], function(m) { m.init(); });
+require(['mod_googlemeet/ai_review'], function(m) {
+    m.init();
+});
 {{/aistatusisstuck}}{{/aipendingreview}}
 {{/js}}

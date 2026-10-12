@@ -20,6 +20,8 @@ use stdClass;
 use moodle_exception;
 use mod_googlemeet\gemini_transient_exception;
 
+defined('MOODLE_INTERNAL') || die();
+
 // The \curl class is defined in lib/filelib.php, which is not autoloaded and not loaded by every
 // task or CLI entry point.
 global $CFG;
@@ -38,7 +40,6 @@ require_once($CFG->libdir . '/filelib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class gemini_client {
-
     /** @var string The Gemini API base URL */
     private const API_BASE_URL = 'https://generativelanguage.googleapis.com/v1beta/models/';
 
@@ -268,8 +269,12 @@ PROMPT;
      * @return array Chapter list.
      * @throws moodle_exception If generation or parsing fails.
      */
-    public function generate_chapters(string $transcript, string $lang = '', string $videoname = '',
-            string $duration = ''): array {
+    public function generate_chapters(
+        string $transcript,
+        string $lang = '',
+        string $videoname = '',
+        string $duration = ''
+    ): array {
         if (!$this->is_configured()) {
             throw new moodle_exception('ai_not_configured', 'googlemeet');
         }
@@ -331,6 +336,7 @@ PROMPT;
      */
     private function build_analysis_prompt(string $videoname, string $duration, string $videourl): string {
         $ctx = $this->context_line();
+        // phpcs:disable moodle.Files.LineLength -- Prompt text: a line break would change the prompt.
         return <<<PROMPT
 You are an educational assistant analyzing a recorded meeting/class video.
 
@@ -361,6 +367,7 @@ IMPORTANT: Respond ONLY with valid JSON in the following format (no markdown, no
 
 If you cannot access the video, analyze based on the title and provide your best interpretation, noting that direct video analysis was not possible.
 PROMPT;
+        // phpcs:enable
     }
 
     /**
@@ -435,9 +442,9 @@ PROMPT;
             'contents' => [
                 [
                     'parts' => [
-                        ['text' => $prompt]
-                    ]
-                ]
+                        ['text' => $prompt],
+                    ],
+                ],
             ],
             'generationConfig' => [
                 'temperature' => 0.7,
@@ -457,8 +464,8 @@ PROMPT;
 
         // Set timeout options for potentially long AI processing.
         $options = [
-            'CURLOPT_TIMEOUT' => 120,        // 2 minutes max total time.
-            'CURLOPT_CONNECTTIMEOUT' => 30,  // 30 seconds to connect.
+            'CURLOPT_TIMEOUT' => 120, // 2 minutes max total time.
+            'CURLOPT_CONNECTTIMEOUT' => 30, // 30 seconds to connect.
         ];
 
         $response = $curl->post($url, json_encode($data), $options);
@@ -513,17 +520,17 @@ PROMPT;
         $errormsg = isset($error->error->message) ? $error->error->message : "HTTP error {$httpcode}";
         debugging("Gemini API error ({$model}): {$errormsg}", DEBUG_DEVELOPER);
 
-        $transient_patterns = ['high demand', 'overloaded', 'RESOURCE_EXHAUSTED', 'quota', 'rate limit', 'try again'];
-        $is_transient = in_array($httpcode, [429, 500, 503], true);
-        if (!$is_transient) {
-            foreach ($transient_patterns as $p) {
+        $transientpatterns = ['high demand', 'overloaded', 'RESOURCE_EXHAUSTED', 'quota', 'rate limit', 'try again'];
+        $istransient = in_array($httpcode, [429, 500, 503], true);
+        if (!$istransient) {
+            foreach ($transientpatterns as $p) {
                 if (stripos($errormsg, $p) !== false) {
-                    $is_transient = true;
+                    $istransient = true;
                     break;
                 }
             }
         }
-        if ($is_transient) {
+        if ($istransient) {
             throw new gemini_transient_exception($errormsg);
         }
         throw new moodle_exception('ai_error', 'googlemeet', '', $errormsg);
@@ -542,7 +549,7 @@ PROMPT;
         if (!in_array($threshold, self::SAFETY_THRESHOLDS, true)) {
             $threshold = self::DEFAULT_SAFETY_THRESHOLD;
         }
-        return array_map(static function(string $category) use ($threshold): array {
+        return array_map(static function (string $category) use ($threshold): array {
             return ['category' => $category, 'threshold' => $threshold];
         }, self::SAFETY_CATEGORIES);
     }
@@ -600,7 +607,7 @@ PROMPT;
         $text = trim($text);
 
         // Remove markdown code blocks if present.
-        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $text, $matches)) {
+        if (preg_match('/\x60{3}(?:json)?\s*([\s\S]*?)\s*\x60{3}/', $text, $matches)) {
             $text = $matches[1];
         }
 
@@ -649,7 +656,7 @@ PROMPT;
         }
 
         $text = trim($decoded->candidates[0]->content->parts[0]->text);
-        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $text, $matches)) {
+        if (preg_match('/\x60{3}(?:json)?\s*([\s\S]*?)\s*\x60{3}/', $text, $matches)) {
             $text = trim($matches[1]);
         }
         if (preg_match('/(\[[\s\S]*\])/', $text, $matches)) {
@@ -716,7 +723,7 @@ PROMPT;
         }
 
         $text = trim($decoded->candidates[0]->content->parts[0]->text);
-        if (preg_match('/```(?:json)?\s*([\s\S]*?)\s*```/', $text, $matches)) {
+        if (preg_match('/\x60{3}(?:json)?\s*([\s\S]*?)\s*\x60{3}/', $text, $matches)) {
             $text = trim($matches[1]);
         }
         if (preg_match('/(\{[\s\S]*\}|\[[\s\S]*\])/', $text, $matches)) {
@@ -777,7 +784,7 @@ PROMPT;
             ];
         }
 
-        usort($chapters, static function(array $a, array $b): int {
+        usort($chapters, static function (array $a, array $b): int {
             return $a['_seconds'] <=> $b['_seconds'];
         });
 
@@ -927,7 +934,7 @@ PROMPT;
                 CURLOPT_INFILE => $fp,
                 CURLOPT_INFILESIZE => $filesize,
                 CURLOPT_CUSTOMREQUEST => 'POST',
-                CURLOPT_TIMEOUT => 600,          // 10 minutes for large files.
+                CURLOPT_TIMEOUT => 600, // 10 minutes for large files.
                 CURLOPT_CONNECTTIMEOUT => 60,
                 CURLOPT_HTTPHEADER => [
                     'x-goog-api-key: ' . $this->apikey,
@@ -1047,6 +1054,7 @@ PROMPT;
         }
 
         $ctx = $this->context_line();
+        // phpcs:disable moodle.Files.LineLength -- Prompt text: a line break would change the prompt.
         $prompt = <<<PROMPT
 You are an educational assistant analyzing a class transcript.
 
@@ -1074,6 +1082,7 @@ Respond ONLY with valid JSON (no markdown):
     "language": "detected ISO 639-1 code"
 }
 PROMPT;
+        // phpcs:enable
 
         $response = $this->call_api($prompt);
         debugging("Gemini API: Transcript analysis completed", DEBUG_DEVELOPER);
@@ -1128,7 +1137,11 @@ PROMPT;
      * @throws moodle_exception If analysis fails
      */
     private function analyze_video_with_file_using_model(
-        string $fileuri, string $mimetype, string $videoname, string $duration, string $model
+        string $fileuri,
+        string $mimetype,
+        string $videoname,
+        string $duration,
+        string $model
     ): stdClass {
 
         debugging("Gemini API: Analyzing video with file URI: {$fileuri} using model: {$model}", DEBUG_DEVELOPER);
@@ -1137,6 +1150,7 @@ PROMPT;
         $url = self::API_BASE_URL . $model . ':generateContent';
 
         $ctx = $this->context_line();
+        // phpcs:disable moodle.Files.LineLength -- Prompt text: a line break would change the prompt.
         $prompt = <<<PROMPT
 You are an educational assistant analyzing a recorded meeting/class video.
 
@@ -1164,6 +1178,7 @@ IMPORTANT: Respond ONLY with valid JSON in the following format (no markdown, no
     "language": "detected language code (e.g., es, en, fr)"
 }
 PROMPT;
+        // phpcs:enable
 
         $data = [
             'contents' => [
@@ -1173,11 +1188,11 @@ PROMPT;
                             'fileData' => [
                                 'mimeType' => $mimetype,
                                 'fileUri' => $fileuri,
-                            ]
+                            ],
                         ],
-                        ['text' => $prompt]
-                    ]
-                ]
+                        ['text' => $prompt],
+                    ],
+                ],
             ],
             'generationConfig' => [
                 'temperature' => 0.7,
@@ -1195,7 +1210,7 @@ PROMPT;
         ]);
 
         $options = [
-            'CURLOPT_TIMEOUT' => 300,        // 5 minutes for video analysis.
+            'CURLOPT_TIMEOUT' => 300, // 5 minutes for video analysis.
             'CURLOPT_CONNECTTIMEOUT' => 60,
         ];
 
@@ -1231,5 +1246,4 @@ PROMPT;
 
         return $info['http_code'] === 200 || $info['http_code'] === 204;
     }
-
 }

@@ -47,6 +47,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  */
 class process_autosync extends \core\task\scheduled_task {
     /**
+     * Name of the task, shown on the scheduled tasks page.
+     *
      * @return string
      */
     public function get_name() {
@@ -386,10 +388,12 @@ class process_autosync extends \core\task\scheduled_task {
         int $attemptsdone
     ): string {
         // Got what we came for: at least one recording landed in the DB.
-        if (is_array($stats)
+        if (
+            is_array($stats)
             && ((int) ($stats['inserted'] ?? 0) > 0
                 || (int) ($stats['updated'] ?? 0) > 0
-                || (int) ($stats['restored'] ?? 0) > 0)) {
+                || (int) ($stats['restored'] ?? 0) > 0)
+        ) {
             return 'success';
         }
 
@@ -470,10 +474,16 @@ class process_autosync extends \core\task\scheduled_task {
             try {
                 $a = (object)[
                     'name' => format_string($googlemeet->name, true, ['context' => $context, 'escape' => false]),
-                    'course' => $course ? format_string($course->fullname, true,
-                        ['context' => \context_course::instance($course->id), 'escape' => false]) : '',
-                    'date' => userdate((int)$event->eventdate, get_string('strftimedmyhm', 'googlemeet'),
-                        $user->timezone ?? 99),
+                    'course' => $course ? format_string(
+                        $course->fullname,
+                        true,
+                        ['context' => \context_course::instance($course->id), 'escape' => false]
+                    ) : '',
+                    'date' => userdate(
+                        (int)$event->eventdate,
+                        get_string('strftimedmyhm', 'googlemeet'),
+                        $user->timezone ?? 99
+                    ),
                     'attempts' => $attempts,
                     'url' => $url->out(false),
                 ];
@@ -492,8 +502,11 @@ class process_autosync extends \core\task\scheduled_task {
                 $message->contexturl = $url->out(false);
                 $message->contexturlname = $a->name;
                 $message->courseid = $cm->course;
-                $message->customdata = \mod_googlemeet\local\reminders::app_customdata((int)$cm->id, (int)$cm->course,
-                    $url);
+                $message->customdata = \mod_googlemeet\local\reminders::app_customdata(
+                    (int)$cm->id,
+                    (int)$cm->course,
+                    $url
+                );
                 if (message_send($message) !== false) {
                     $sent++;
                 }
@@ -523,8 +536,15 @@ class process_autosync extends \core\task\scheduled_task {
      * @param bool $loggedin
      * @return void
      */
-    private static function log_activity_outcome(int $googlemeetid, array $counts, ?array $stats, ?\Throwable $exception,
-            bool $identitymissing, bool $authfailure, bool $loggedin): void {
+    private static function log_activity_outcome(
+        int $googlemeetid,
+        array $counts,
+        ?array $stats,
+        ?\Throwable $exception,
+        bool $identitymissing,
+        bool $authfailure,
+        bool $loggedin
+    ): void {
         if ($counts['exhausted'] > 0) {
             $status = sync_log::STATUS_EXHAUSTED;
         } else if ($counts['permanent'] > 0 || $counts['infra_failure'] > 0) {

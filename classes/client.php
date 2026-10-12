@@ -31,7 +31,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class client {
-
     /**
      * OAuth 2 client
      * @var \core\oauth2\client
@@ -138,7 +137,8 @@ class client {
      */
     public function get_attendance_source(): \mod_googlemeet\local\attendance\meet_api_source {
         return new \mod_googlemeet\local\attendance\meet_api_source(
-            new \mod_googlemeet\local\attendance\meet_rest($this->get_user_oauth_client()));
+            new \mod_googlemeet\local\attendance\meet_rest($this->get_user_oauth_client())
+        );
     }
 
     /**
@@ -223,7 +223,7 @@ class client {
                     mimeType = "application/vnd.google-apps.folder" and
                     "me" in owners',
             'pageSize' => 1000,
-            'fields' => 'nextPageToken, files(id,owners)'
+            'fields' => 'nextPageToken, files(id,owners)',
         ];
 
         $folders = $this->list_all_pages($service, $folderparams);
@@ -312,9 +312,11 @@ class client {
         $logouturl->param('logout', true);
         $logouturl->param('sesskey', sesskey());
 
-        $img = html_writer::img('data:image/jpeg;base64,'.$userpicture, '');
+        $img = html_writer::img('data:image/jpeg;base64,' . $userpicture, '');
         $out = html_writer::start_div('', ['id' => 'googlemeet_auth-info']);
-        $out .= html_writer::link($userurl, $img,
+        $out .= html_writer::link(
+            $userurl,
+            $img,
             ['id' => 'googlemeet_picture-user', 'target' => '_blank', 'title' => get_string('manage', 'googlemeet')]
         );
         $out .= html_writer::start_div('', ['id' => 'googlemeet_user-name']);
@@ -322,7 +324,8 @@ class client {
         $out .= html_writer::span($name);
         $out .= html_writer::span($username);
         $out .= html_writer::end_div();
-        $out .= html_writer::link($logouturl,
+        $out .= html_writer::link(
+            $logouturl,
             $OUTPUT->pix_icon('logout', '', 'googlemeet', ['class' => 'm-0']),
             ['class' => 'btn btn-secondary btn-sm', 'title' => get_string('logout', 'googlemeet')]
         );
@@ -476,7 +479,7 @@ class client {
         $service = new rest($this->get_user_oauth_client());
 
         $eventparams = [
-            'calendarid' => $calendarid
+            'calendarid' => $calendarid,
         ];
 
         $eventresponse = helper::request($service, 'insertevent', $eventparams, json_encode($eventrawpost));
@@ -484,21 +487,20 @@ class client {
         $conferenceparams = [
             'calendarid' => $calendarid,
             'eventid' => $eventresponse->id,
-            'conferenceDataVersion' => 1
+            'conferenceDataVersion' => 1,
         ];
 
         $conferencerawpost = [
             'conferenceData' => [
                 'createRequest' => [
-                    'requestId' => $eventresponse->id
-                ]
-            ]
+                    'requestId' => $eventresponse->id,
+                ],
+            ],
         ];
 
         $conferenceresponse = helper::request($service, 'createconference', $conferenceparams, json_encode($conferencerawpost));
 
         return $conferenceresponse;
-
     }
 
     /**
@@ -549,7 +551,7 @@ class client {
                             "me" in owners and
                             ' . $namefilter,
                     'pageSize' => 100,
-                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)'
+                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)',
                 ];
             } else {
                 $recordingparams = [
@@ -559,7 +561,7 @@ class client {
                             "me" in owners and
                             ' . $namefilter,
                     'pageSize' => 1000,
-                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)'
+                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)',
                 ];
             }
 
@@ -583,13 +585,21 @@ class client {
                 $existingids = [];
                 $existingnotes = [];
                 if (!$deferenrichment) {
-                    $existingids = $DB->get_fieldset_select('googlemeet_recordings', 'recordingid',
-                        'googlemeetid = ?', [$googlemeet->id]);
+                    $existingids = $DB->get_fieldset_select(
+                        'googlemeet_recordings',
+                        'recordingid',
+                        'googlemeetid = ?',
+                        [$googlemeet->id]
+                    );
                     $existingids = array_flip($existingids);
                     // Map recordingid => notestext so we know which existing recordings
                     // still lack notes (Gemini notes are often generated later).
-                    $existingnotes = $DB->get_records_menu('googlemeet_recordings',
-                        ['googlemeetid' => $googlemeet->id], '', 'recordingid, notestext');
+                    $existingnotes = $DB->get_records_menu(
+                        'googlemeet_recordings',
+                        ['googlemeetid' => $googlemeet->id],
+                        '',
+                        'recordingid, notestext'
+                    );
                 }
 
                 for ($i = 0; $i < $recordingscount; $i++) {
@@ -601,16 +611,18 @@ class client {
                         // play it in the embedded player. googlemeet/makerecordingspublic (default on) can
                         // be turned off to keep recordings private, at the cost of playback for anyone but
                         // the Drive owner.
-                        if (!$deferenrichment
+                        if (
+                            !$deferenrichment
                                 && get_config('googlemeet', 'makerecordingspublic')
-                                && !in_array('anyoneWithLink', $recording->permissionIds)) {
+                                && !in_array('anyoneWithLink', $recording->permissionIds)
+                        ) {
                             $permissionparams = [
                                 'fileid' => $recording->id,
-                                'fields' => 'id'
+                                'fields' => 'id',
                             ];
                             $permissionrawpost = [
                                 "role" => "reader",
-                                "type" => "anyone"
+                                "type" => "anyone",
                             ];
                             helper::request($service, 'create_permission', $permissionparams, json_encode($permissionrawpost));
                         }
@@ -752,7 +764,7 @@ class client {
         }
 
         // Batch query: get all existing recordings by their IDs to avoid N+1 queries.
-        $recordingids = array_filter(array_map(function($r) {
+        $recordingids = array_filter(array_map(function ($r) {
             return $r->id ?? null;
         }, $recordings));
 
@@ -761,9 +773,14 @@ class client {
         // own rows must not be skipped here, or the sync would trash them.
         $existingrecordings = [];
         if (!empty($recordingids)) {
-            list($insql, $params) = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
-            $records = $DB->get_recordset_select('googlemeet_recordings', "recordingid $insql", $params, '',
-                'id, recordingid, googlemeetid');
+            [$insql, $params] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
+            $records = $DB->get_recordset_select(
+                'googlemeet_recordings',
+                "recordingid $insql",
+                $params,
+                '',
+                'id, recordingid, googlemeetid'
+            );
             foreach ($records as $rec) {
                 $existingrecordings[$rec->recordingid][(int)$rec->googlemeetid] = true;
             }
@@ -794,7 +811,7 @@ class client {
                 continue;
             }
 
-            // For new recordings, apply name-based filtering:
+            // For new recordings, apply name-based filtering.
 
             // Priority 1: If custom filter is set, check it first (case-insensitive contains).
             if (!empty($customfilterlower)) {
@@ -851,9 +868,9 @@ class client {
             'q' => $parentclause . 'trashed = false and
                     "me" in owners and
                     (mimeType = "text/plain" or mimeType = "text/vtt" or mimeType = "application/x-subrip") and
-                    name contains "'.$this->drive_quote($basename).'"',
+                    name contains "' . $this->drive_quote($basename) . '"',
             'pageSize' => 10,
-            'fields' => 'nextPageToken, files(id,name,mimeType)'
+            'fields' => 'nextPageToken, files(id,name,mimeType)',
         ];
 
         try {
@@ -916,7 +933,7 @@ class client {
             'q' => 'trashed = false and "me" in owners and mimeType = "application/vnd.google-apps.document"',
             'orderBy' => 'createdTime desc',
             'pageSize' => 1000,
-            'fields' => 'nextPageToken, files(id,name,createdTime)'
+            'fields' => 'nextPageToken, files(id,name,createdTime)',
         ];
 
         try {
@@ -992,11 +1009,11 @@ class client {
                 try {
                     $permissionparams = [
                         'fileid' => $recording->recordingid,
-                        'fields' => 'id'
+                        'fields' => 'id',
                     ];
                     $permissionrawpost = [
                         'role' => 'reader',
-                        'type' => 'anyone'
+                        'type' => 'anyone',
                     ];
                     helper::request($service, 'create_permission', $permissionparams, json_encode($permissionrawpost));
                 } catch (\Throwable $e) {
@@ -1092,8 +1109,10 @@ class client {
             $doctime = self::google_time_to_timestamp($file->createdTime ?? null);
             if ($doctime === null) {
                 if ($debugdiscarded) {
-                    debugging('mod_googlemeet: notes candidate discarded without createdTime: ' . $filename,
-                        DEBUG_DEVELOPER);
+                    debugging(
+                        'mod_googlemeet: notes candidate discarded without createdTime: ' . $filename,
+                        DEBUG_DEVELOPER
+                    );
                 }
                 continue;
             }
@@ -1101,8 +1120,10 @@ class client {
             $distance = abs($doctime - $recordingcreatedtime);
             if ($distance > self::NOTES_PROXIMITY_SECONDS) {
                 if ($debugdiscarded) {
-                    debugging('mod_googlemeet: notes candidate discarded outside 36h window: ' . $filename,
-                        DEBUG_DEVELOPER);
+                    debugging(
+                        'mod_googlemeet: notes candidate discarded outside 36h window: ' . $filename,
+                        DEBUG_DEVELOPER
+                    );
                 }
                 continue;
             }
@@ -1120,7 +1141,7 @@ class client {
             return null;
         }
 
-        usort($pool, static function(array $a, array $b): int {
+        usort($pool, static function (array $a, array $b): int {
             return $a['distance'] <=> $b['distance'];
         });
 
@@ -1215,16 +1236,22 @@ class client {
         // transcript appended at the end (shown in its own tab), and promo/disclaimer
         // paragraphs. Keep only the notes (Resumen/Summary/Resumo …). Markers are
         // localized (es/en/pt); a language-agnostic fallback also removes the transcript.
-        // (a) Drop everything before the first notes heading.
+        // Step (a): drop everything before the first notes heading.
         $html = preg_replace('/^.*?(?=<h[23]\b[^>]*>(?:(?!<\/h[23]>).)*?(?:Resumen|Summary|Resumo)\b)/isu', '', $html);
-        // (b) Drop the transcript appendix: localized markers first…
+        // Step (b): drop the transcript appendix: localized markers first...
         $html = preg_replace('/<p\b[^>]*>(?:(?!<\/p>).)*?📖\s*(?:Transcripci[oó]n|Transcript|Transcri[çc][aã]o).*$/isu', '', $html);
         $html = preg_replace('/<h2\b[^>]*>(?:(?!<\/h2>).)*?(?:Transcripci[oó]n|Transcript|Transcri[çc][aã]o).*$/isu', '', $html);
-        // …then language-agnostic: cut from the first timestamp heading (<h3>HH:MM:SS</h3>), used only by the transcript.
+        // ...then language-agnostic: cut from the first timestamp heading (<h3>HH:MM:SS</h3>), used only by the transcript.
         $html = preg_replace('/<h3\b[^>]*>(?:(?!<\/h3>).)*?\b\d{1,2}:\d{2}:\d{2}\b.*$/isu', '', $html);
-        // (c) Drop Gemini promo/disclaimer paragraphs (es/en/pt).
-        $html = preg_replace('/<p\b[^>]*>(?:(?!<\/p>).)*?(?:Revisa las notas de Gemini|Check Gemini.?s notes|Revise as notas do Gemini|Gemini (?:toma|tom[oó]|takes) notas|Obt[eé]n sugerencias|Get tips|Responde una breve encuesta|Take a .{0,14}survey|Responda .{0,14}pesquisa)(?:(?!<\/p>).)*?<\/p>/isu', '', $html);
-        // (d) Timestamp references point to the (removed) transcript anchors; flatten to plain text.
+        // Step (c): drop Gemini promo/disclaimer paragraphs (es/en/pt).
+        $html = preg_replace(
+            '/<p\b[^>]*>(?:(?!<\/p>).)*?(?:Revisa las notas de Gemini|Check Gemini.?s notes|Revise as notas do Gemini'
+                . '|Gemini (?:toma|tom[oó]|takes) notas|Obt[eé]n sugerencias|Get tips|Responde una breve encuesta'
+                . '|Take a .{0,14}survey|Responda .{0,14}pesquisa)(?:(?!<\/p>).)*?<\/p>/isu',
+            '',
+            $html
+        );
+        // Step (d): timestamp references point to the (removed) transcript anchors; flatten to plain text.
         $html = preg_replace('/<a\b[^>]*href="#[^"]*"[^>]*>(.*?)<\/a>/is', '$1', $html);
 
         return trim($html);
@@ -1281,7 +1308,7 @@ class client {
                 continue;
             }
 
-            // Skip timestamp lines (format: 00:00:00.000 --> 00:00:00.000 or 0:00:00.000,0:00:00.000).
+            // Skip timestamp lines, written as "00:00:00.000 --> 00:00:00.000" or "0:00:00.000,0:00:00.000".
             if (preg_match('/^\d{1,2}:\d{2}:\d{2}[.,]\d{3}/', $line)) {
                 continue;
             }
@@ -1312,16 +1339,16 @@ class client {
      *
      * @return string The formatted time
      */
-    protected function formatseconds($milli=0) {
+    protected function formatseconds($milli = 0) {
         $secs = $milli / 1000;
 
         if ($secs < MINSECS) {
-            return '0:'. str_pad(floor($secs), 2, "0", STR_PAD_LEFT);
+            return '0:' . str_pad(floor($secs), 2, "0", STR_PAD_LEFT);
         } else if ($secs >= MINSECS && $secs < HOURSECS) {
-            return floor($secs / MINSECS) .':'. str_pad(floor($secs % MINSECS), 2, "0", STR_PAD_LEFT);
+            return floor($secs / MINSECS) . ':' . str_pad(floor($secs % MINSECS), 2, "0", STR_PAD_LEFT);
         } else {
-            return floor($secs / HOURSECS) .':'.
-                str_pad(floor(($secs % HOURSECS) / MINSECS), 2, "0", STR_PAD_LEFT) .':'.
+            return floor($secs / HOURSECS) . ':' .
+                str_pad(floor(($secs % HOURSECS) / MINSECS), 2, "0", STR_PAD_LEFT) . ':' .
                 str_pad(floor(($secs % HOURSECS) % MINSECS), 2, "0", STR_PAD_LEFT);
         }
     }
@@ -1335,5 +1362,4 @@ class client {
         $userinfo = $this->get_cached_userinfo();
         return $userinfo['username'] ?? '';
     }
-
 }

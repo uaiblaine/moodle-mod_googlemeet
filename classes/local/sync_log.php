@@ -27,7 +27,6 @@ namespace mod_googlemeet\local;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class sync_log {
-
     /** @var string Teacher-requested Drive sync (adhoc). */
     public const KIND_MANUAL = 'manual';
     /** @var string Scheduled autosync of one activity. */

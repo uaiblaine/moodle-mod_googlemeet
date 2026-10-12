@@ -46,11 +46,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 #[CoversFunction('googlemeet_summary_paragraphs')]
 #[CoversFunction('googlemeet_get_recording_seek_url')]
 #[CoversFunction('googlemeet_format_seconds_timestamp')]
-class locallib_test extends \advanced_testcase {
-
-    // -------------------------------------------------------------------------
-    // Helpers
-    // -------------------------------------------------------------------------
+final class locallib_test extends \advanced_testcase {
+    // Helpers.
 
     /**
      * Build a minimal holiday stdClass like the DB returns.
@@ -146,8 +143,10 @@ class locallib_test extends \advanced_testcase {
      * AI summaries are split on blank lines; single line breaks stay inside the paragraph.
      */
     public function test_summary_paragraphs(): void {
-        $this->assertSame(["Uno\nsigue", 'Dos & tres', 'Cuatro'],
-            googlemeet_summary_paragraphs("Uno\nsigue\n\n\nDos & tres\r\n\r\nCuatro  "));
+        $this->assertSame(
+            ["Uno\nsigue", 'Dos & tres', 'Cuatro'],
+            googlemeet_summary_paragraphs("Uno\nsigue\n\n\nDos & tres\r\n\r\nCuatro  ")
+        );
         $this->assertSame([], googlemeet_summary_paragraphs(" \n \n"));
     }
 
@@ -179,9 +178,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertSame(1563, googlemeet_timestamp_to_seconds(googlemeet_format_seconds_timestamp(1563)));
     }
 
-    // =========================================================================
-    // googlemeet_is_holiday()
-    // =========================================================================
+    // Tests of googlemeet_is_holiday().
 
     /**
      * An empty holidays array means nothing is a holiday.
@@ -281,9 +278,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertFalse(googlemeet_is_holiday(mktime(10, 0, 0, 3, 1, 2026), $holidays));
     }
 
-    // =========================================================================
-    // googlemeet_is_cancelled()
-    // =========================================================================
+    // Tests of googlemeet_is_cancelled().
 
     /**
      * Empty cancelled list — nothing is cancelled.
@@ -339,7 +334,7 @@ class locallib_test extends \advanced_testcase {
         $cancelled = [
             $this->make_cancelled(mktime(0, 0, 0, 3, 10, 2026), 'Reason A'),
             $this->make_cancelled(mktime(0, 0, 0, 5, 20, 2026), 'Reason B'),
-            $this->make_cancelled(mktime(0, 0, 0, 9, 1,  2026), 'Reason C'),
+            $this->make_cancelled(mktime(0, 0, 0, 9, 1, 2026), 'Reason C'),
         ];
 
         // Only the May date should match.
@@ -395,21 +390,26 @@ class locallib_test extends \advanced_testcase {
 
         googlemeet_save_cancelled($googlemeet);
 
-        $records = array_values($DB->get_records('googlemeet_cancelled',
-            ['googlemeetid' => $googlemeetid], 'cancelleddate ASC, id ASC'));
+        $records = array_values($DB->get_records(
+            'googlemeet_cancelled',
+            ['googlemeetid' => $googlemeetid],
+            'cancelleddate ASC, id ASC'
+        ));
 
         $this->assertCount(2, $records);
-        $this->assertSame(usergetmidnight(mktime(0, 0, 0, 5, 4, 2026)),
-            usergetmidnight((int)$records[0]->cancelleddate));
+        $this->assertSame(
+            usergetmidnight(mktime(0, 0, 0, 5, 4, 2026)),
+            usergetmidnight((int)$records[0]->cancelleddate)
+        );
         $this->assertSame('Teacher sick', $records[0]->reason);
-        $this->assertSame(usergetmidnight(mktime(0, 0, 0, 7, 8, 2026)),
-            usergetmidnight((int)$records[1]->cancelleddate));
+        $this->assertSame(
+            usergetmidnight(mktime(0, 0, 0, 7, 8, 2026)),
+            usergetmidnight((int)$records[1]->cancelleddate)
+        );
         $this->assertSame('Session cancelled', $records[1]->reason);
     }
 
-    // =========================================================================
-    // googlemeet_clear_url()
-    // =========================================================================
+    // Tests of googlemeet_clear_url().
 
     /**
      * A full Meet URL is normalised to the canonical https:// form.
@@ -472,9 +472,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertNull(googlemeet_clear_url('https://meet.google.com/abcd-ef-ghij'));  // 4-2-4.
     }
 
-    // =========================================================================
-    // DB-backed: googlemeet_construct_events_data_for_add() reads googlemeet_holidays.
-    // =========================================================================
+    // Tests of DB-backed code: googlemeet_construct_events_data_for_add() reads googlemeet_holidays.
 
     /**
      * Non-recurring event: single event returned, no holidays set.
@@ -698,9 +696,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertNotContains('Wed', $eventdates, 'Wednesday event must not appear.');
     }
 
-    // =========================================================================
-    // googlemeet_truncate_summary()
-    // =========================================================================
+    // Tests of googlemeet_truncate_summary().
 
     /**
      * Text within the limit is returned unchanged.
@@ -731,9 +727,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertStringNotContainsString("\xEF\xBF\xBD", $out);
     }
 
-    // =========================================================================
-    // googlemeet_ai_status_flags()
-    // =========================================================================
+    // Tests of googlemeet_ai_status_flags().
 
     /**
      * A completed status sets the row and completed flags, not the failed one.
@@ -772,9 +766,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertFalse($f['hasanalysisrow']);
     }
 
-    // =========================================================================
-    // googlemeet_recording_is_new()
-    // =========================================================================
+    // Tests of googlemeet_recording_is_new().
 
     /**
      * A recording younger than the threshold counts as new.
@@ -789,7 +781,7 @@ class locallib_test extends \advanced_testcase {
      */
     public function test_recording_is_new_outside_threshold(): void {
         $now = mktime(12, 0, 0, 6, 10, 2026);
-        $created = mktime(12, 0, 0, 5, 20, 2026); // ~21 days earlier.
+        $created = mktime(12, 0, 0, 5, 20, 2026); // About 21 days earlier.
         $this->assertFalse(googlemeet_recording_is_new($created, $now, 7));
     }
     /**
@@ -802,10 +794,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertStringContainsString('2026', $out);
     }
 
-    // =========================================================================
-    // googlemeet_filter_recordings_by_query(), googlemeet_filter_recordings_by_topic(),
-    // googlemeet_collect_topics()
-    // =========================================================================
+    // Tests of the recording filters by query and by topic, and of googlemeet_collect_topics().
 
     /**
      * Build a minimal recording stdClass for filter tests.
@@ -818,7 +807,10 @@ class locallib_test extends \advanced_testcase {
      */
     private function rec(string $name, bool $hasai = false, array $topics = [], string $summary = ''): \stdClass {
         $r = new \stdClass();
-        $r->name = $name; $r->hasai = $hasai; $r->aitopics = $topics; $r->aisummary = $summary;
+        $r->name = $name;
+        $r->hasai = $hasai;
+        $r->aitopics = $topics;
+        $r->aisummary = $summary;
         return $r;
     }
 
@@ -867,9 +859,7 @@ class locallib_test extends \advanced_testcase {
         $this->assertSame(['LCSP', 'LPAC'], googlemeet_collect_topics($recs));
     }
 
-    // =========================================================================
-    // googlemeet_topic_preview()
-    // =========================================================================
+    // Tests of googlemeet_topic_preview().
 
     /**
      * The preview keeps the first $max topics and counts the rest as overflow.

@@ -40,7 +40,6 @@ defined('MOODLE_INTERNAL') || die();
 #[CoversClass(request_sync::class)]
 #[CoversClass(get_sync_status::class)]
 final class sync_manager_test extends \advanced_testcase {
-
     /** @var array User ids the fake runner ran as. */
     private array $ranas = [];
 
@@ -83,7 +82,7 @@ final class sync_manager_test extends \advanced_testcase {
      * @return void
      */
     private function fake_runner($result): void {
-        sync_manager::set_runner(function(\stdClass $googlemeet, \stdClass $user) use ($result) {
+        sync_manager::set_runner(function (\stdClass $googlemeet, \stdClass $user) use ($result) {
             global $USER, $DB;
             $this->ranas[] = (int)$USER->id;
             if ($result instanceof \Throwable) {

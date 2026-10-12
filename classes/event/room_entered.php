@@ -32,7 +32,6 @@ namespace mod_googlemeet\event;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class room_entered extends \core\event\base {
-
     /**
      * Init method.
      *

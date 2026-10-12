@@ -24,12 +24,12 @@ namespace mod_googlemeet\local;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class room_entry {
-
     /** @var int Seconds before the start in which a session already counts as the one being joined. */
     public const EARLY_WINDOW = 30 * MINSECS;
 
     /** @var string Valid Google Meet room URL. */
-    public const MEET_URL_PATTERN = '/^https:\/\/meet\.google\.com\/[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/';
+    public const MEET_URL_PATTERN = '/^https:\/\/meet\.google\.com\/'
+        . '[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/';
 
     /**
      * The session (googlemeet_events row) being joined at $now: live, or starting within the early window.
@@ -42,10 +42,15 @@ class room_entry {
         global $DB;
 
         $now = $now ?? time();
-        $records = $DB->get_records_select('googlemeet_events',
+        $records = $DB->get_records_select(
+            'googlemeet_events',
             'googlemeetid = :googlemeetid AND eventdate <= :earliest AND eventdate + duration >= :now',
             ['googlemeetid' => $googlemeetid, 'earliest' => $now + self::EARLY_WINDOW, 'now' => $now],
-            'eventdate ASC', '*', 0, 1);
+            'eventdate ASC',
+            '*',
+            0,
+            1
+        );
         return $records ? reset($records) : null;
     }
 

@@ -32,7 +32,6 @@ require_once($CFG->libdir . '/completionlib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class completion_updater {
-
     /** @var string[] Rules fed by recording progress. */
     public const PROGRESS_RULES = ['completionrecordings', 'completionwatchpercent'];
 

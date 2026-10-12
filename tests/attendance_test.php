@@ -48,7 +48,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversClass(\mod_googlemeet\local\attendance\privacy::class)]
 #[CoversClass(\mod_googlemeet\task\fetch_attendance::class)]
 final class attendance_test extends \advanced_testcase {
-
     /** @var \stdClass */
     private $course;
     /** @var \stdClass */
@@ -78,14 +77,26 @@ final class attendance_test extends \advanced_testcase {
         $gen = $this->getDataGenerator();
         $this->course = $gen->create_course();
         $this->teacher = $gen->create_and_enrol($this->course, 'editingteacher', ['email' => 'organiser@example.com']);
-        $this->students['ana'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Ana', 'lastname' => 'García López']);
-        $this->students['luis'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Luis', 'lastname' => 'Pérez']);
-        $this->students['juan1'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Juan', 'lastname' => 'Martín']);
-        $this->students['juan2'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Juan', 'lastname' => 'Martín']);
+        $this->students['ana'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Ana', 'lastname' => 'García López']
+        );
+        $this->students['luis'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Luis', 'lastname' => 'Pérez']
+        );
+        $this->students['juan1'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Juan', 'lastname' => 'Martín']
+        );
+        $this->students['juan2'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Juan', 'lastname' => 'Martín']
+        );
 
         $this->googlemeet = $gen->create_module('googlemeet', ['course' => $this->course->id,
             'url' => 'https://meet.google.com/abc-defg-hij']);
@@ -167,7 +178,8 @@ final class attendance_test extends \advanced_testcase {
         $this->assertSame(0, meet_api_source::parse_time(''));
         $this->assertTrue(meet_api_source::is_scope_error('403: Request had insufficient authentication scopes.'));
         $this->assertFalse(meet_api_source::is_scope_error(
-            '403: Google Meet REST API has not been used in project 123 before or it is disabled.'));
+            '403: Google Meet REST API has not been used in project 123 before or it is disabled.'
+        ));
         $this->assertFalse(meet_api_source::is_scope_error('500: Internal error'));
         $this->assertSame('jose maria nunez', service::normalise_name('  José-María  Núñez '));
 
@@ -196,8 +208,10 @@ final class attendance_test extends \advanced_testcase {
         $this->assertSame(service::STATUS_DONE, $status);
 
         // The query is scoped to the meeting code with a margin around the session.
-        $this->assertSame(['conferences', 'abc-defg-hij', $this->start - HOURSECS, $this->start + 2 * HOURSECS],
-            $source->calls[0]);
+        $this->assertSame(
+            ['conferences', 'abc-defg-hij', $this->start - HOURSECS, $this->start + 2 * HOURSECS],
+            $source->calls[0]
+        );
 
         $rows = $DB->get_records('googlemeet_attendance', ['eventid' => $this->eventid]);
         $this->assertCount(5, $rows);
@@ -394,8 +408,10 @@ final class attendance_test extends \advanced_testcase {
         $broken = clone $this->googlemeet;
         $broken->url = 'https://example.com/room';
         $this->assertSame(service::STATUS_ERROR, service::process($broken, $this->sync_row(), $source, time()));
-        $this->assertEquals(service::MAX_ATTEMPTS,
-            $DB->get_field('googlemeet_attendance_sync', 'attempts', ['eventid' => $this->eventid]));
+        $this->assertEquals(
+            service::MAX_ATTEMPTS,
+            $DB->get_field('googlemeet_attendance_sync', 'attempts', ['eventid' => $this->eventid])
+        );
     }
 
     /**
@@ -429,7 +445,7 @@ final class attendance_test extends \advanced_testcase {
         global $DB, $USER;
 
         $source = $this->double($this->start);
-        $task = new class($source) extends \mod_googlemeet\task\fetch_attendance {
+        $task = new class ($source) extends \mod_googlemeet\task\fetch_attendance {
             /** @var attendance_source_double */
             public $source;
             /** @var int */
@@ -459,8 +475,10 @@ final class attendance_test extends \advanced_testcase {
 
         $this->assertEquals($this->teacher->id, $task->runas);
         $this->assertEquals($before, $USER->id);
-        $this->assertSame(service::STATUS_DONE,
-            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => $this->eventid]));
+        $this->assertSame(
+            service::STATUS_DONE,
+            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => $this->eventid])
+        );
     }
 
     /**
@@ -544,8 +562,14 @@ final class attendance_test extends \advanced_testcase {
         service::process($this->googlemeet, $this->sync_row(), $this->double($this->start), time());
         set_config('backup_general_users', 1, 'backup');
 
-        $bc = new \backup_controller(\backup::TYPE_1COURSE, $this->course->id, \backup::FORMAT_MOODLE,
-            \backup::INTERACTIVE_NO, \backup::MODE_GENERAL, $USER->id);
+        $bc = new \backup_controller(
+            \backup::TYPE_1COURSE,
+            $this->course->id,
+            \backup::FORMAT_MOODLE,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id
+        );
         $bc->get_plan()->get_setting('users')->set_value(true);
         $bc->execute_plan();
         $file = $bc->get_results()['backup_destination'];
@@ -554,8 +578,14 @@ final class attendance_test extends \advanced_testcase {
         $backupdir = 'googlemeet-ana03-' . random_string(6);
         $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), make_backup_temp_directory($backupdir));
         $newcourseid = \restore_dbops::create_new_course('Copy', 'ana03copy', $this->course->category);
-        $rc = new \restore_controller($backupdir, $newcourseid, \backup::INTERACTIVE_NO, \backup::MODE_GENERAL,
-            $USER->id, \backup::TARGET_NEW_COURSE);
+        $rc = new \restore_controller(
+            $backupdir,
+            $newcourseid,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id,
+            \backup::TARGET_NEW_COURSE
+        );
         $rc->get_plan()->get_setting('users')->set_value(true);
         $this->assertTrue($rc->execute_precheck());
         $rc->execute_plan();
@@ -568,8 +598,10 @@ final class attendance_test extends \advanced_testcase {
         $eventids = array_unique(array_column($rows, 'eventid'));
         $this->assertCount(1, $eventids);
         $this->assertTrue($DB->record_exists('googlemeet_events', ['id' => reset($eventids), 'googlemeetid' => $new->id]));
-        $this->assertSame(service::STATUS_DONE,
-            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => reset($eventids)]));
+        $this->assertSame(
+            service::STATUS_DONE,
+            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => reset($eventids)])
+        );
         $userids = array_filter(array_map('intval', array_column($rows, 'userid')));
         $this->assertEqualsCanonicalizing([(int)$this->students['ana']->id, (int)$this->students['luis']->id], $userids);
     }

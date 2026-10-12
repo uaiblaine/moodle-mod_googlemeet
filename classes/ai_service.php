@@ -35,7 +35,6 @@ use moodle_exception;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class ai_service {
-
     /** @var int Max transient retries before giving up (mirrors cli/process_transcripts.php). */
     const MAX_TRANSIENT_RETRIES = 4;
 
@@ -104,8 +103,12 @@ class ai_service {
      *                  row in 'processing' (keypoints and topics empty)
      * @throws moodle_exception If the recording is missing or deleted, or queueing fails
      */
-    public function generate_analysis(int $recordingid, bool $regenerate = false, bool $forcedownload = false,
-            bool $alreadyclaimed = false): stdClass {
+    public function generate_analysis(
+        int $recordingid,
+        bool $regenerate = false,
+        bool $forcedownload = false,
+        bool $alreadyclaimed = false
+    ): stdClass {
         global $DB;
 
         debugging("AI Service: Starting analysis for recording {$recordingid}, regenerate=" . ($regenerate ? 'true' : 'false')
@@ -175,7 +178,7 @@ class ai_service {
             'analysisid' => $analysis->id,
             'forcedownload' => $forcedownload,
         ]);
-        \core\task\manager::queue_adhoc_task($task, true); // true = check for duplicates.
+        \core\task\manager::queue_adhoc_task($task, true); // The true argument checks for duplicates.
 
         debugging("AI Service: Background task queued successfully", DEBUG_DEVELOPER);
 
@@ -266,7 +269,6 @@ class ai_service {
             $analysis->chapters = $result->chapters ?? [];
 
             return $analysis;
-
         } catch (\Exception $e) {
             $analysis->status = 'failed';
             $analysis->error = $e instanceof \mod_googlemeet\gemini_safety_exception ? $e->get_user_message() : $e->getMessage();
@@ -459,8 +461,11 @@ class ai_service {
 
         // Check claimability first: a second claim of a row already 'processing' must return false
         // even within the same second, which the timestamp ownership check below cannot tell apart.
-        $row = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid],
-            'id, status, retrycount, nextretry');
+        $row = $DB->get_record(
+            'googlemeet_ai_analysis',
+            ['id' => $analysisid],
+            'id, status, retrycount, nextretry'
+        );
         if (!$row) {
             return false;
         }
@@ -606,7 +611,7 @@ class ai_service {
         }
 
         $now = time();
-        list($insql, $inparams) = $DB->get_in_or_equal(array_keys($stale), SQL_PARAMS_NAMED);
+        [$insql, $inparams] = $DB->get_in_or_equal(array_keys($stale), SQL_PARAMS_NAMED);
         $params = $inparams + ['now' => $now];
 
         $sql = "UPDATE {googlemeet_ai_analysis}
@@ -661,9 +666,13 @@ class ai_service {
         global $DB;
 
         $maxage = $maxage ?? self::get_stuck_threshold();
-        $stale = $DB->get_records_select('googlemeet_ai_analysis',
+        $stale = $DB->get_records_select(
+            'googlemeet_ai_analysis',
             "status = 'processing' AND timemodified < :threshold",
-            ['threshold' => time() - $maxage], '', 'id, retrycount');
+            ['threshold' => time() - $maxage],
+            '',
+            'id, retrycount'
+        );
         $minutes = (int)round($maxage / MINSECS);
         foreach ($stale as $row) {
             $retrycount = (int)$row->retrycount;

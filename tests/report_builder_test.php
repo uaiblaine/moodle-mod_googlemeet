@@ -36,7 +36,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 #[CoversClass(\mod_googlemeet\local\report_builder::class)]
 #[CoversClass(\mod_googlemeet\output\report_page::class)]
 final class report_builder_test extends \advanced_testcase {
-
     /**
      * Insert a recording.
      *
@@ -163,8 +162,14 @@ final class report_builder_test extends \advanced_testcase {
         $this->assertEquals($s1->email, $table['rows'][0]['email']);
 
         // The template context renders without errors.
-        $page = new output\report_page($builder->build(0, false, $now), $googlemeet, $cm, $context,
-            ['groupid' => 0, 'groups' => [], 'inactive' => 0, 'page' => 0, 'perpage' => 50], []);
+        $page = new output\report_page(
+            $builder->build(0, false, $now),
+            $googlemeet,
+            $cm,
+            $context,
+            ['groupid' => 0, 'groups' => [], 'inactive' => 0, 'page' => 0, 'perpage' => 50],
+            []
+        );
         $ctx = $page->export_for_template($GLOBALS['PAGE']->get_renderer('core'));
         $this->assertCount(3, $ctx['rows']);
         // 1 completed cell out of 3 students x 2 recordings.

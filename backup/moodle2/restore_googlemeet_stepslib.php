@@ -27,7 +27,6 @@
  * Defines the structure step to restore one mod_googlemeet activity.
  */
 class restore_googlemeet_activity_structure_step extends restore_activity_structure_step {
-
     /** @var bool Whether this restore includes user information. */
     protected $userinfo = false;
 
@@ -37,38 +36,56 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
      * @return restore_path_element[].
      */
     protected function define_structure() {
-        $paths = array();
+        $paths = [];
         $userinfo = $this->get_setting_value('userinfo');
         $this->userinfo = (bool) $userinfo;
 
         $paths[] = new restore_path_element('googlemeet', '/activity/googlemeet');
 
-        $paths[] = new restore_path_element('googlemeet_event',
-            '/activity/googlemeet/events/event');
+        $paths[] = new restore_path_element(
+            'googlemeet_event',
+            '/activity/googlemeet/events/event'
+        );
 
-        $paths[] = new restore_path_element('googlemeet_recording',
-            '/activity/googlemeet/recordings/recording');
+        $paths[] = new restore_path_element(
+            'googlemeet_recording',
+            '/activity/googlemeet/recordings/recording'
+        );
 
         // AI analysis (summary, key points, topics, chapters) is course content, restored with or
         // without user info; process_googlemeet_aianalysis() decides what a copy without user info keeps.
-        $paths[] = new restore_path_element('googlemeet_aianalysis',
-            '/activity/googlemeet/recordings/recording/aianalysis');
+        $paths[] = new restore_path_element(
+            'googlemeet_aianalysis',
+            '/activity/googlemeet/recordings/recording/aianalysis'
+        );
         if ($userinfo) {
-            $paths[] = new restore_path_element('googlemeet_recordingprogress',
-                '/activity/googlemeet/recordings/recording/recordingprogresses/recordingprogress');
-            $paths[] = new restore_path_element('googlemeet_recordingsub',
-                '/activity/googlemeet/recordingsubs/recordingsub');
-            $paths[] = new restore_path_element('googlemeet_practiceattempt',
-                '/activity/googlemeet/practiceattempts/practiceattempt');
-            $paths[] = new restore_path_element('googlemeet_attendance',
-                '/activity/googlemeet/events/event/attendances/attendance');
+            $paths[] = new restore_path_element(
+                'googlemeet_recordingprogress',
+                '/activity/googlemeet/recordings/recording/recordingprogresses/recordingprogress'
+            );
+            $paths[] = new restore_path_element(
+                'googlemeet_recordingsub',
+                '/activity/googlemeet/recordingsubs/recordingsub'
+            );
+            $paths[] = new restore_path_element(
+                'googlemeet_practiceattempt',
+                '/activity/googlemeet/practiceattempts/practiceattempt'
+            );
+            $paths[] = new restore_path_element(
+                'googlemeet_attendance',
+                '/activity/googlemeet/events/event/attendances/attendance'
+            );
         }
 
-        $paths[] = new restore_path_element('googlemeet_holiday',
-            '/activity/googlemeet/holidays/holiday');
+        $paths[] = new restore_path_element(
+            'googlemeet_holiday',
+            '/activity/googlemeet/holidays/holiday'
+        );
 
-        $paths[] = new restore_path_element('googlemeet_cancelled',
-            '/activity/googlemeet/cancelleddates/cancelleddate');
+        $paths[] = new restore_path_element(
+            'googlemeet_cancelled',
+            '/activity/googlemeet/cancelleddates/cancelleddate'
+        );
 
         return $this->prepare_activity_structure($paths);
     }
@@ -186,8 +203,10 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $oldid = $data->id;
 
         $data->recordingid = $this->get_new_parentid('googlemeet_recording');
-        if (empty($data->recordingid)
-                || $DB->record_exists('googlemeet_ai_analysis', ['recordingid' => $data->recordingid])) {
+        if (
+            empty($data->recordingid)
+                || $DB->record_exists('googlemeet_ai_analysis', ['recordingid' => $data->recordingid])
+        ) {
             return;
         }
         $data->timecreated = $this->apply_date_offset($data->timecreated);
@@ -235,8 +254,12 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
             return;
         }
 
-        if (!$DB->record_exists('googlemeet_recording_progress',
-                ['recordingid' => $data->recordingid, 'userid' => $data->userid])) {
+        if (
+            !$DB->record_exists(
+                'googlemeet_recording_progress',
+                ['recordingid' => $data->recordingid, 'userid' => $data->userid]
+            )
+        ) {
             $DB->insert_record('googlemeet_recording_progress', $data);
         }
     }
@@ -259,8 +282,12 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
             return;
         }
 
-        if (!$DB->record_exists('googlemeet_recording_subs',
-                ['googlemeetid' => $data->googlemeetid, 'userid' => $data->userid])) {
+        if (
+            !$DB->record_exists(
+                'googlemeet_recording_subs',
+                ['googlemeetid' => $data->googlemeetid, 'userid' => $data->userid]
+            )
+        ) {
             $DB->insert_record('googlemeet_recording_subs', $data);
         }
     }
@@ -392,7 +419,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         \mod_googlemeet\question_service::remap_restored_questions(
             $context,
             (int)$this->task->get_old_moduleid(),
-            function(int $oldrecordingid) {
+            function (int $oldrecordingid) {
                 return $this->get_mappingid('googlemeet_recording', $oldrecordingid);
             }
         );

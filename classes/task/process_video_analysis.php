@@ -37,7 +37,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class process_video_analysis extends adhoc_task {
-
     /**
      * Get the task name.
      *
@@ -151,7 +150,6 @@ class process_video_analysis extends adhoc_task {
             $DB->update_record('googlemeet_ai_analysis', $analysis);
 
             mtrace("Analysis saved successfully.");
-
         } catch (gemini_transient_exception $e) {
             // Transient error (rate limit / overload): schedule a bounded retry with back-off. The
             // scheduled process_ai_analysis task re-picks the row once nextretry elapses, up to
@@ -159,14 +157,12 @@ class process_video_analysis extends adhoc_task {
             mtrace("Transient error: " . $e->getMessage() . " (scheduling retry if attempts remain).");
             $aiservice = new ai_service();
             $aiservice->record_transient_failure($analysisid, (int) ($analysis->retrycount ?? 0), $e->getMessage());
-
         } catch (\mod_googlemeet\gemini_safety_exception $e) {
             // Content blocked by Gemini's safety filters. Retrying the same content gives the same
             // result, so no automatic retry, but the stored error explains it to the teacher.
             mtrace("Blocked by Gemini safety filters: " . ($e->debuginfo ?? ''));
             $aiservice = new ai_service();
             $aiservice->record_permanent_failure($analysisid, $e->get_user_message());
-
         } catch (\Exception $e) {
             mtrace("Error: " . $e->getMessage());
 
@@ -251,7 +247,6 @@ class process_video_analysis extends adhoc_task {
             mtrace("Analysis completed.");
 
             return $result;
-
         } finally {
             // Delete the uploaded Gemini file regardless of whether analysis succeeded — it is
             // retained server-side and must not leak if wait_for_file_processing() or
@@ -282,10 +277,10 @@ class process_video_analysis extends adhoc_task {
     private function extract_drive_file_id(string $url): ?string {
         // Match various Google Drive URL formats.
         $patterns = [
-            '/\/file\/d\/([a-zA-Z0-9_-]+)/',           // /file/d/FILE_ID/
-            '/id=([a-zA-Z0-9_-]+)/',                   // ?id=FILE_ID
-            '/\/d\/([a-zA-Z0-9_-]+)/',                 // /d/FILE_ID/
-            '/open\?id=([a-zA-Z0-9_-]+)/',             // open?id=FILE_ID
+            '/\/file\/d\/([a-zA-Z0-9_-]+)/', // Form /file/d/FILE_ID/.
+            '/id=([a-zA-Z0-9_-]+)/', // Form ?id=FILE_ID.
+            '/\/d\/([a-zA-Z0-9_-]+)/', // Form /d/FILE_ID/.
+            '/open\?id=([a-zA-Z0-9_-]+)/', // Form open?id=FILE_ID.
         ];
 
         foreach ($patterns as $pattern) {
@@ -348,15 +343,23 @@ class process_video_analysis extends adhoc_task {
             if ($freespace !== false && $freespace < $requiredspace) {
                 $freemb = round($freespace / 1048576);
                 $needmb = round($requiredspace / 1048576);
-                throw new \moodle_exception('ai_error', 'googlemeet', '',
-                    "Insufficient disk space. Need {$needmb}MB but only {$freemb}MB available.");
+                throw new \moodle_exception(
+                    'ai_error',
+                    'googlemeet',
+                    '',
+                    "Insufficient disk space. Need {$needmb}MB but only {$freemb}MB available."
+                );
             }
         } else {
             // Unknown file size - check for minimum 500MB free as safety.
             $freespace = disk_free_space($tempdir);
             if ($freespace !== false && $freespace < 524288000) { // 500MB.
-                throw new \moodle_exception('ai_error', 'googlemeet', '',
-                    'Insufficient disk space. Need at least 500MB free for video download.');
+                throw new \moodle_exception(
+                    'ai_error',
+                    'googlemeet',
+                    '',
+                    'Insufficient disk space. Need at least 500MB free for video download.'
+                );
             }
         }
 

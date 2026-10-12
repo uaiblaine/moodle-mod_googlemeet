@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 namespace mod_googlemeet\external;
 
 use core_external\external_api;
@@ -32,7 +33,6 @@ use mod_googlemeet\local\sync_manager;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class request_sync extends external_api {
-
     /**
      * Parameters.
      *

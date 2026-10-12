@@ -31,7 +31,6 @@ namespace mod_googlemeet\local;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class impersonation {
-
     /** @var string Prefix of the session keys where core stores OAuth 2 access tokens. */
     private const OAUTH_PREFIX = 'oauth2-state-';
 

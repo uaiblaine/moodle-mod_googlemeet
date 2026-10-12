@@ -28,7 +28,6 @@ namespace mod_googlemeet\event;
  * The mod_googlemeet course module viewed event class.
  */
 class course_module_viewed extends \core\event\course_module_viewed {
-
     /**
      * Init method.
      *
@@ -46,6 +45,6 @@ class course_module_viewed extends \core\event\course_module_viewed {
      * @return array
      */
     public static function get_objectid_mapping() {
-        return array('db' => 'googlemeet', 'restore' => 'googlemeet');
+        return ['db' => 'googlemeet', 'restore' => 'googlemeet'];
     }
 }

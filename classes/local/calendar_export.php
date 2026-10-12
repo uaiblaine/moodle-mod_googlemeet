@@ -33,7 +33,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class calendar_export {
-
     /**
      * Upcoming (or in progress) sessions of an activity, cancelled ones left out.
      *
@@ -44,11 +43,16 @@ class calendar_export {
     public static function get_upcoming_events(int $googlemeetid, int $now): array {
         global $CFG, $DB;
         require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-        $events = $DB->get_records_select('googlemeet_events', 'googlemeetid = :gid AND eventdate + duration > :now',
-            ['gid' => $googlemeetid, 'now' => $now], 'eventdate ASC, id ASC', 'id, eventdate, duration');
+        $events = $DB->get_records_select(
+            'googlemeet_events',
+            'googlemeetid = :gid AND eventdate + duration > :now',
+            ['gid' => $googlemeetid, 'now' => $now],
+            'eventdate ASC, id ASC',
+            'id, eventdate, duration'
+        );
         $cancelled = \googlemeet_get_cancelled($googlemeetid);
         if ($cancelled) {
-            $events = array_filter($events, static function($event) use ($cancelled) {
+            $events = array_filter($events, static function ($event) use ($cancelled) {
                 return \googlemeet_is_cancelled((int)$event->eventdate, $cancelled) === false;
             });
         }
@@ -66,13 +70,22 @@ class calendar_export {
      * @param string $timezone Display-hint timezone (e.g. Europe/Madrid).
      * @return string text/calendar content (CRLF line endings, folded at 75 octets).
      */
-    public static function build_ics(stdClass $googlemeet, int $cmid, string $coursename, array $events, int $now,
-            string $timezone): string {
+    public static function build_ics(
+        stdClass $googlemeet,
+        int $cmid,
+        string $coursename,
+        array $events,
+        int $now,
+        string $timezone
+    ): string {
         global $CFG;
 
         $host = parse_url($CFG->wwwroot, PHP_URL_HOST) ?: 'moodle';
-        $name = format_string($googlemeet->name, true,
-            ['context' => \context_module::instance($cmid), 'escape' => false]);
+        $name = format_string(
+            $googlemeet->name,
+            true,
+            ['context' => \context_module::instance($cmid), 'escape' => false]
+        );
         $description = self::description($googlemeet, $cmid);
         $activityurl = (new \moodle_url('/mod/googlemeet/view.php', ['id' => $cmid]))->out(false);
 
@@ -82,8 +95,11 @@ class calendar_export {
             'PRODID:-//Moodle//mod_googlemeet//EN',
             'CALSCALE:GREGORIAN',
             'METHOD:PUBLISH',
-            'X-WR-CALNAME:' . self::escape_text(get_string('calendar_ics_name', 'googlemeet',
-                (object)['name' => $name, 'course' => $coursename])),
+            'X-WR-CALNAME:' . self::escape_text(get_string(
+                'calendar_ics_name',
+                'googlemeet',
+                (object)['name' => $name, 'course' => $coursename]
+            )),
             'X-WR-TIMEZONE:' . self::escape_text($timezone),
         ];
         foreach ($events as $event) {
@@ -117,8 +133,11 @@ class calendar_export {
     public static function google_calendar_url(stdClass $googlemeet, int $cmid, stdClass $event): string {
         $params = [
             'action' => 'TEMPLATE',
-            'text' => format_string($googlemeet->name, true,
-                ['context' => \context_module::instance($cmid), 'escape' => false]),
+            'text' => format_string(
+                $googlemeet->name,
+                true,
+                ['context' => \context_module::instance($cmid), 'escape' => false]
+            ),
             'dates' => self::utc((int)$event->eventdate) . '/' .
                 self::utc((int)$event->eventdate + max(0, (int)$event->duration)),
             'details' => self::description($googlemeet, $cmid),
@@ -170,8 +189,11 @@ class calendar_export {
         if (!empty($googlemeet->url)) {
             $parts[] = get_string('calendar_ics_join', 'googlemeet', (string)$googlemeet->url);
         }
-        $parts[] = get_string('calendar_ics_activity', 'googlemeet',
-            (new \moodle_url('/mod/googlemeet/view.php', ['id' => $cmid]))->out(false));
+        $parts[] = get_string(
+            'calendar_ics_activity',
+            'googlemeet',
+            (new \moodle_url('/mod/googlemeet/view.php', ['id' => $cmid]))->out(false)
+        );
         return implode("\n", $parts);
     }
 

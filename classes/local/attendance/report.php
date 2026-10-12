@@ -24,7 +24,6 @@ namespace mod_googlemeet\local\attendance;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class report {
-
     /** @var string Row of a matched participant. */
     public const ROW_PRESENT = 'present';
     /** @var string Participant not matched to a student. */

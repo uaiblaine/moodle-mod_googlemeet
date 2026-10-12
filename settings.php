@@ -87,7 +87,7 @@ if ($ADMIN->fulltree) {
         1
     ));
 
-    $minutes = array();
+    $minutes = [];
     for ($i = 0; $i <= 120; $i = $i + 5) {
         $minutes[$i] = $i;
     }

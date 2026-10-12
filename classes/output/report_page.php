@@ -28,7 +28,6 @@ use renderer_base;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class report_page implements \renderable, \templatable {
-
     /** @var array Result of report_builder::build(). */
     protected $data;
 
@@ -57,8 +56,14 @@ class report_page implements \renderable, \templatable {
      * @param array $filters Filter state.
      * @param string[] $identityfields Identity fields.
      */
-    public function __construct(array $data, \stdClass $googlemeet, \stdClass $cm, \context_module $context,
-            array $filters, array $identityfields) {
+    public function __construct(
+        array $data,
+        \stdClass $googlemeet,
+        \stdClass $cm,
+        \context_module $context,
+        array $filters,
+        array $identityfields
+    ) {
         $this->data = $data;
         $this->googlemeet = $googlemeet;
         $this->cm = $cm;
@@ -86,14 +91,22 @@ class report_page implements \renderable, \templatable {
             $stats = $this->data['recordingstats'][$recording->id];
             $headers[] = [
                 'index' => $index,
-                'name' => format_string(googlemeet_display_name((string)$recording->name), true,
-                    ['context' => $this->context]),
+                'name' => format_string(
+                    googlemeet_display_name((string)$recording->name),
+                    true,
+                    ['context' => $this->context]
+                ),
                 'date' => userdate($recording->createdtime, get_string('strftimedateshort', 'langconfig')),
                 'hidden' => empty($recording->visible),
-                'url' => (new moodle_url('/mod/googlemeet/view.php',
-                    ['id' => $this->cm->id, 'recording' => $recording->id]))->out(false),
-                'completedlabel' => get_string('report_rec_completed', 'googlemeet',
-                    ['n' => $stats['completed'], 'total' => $students]),
+                'url' => (new moodle_url(
+                    '/mod/googlemeet/view.php',
+                    ['id' => $this->cm->id, 'recording' => $recording->id]
+                ))->out(false),
+                'completedlabel' => get_string(
+                    'report_rec_completed',
+                    'googlemeet',
+                    ['n' => $stats['completed'], 'total' => $students]
+                ),
             ];
         }
 
@@ -116,8 +129,10 @@ class report_page implements \renderable, \templatable {
                     'isunseen' => $state === 'unseen',
                     'title' => get_string('report_cell_title', 'googlemeet', [
                         'pct' => $cell['pct'],
-                        'date' => $cell['timemodified'] ? userdate($cell['timemodified'],
-                            get_string('strftimedatetimeshort', 'langconfig')) : get_string('never'),
+                        'date' => $cell['timemodified'] ? userdate(
+                            $cell['timemodified'],
+                            get_string('strftimedatetimeshort', 'langconfig')
+                        ) : get_string('never'),
                     ]),
                 ];
             }
@@ -127,12 +142,16 @@ class report_page implements \renderable, \templatable {
             }
             $rows[] = [
                 'fullname' => fullname($row['user']),
-                'profileurl' => (new moodle_url('/user/view.php',
-                    ['id' => $row['user']->id, 'course' => $this->cm->course]))->out(false),
+                'profileurl' => (new moodle_url(
+                    '/user/view.php',
+                    ['id' => $row['user']->id, 'course' => $this->cm->course]
+                ))->out(false),
                 'identity' => $identity,
                 'completedlabel' => $row['completed'] . '/' . $totalrec,
-                'lastaccess' => $row['lastaccess'] ? userdate($row['lastaccess'],
-                    get_string('strftimedatetimeshort', 'langconfig')) : get_string('never'),
+                'lastaccess' => $row['lastaccess'] ? userdate(
+                    $row['lastaccess'],
+                    get_string('strftimedatetimeshort', 'langconfig')
+                ) : get_string('never'),
                 'lastaccessago' => $row['lastaccess'] ? format_time($now - $row['lastaccess']) : '',
                 'inactive' => $row['inactive'],
                 'cells' => $cells,
@@ -168,10 +187,15 @@ class report_page implements \renderable, \templatable {
                 ];
             }
             $failedsections[] = [
-                'name' => format_string(googlemeet_display_name((string)$recording->name), true,
-                    ['context' => $this->context]),
-                'url' => (new moodle_url('/mod/googlemeet/view.php',
-                    ['id' => $this->cm->id, 'recording' => $recording->id]))->out(false),
+                'name' => format_string(
+                    googlemeet_display_name((string)$recording->name),
+                    true,
+                    ['context' => $this->context]
+                ),
+                'url' => (new moodle_url(
+                    '/mod/googlemeet/view.php',
+                    ['id' => $this->cm->id, 'recording' => $recording->id]
+                ))->out(false),
                 'items' => $items,
             ];
         }

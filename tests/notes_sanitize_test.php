@@ -30,7 +30,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
  */
 #[CoversClass(\mod_googlemeet\client::class)]
 final class notes_sanitize_test extends \advanced_testcase {
-
     /**
      * Invoke the private sanitize_notes_html() via reflection.
      *

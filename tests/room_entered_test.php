@@ -33,7 +33,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(room_entry::class)]
 #[CoversClass(log_room_entered::class)]
 final class room_entered_test extends \advanced_testcase {
-
     /**
      * Activity + student.
      *

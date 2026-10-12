@@ -28,7 +28,6 @@ use mod_googlemeet\local\recording_cleanup;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class purge_trash extends \core\task\scheduled_task {
-
     /**
      * Task name.
      *
@@ -48,9 +47,18 @@ class purge_trash extends \core\task\scheduled_task {
             return;
         }
         $stats = recording_cleanup::purge_expired_trash(null, $days);
-        mtrace(sprintf('mod_googlemeet purge_trash: retention %d days, %d recording(s) purged '
+        mtrace(sprintf(
+            'mod_googlemeet purge_trash: retention %d days, %d recording(s) purged '
                 . '(analysis %d, progress %d, attempts %d, files %d, preferences %d, questions deleted %d, hidden %d).',
-            $days, $stats['recordings'], $stats['analysis'], $stats['progress'], $stats['attempts'], $stats['files'],
-            $stats['preferences'], $stats['questionsdeleted'], $stats['questionshidden']));
+            $days,
+            $stats['recordings'],
+            $stats['analysis'],
+            $stats['progress'],
+            $stats['attempts'],
+            $stats['files'],
+            $stats['preferences'],
+            $stats['questionsdeleted'],
+            $stats['questionshidden']
+        ));
     }
 }

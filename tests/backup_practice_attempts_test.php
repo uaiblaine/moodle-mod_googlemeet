@@ -36,7 +36,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
  */
 #[CoversNothing]
 final class backup_practice_attempts_test extends \advanced_testcase {
-
     /**
      * A course backup with users restored as a new course keeps the attempts, bound to the new ids.
      */
@@ -66,8 +65,14 @@ final class backup_practice_attempts_test extends \advanced_testcase {
         $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_READY, ['questionid' => $qid]);
         practice_attempts::record((int)$googlemeet->id, $recid, $qid, (int)$student->id, false, 1000);
 
-        $bc = new \backup_controller(\backup::TYPE_1COURSE, $course->id, \backup::FORMAT_MOODLE,
-            \backup::INTERACTIVE_NO, \backup::MODE_GENERAL, $USER->id);
+        $bc = new \backup_controller(
+            \backup::TYPE_1COURSE,
+            $course->id,
+            \backup::FORMAT_MOODLE,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id
+        );
         $bc->get_plan()->get_setting('users')->set_value(true);
         $bc->execute_plan();
         $file = $bc->get_results()['backup_destination'];
@@ -76,8 +81,14 @@ final class backup_practice_attempts_test extends \advanced_testcase {
         $backupdir = 'googlemeet-ana05-' . random_string(6);
         $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), make_backup_temp_directory($backupdir));
         $newcourseid = \restore_dbops::create_new_course('Copy', 'ana05copy', $course->category);
-        $rc = new \restore_controller($backupdir, $newcourseid, \backup::INTERACTIVE_NO, \backup::MODE_GENERAL,
-            $USER->id, \backup::TARGET_NEW_COURSE);
+        $rc = new \restore_controller(
+            $backupdir,
+            $newcourseid,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id,
+            \backup::TARGET_NEW_COURSE
+        );
         $rc->get_plan()->get_setting('users')->set_value(true);
         $this->assertTrue($rc->execute_precheck());
         $rc->execute_plan();
@@ -97,8 +108,13 @@ final class backup_practice_attempts_test extends \advanced_testcase {
         // The restored attempt drives "review my failed questions" in the copy.
         $newcm = get_coursemodule_from_instance('googlemeet', $newgooglemeet->id, $newcourseid, false, MUST_EXIST);
         $this->setUser($student);
-        $questions = practice_attempts::get_session_questions($newgooglemeet, $newcm, \context_module::instance($newcm->id),
-            (int)$student->id, practice_attempts::MODE_FAILED);
+        $questions = practice_attempts::get_session_questions(
+            $newgooglemeet,
+            $newcm,
+            \context_module::instance($newcm->id),
+            (int)$student->id,
+            practice_attempts::MODE_FAILED
+        );
         $this->assertEquals([(int)$attempt->questionid], array_column($questions, 'questionid'));
 
         // Source untouched.

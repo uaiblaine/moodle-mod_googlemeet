@@ -9,7 +9,7 @@
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="course" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false" COMMENT="ID of the course this activity is part of."/>
         <FIELD NAME="name" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="The name of the activity module instance."/>
-        <FIELD NAME="originalname" TYPE="char" LENGTH="255" NOTNULL="true" DEFAULT="" SEQUENCE="false" COMMENT="The original name of the activity module instance."/>
+        <FIELD NAME="originalname" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="The original name of the activity module instance."/>
         <FIELD NAME="url" TYPE="char" LENGTH="255" NOTNULL="true" SEQUENCE="false" COMMENT="The URL of room."/>
         <FIELD NAME="creatoremail" TYPE="char" LENGTH="255" NOTNULL="false" SEQUENCE="false" COMMENT="Email from the Google account that created the room."/>
         <FIELD NAME="intro" TYPE="text" NOTNULL="false" SEQUENCE="false" COMMENT="Activity description."/>
@@ -35,10 +35,10 @@
         <FIELD NAME="autosynchours" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Hours after session end to auto-sync recordings from Google Drive. 0 = disabled."/>
         <FIELD NAME="stalealerttime" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When admins were last alerted that this recurrence looks abandoned. 0 = no open alert."/>
         <FIELD NAME="notifyhoursbefore" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Second (early) reminder this many hours before each session. 0 = off."/>
-        <FIELD NAME="completionrecordings" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="ANA-01: completion requires at least N watched recordings. 0 = rule off."/>
-        <FIELD NAME="completionwatchpercent" TYPE="int" LENGTH="3" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="ANA-01: completion requires watching at least this percentage of the visible recordings. 0 = rule off."/>
-        <FIELD NAME="completionpractice" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="ANA-01: completion requires answering at least N distinct practice questions. 0 = rule off."/>
-        <FIELD NAME="attendanceenabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="ANA-03: per-activity opt-in to fetch real attendance from the Google Meet REST API."/>
+        <FIELD NAME="completionrecordings" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion requires at least N watched recordings. 0 = rule off."/>
+        <FIELD NAME="completionwatchpercent" TYPE="int" LENGTH="3" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion requires watching at least this percentage of the visible recordings. 0 = rule off."/>
+        <FIELD NAME="completionpractice" TYPE="int" LENGTH="4" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Completion requires answering at least N distinct practice questions. 0 = rule off."/>
+        <FIELD NAME="attendanceenabled" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Per-activity opt-in to fetch real attendance from the Google Meet REST API."/>
       </FIELDS>
       <KEYS>
         <KEY NAME="primary" TYPE="primary" FIELDS="id"/>
@@ -199,7 +199,7 @@
         <FIELD NAME="nextretry" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="Unix timestamp of next retry attempt (0=retry immediately, future=cooldown)"/>
         <FIELD NAME="timecreated" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
         <FIELD NAME="timemodified" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false"/>
-        <FIELD NAME="reviewed" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when a teacher approved the current content (IA-04)."/>
+        <FIELD NAME="reviewed" TYPE="int" LENGTH="1" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="1 when a teacher approved the current content."/>
         <FIELD NAME="timereviewed" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="When the content was approved."/>
         <FIELD NAME="reviewedby" TYPE="int" LENGTH="10" NOTNULL="true" DEFAULT="0" SEQUENCE="false" COMMENT="User who approved the content (0 = none/system)."/>
       </FIELDS>
@@ -211,7 +211,7 @@
         <INDEX NAME="status" UNIQUE="false" FIELDS="status"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="googlemeet_practice_attempts" COMMENT="Stores each student practice answer (ANA-05).">
+    <TABLE NAME="googlemeet_practice_attempts" COMMENT="Stores each student practice answer.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="googlemeetid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -252,7 +252,7 @@
         <INDEX NAME="timequeued" UNIQUE="false" FIELDS="timequeued"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="googlemeet_attendance" COMMENT="ANA-03: participants of a session, read from the Google Meet REST API.">
+    <TABLE NAME="googlemeet_attendance" COMMENT="Participants of a session, read from the Google Meet REST API.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="googlemeetid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>
@@ -280,7 +280,7 @@
         <INDEX NAME="googleuserid" UNIQUE="false" FIELDS="googleuserid"/>
       </INDEXES>
     </TABLE>
-    <TABLE NAME="googlemeet_attendance_sync" COMMENT="ANA-03: per-session state of the Meet attendance fetch.">
+    <TABLE NAME="googlemeet_attendance_sync" COMMENT="Per-session state of the Meet attendance fetch.">
       <FIELDS>
         <FIELD NAME="id" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="true"/>
         <FIELD NAME="googlemeetid" TYPE="int" LENGTH="10" NOTNULL="true" SEQUENCE="false"/>

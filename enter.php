@@ -38,8 +38,12 @@ require_capability('mod/googlemeet:view', $context);
 
 $roomurl = room_entry::room_url($googlemeet);
 if ($roomurl === null) {
-    redirect(new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
-        get_string('roomunavailable', 'googlemeet'), null, \core\output\notification::NOTIFY_WARNING);
+    redirect(
+        new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
+        get_string('roomunavailable', 'googlemeet'),
+        null,
+        \core\output\notification::NOTIFY_WARNING
+    );
 }
 
 // Only log requests coming from the activity's own button: a forged cross-site link must not

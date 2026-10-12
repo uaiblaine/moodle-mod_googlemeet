@@ -35,7 +35,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class reminders {
-
     /** @var int Reminder "minutesbefore" minutes before the session. */
     const KIND_MINUTES = 0;
 
@@ -172,12 +171,18 @@ class reminders {
             $kind = (int)($event->kind ?? self::KIND_MINUTES);
             $a = (object)[
                 // Plain-text subject: no HTML escaping (would show "Q&amp;A").
-                'name' => format_string($event->googlemeetname, true,
-                    ['context' => \context_module::instance($event->cmid), 'escape' => false]),
+                'name' => format_string(
+                    $event->googlemeetname,
+                    true,
+                    ['context' => \context_module::instance($event->cmid), 'escape' => false]
+                ),
                 'date' => userdate($event->eventdate, get_string('strftimedmy', 'googlemeet'), $user->timezone),
                 'start' => userdate($event->eventdate, get_string('strftimehm', 'googlemeet'), $user->timezone),
-                'end' => userdate($event->eventdate + $event->duration, get_string('strftimehm', 'googlemeet'),
-                    $user->timezone),
+                'end' => userdate(
+                    $event->eventdate + $event->duration,
+                    get_string('strftimehm', 'googlemeet'),
+                    $user->timezone
+                ),
                 'timezone' => usertimezone($user->timezone),
             ];
             $subjectkey = $kind === self::KIND_HOURS ? 'reminder_subject_hours' : 'reminder_subject_minutes';

@@ -63,17 +63,25 @@ $context = context_module::instance($cm->id);
 require_capability('mod/googlemeet:editrecording', $context);
 
 $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
-$recording = $recordingid > 0 ? $DB->get_record('googlemeet_recordings',
-    ['id' => $recordingid, 'googlemeetid' => $googlemeet->id, 'deleted' => 0]) : false;
+$recording = $recordingid > 0 ? $DB->get_record(
+    'googlemeet_recordings',
+    ['id' => $recordingid, 'googlemeetid' => $googlemeet->id, 'deleted' => 0]
+) : false;
 if (!$recording) {
     // Missing or stale recording id (e.g. a bookmarked/truncated link): go back to the activity.
-    redirect(new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
-        get_string('materials_invalidrecording', 'googlemeet'), null, \core\output\notification::NOTIFY_WARNING);
+    redirect(
+        new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
+        get_string('materials_invalidrecording', 'googlemeet'),
+        null,
+        \core\output\notification::NOTIFY_WARNING
+    );
 }
 
 $url = new moodle_url('/mod/googlemeet/material.php', ['id' => $cm->id, 'recording' => $recording->id]);
-$redirecturl = new moodle_url('/mod/googlemeet/view.php',
-    ['id' => $cm->id, 'recording' => $recording->id, 'tab' => 'materials']);
+$redirecturl = new moodle_url(
+    '/mod/googlemeet/view.php',
+    ['id' => $cm->id, 'recording' => $recording->id, 'tab' => 'materials']
+);
 
 $PAGE->set_url($url);
 $PAGE->set_context($context);
@@ -88,8 +96,14 @@ $data = new stdClass();
 $data->id = $cm->id;
 $data->recording = $recording->id;
 $draftitemid = file_get_submitted_draft_itemid('materials');
-file_prepare_draft_area($draftitemid, $context->id, 'mod_googlemeet', 'recordingmaterial',
-    $recording->id, $options);
+file_prepare_draft_area(
+    $draftitemid,
+    $context->id,
+    'mod_googlemeet',
+    'recordingmaterial',
+    $recording->id,
+    $options
+);
 $data->materials = $draftitemid;
 
 $mform = new mod_googlemeet_material_form(null, ['data' => $data, 'options' => $options]);
@@ -98,8 +112,14 @@ if ($mform->is_cancelled()) {
     redirect($redirecturl);
 } else if ($formdata = $mform->get_data()) {
     require_sesskey();
-    file_save_draft_area_files($formdata->materials, $context->id, 'mod_googlemeet',
-        'recordingmaterial', $recording->id, $options);
+    file_save_draft_area_files(
+        $formdata->materials,
+        $context->id,
+        'mod_googlemeet',
+        'recordingmaterial',
+        $recording->id,
+        $options
+    );
     redirect($redirecturl, get_string('material_saved', 'googlemeet'), null, \core\output\notification::NOTIFY_SUCCESS);
 }
 

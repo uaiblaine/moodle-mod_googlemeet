@@ -16,8 +16,6 @@
 
 namespace mod_googlemeet;
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * The Gemini API returned a transient error (rate limit, overload, HTTP 429/500/503).
  *
@@ -29,7 +27,6 @@ defined('MOODLE_INTERNAL') || die();
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class gemini_transient_exception extends \moodle_exception {
-
     /**
      * Constructor.
      *

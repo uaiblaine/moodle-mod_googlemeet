@@ -36,7 +36,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversClass(reminders::class)]
 final class reminders_test extends \advanced_testcase {
-
     /** @var int Fixed reference time for the tests. */
     private int $now;
 
@@ -85,7 +84,7 @@ final class reminders_test extends \advanced_testcase {
      * @return string[]
      */
     private function due_keys(int $now): array {
-        $keys = array_map(static function($event) {
+        $keys = array_map(static function ($event) {
             return $event->id . ':' . $event->kind;
         }, reminders::get_due_events($now));
         sort($keys);
@@ -218,7 +217,7 @@ final class reminders_test extends \advanced_testcase {
         [$course, $googlemeet, $student] = $this->create_activity();
         $eventid = $this->add_event($googlemeet->id, $this->now + 20 * HOURSECS);
 
-        $due = array_values(array_filter(reminders::get_due_events($this->now), static function($event) use ($eventid) {
+        $due = array_values(array_filter(reminders::get_due_events($this->now), static function ($event) use ($eventid) {
             return (int)$event->id === $eventid;
         }));
         $this->assertCount(1, $due);
@@ -248,8 +247,10 @@ final class reminders_test extends \advanced_testcase {
         $messageproviders = [];
         require($CFG->dirroot . '/mod/googlemeet/db/messages.php');
         foreach (['notification', 'recordingavailable'] as $provider) {
-            $this->assertSame(MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
-                $messageproviders[$provider]['defaults']['airnotifier']);
+            $this->assertSame(
+                MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+                $messageproviders[$provider]['defaults']['airnotifier']
+            );
         }
         $this->assertArrayHasKey('autosyncfailed', $messageproviders);
     }

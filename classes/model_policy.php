@@ -28,7 +28,6 @@ namespace mod_googlemeet;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class model_policy {
-
     /** @var string The primary model to try first. */
     private $primary;
 

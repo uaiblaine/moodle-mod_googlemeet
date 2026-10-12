@@ -34,8 +34,8 @@ $addons = [
                     'class' => '',
                 ],
                 'delegate' => 'CoreCourseModuleDelegate', // Delegate (where to display the link to the plugin).
-                'method' => 'mobile_course_view' // Main function in \mod_googlemeet\output\mobile.
-            ]
+                'method' => 'mobile_course_view', // Main function in \mod_googlemeet\output\mobile.
+            ],
         ],
         'lang' => [ // Language strings that are used in all the handlers.
             ['pluginname', 'googlemeet'],
@@ -62,6 +62,6 @@ $addons = [
             ['mobile_keypoints', 'googlemeet'],
             ['mobile_chapters', 'googlemeet'],
             ['mobile_materials', 'googlemeet'],
-        ]
-    ]
+        ],
+    ],
 ];

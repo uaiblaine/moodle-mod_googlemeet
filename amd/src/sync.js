@@ -153,8 +153,10 @@ export const init = () => {
         }
 
         if (form.data('googlemeetSyncSubmitting')) {
+            // What "return false" did in a jQuery handler, kept explicit so every path returns nothing.
             event.preventDefault();
-            return false;
+            event.stopPropagation();
+            return;
         }
 
         form.data('googlemeetSyncSubmitting', true);

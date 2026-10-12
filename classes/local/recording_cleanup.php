@@ -36,7 +36,6 @@ require_once($CFG->libdir . '/questionlib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class recording_cleanup {
-
     /** @var int Default trash retention in days when the setting was never saved. */
     public const DEFAULT_RETENTION_DAYS = 30;
 
@@ -85,8 +84,11 @@ class recording_cleanup {
      * @param bool $includequestions Also delete (or hide when in use) the tagged practice questions.
      * @return array Counters, see empty_stats().
      */
-    public static function purge_recordings(array $recordingids, ?\context_module $context,
-            bool $includequestions = true): array {
+    public static function purge_recordings(
+        array $recordingids,
+        ?\context_module $context,
+        bool $includequestions = true
+    ): array {
         global $DB;
 
         $recordingids = self::clean_ids($recordingids);
@@ -109,8 +111,11 @@ class recording_cleanup {
      * @param bool $includequestions Also delete (or hide when in use) the tagged practice questions.
      * @return array Counters, see empty_stats().
      */
-    public static function delete_dependents(array $recordingids, ?\context_module $context,
-            bool $includequestions = true): array {
+    public static function delete_dependents(
+        array $recordingids,
+        ?\context_module $context,
+        bool $includequestions = true
+    ): array {
         global $DB;
 
         $stats = self::empty_stats();
@@ -121,11 +126,13 @@ class recording_cleanup {
 
         foreach (array_chunk($recordingids, self::CHUNK) as $chunk) {
             [$insql, $params] = $DB->get_in_or_equal($chunk);
-            foreach ([
+            foreach (
+                [
                 'analysis' => 'googlemeet_ai_analysis',
                 'progress' => 'googlemeet_recording_progress',
                 'attempts' => 'googlemeet_practice_attempts',
-            ] as $key => $table) {
+                ] as $key => $table
+            ) {
                 $stats[$key] += $DB->count_records_select($table, "recordingid $insql", $params);
                 $DB->delete_records_select($table, "recordingid $insql", $params);
             }
@@ -312,8 +319,11 @@ class recording_cleanup {
      *     false: core deletes the whole module question bank itself right after.
      * @return array Counters, see empty_stats().
      */
-    public static function purge_instance_recordings(int $googlemeetid, ?\context_module $context,
-            bool $includequestions = true): array {
+    public static function purge_instance_recordings(
+        int $googlemeetid,
+        ?\context_module $context,
+        bool $includequestions = true
+    ): array {
         global $DB;
 
         $ids = $DB->get_fieldset_select('googlemeet_recordings', 'id', 'googlemeetid = ?', [$googlemeetid]);
@@ -407,8 +417,12 @@ class recording_cleanup {
      * @param string $trashreason trashreason of the row; only manual trash is purged.
      * @return string '' when automatic purge is disabled or does not apply.
      */
-    public static function purge_notice(int $timedeleted, ?int $retentiondays = null, ?int $now = null,
-            string $trashreason = self::TRASH_MANUAL): string {
+    public static function purge_notice(
+        int $timedeleted,
+        ?int $retentiondays = null,
+        ?int $now = null,
+        string $trashreason = self::TRASH_MANUAL
+    ): string {
         if ($trashreason !== self::TRASH_MANUAL) {
             // Sync-trashed recordings are never purged automatically.
             return '';
@@ -420,8 +434,11 @@ class recording_cleanup {
         if ($purgetime <= ($now ?? time())) {
             return get_string('recordings_trash_purgesoon', 'googlemeet');
         }
-        return get_string('recordings_trash_purgeon', 'googlemeet',
-            userdate($purgetime, get_string('trash_purge_dateformat', 'googlemeet')));
+        return get_string(
+            'recordings_trash_purgeon',
+            'googlemeet',
+            userdate($purgetime, get_string('trash_purge_dateformat', 'googlemeet'))
+        );
     }
 
     /**
@@ -447,13 +464,24 @@ class recording_cleanup {
             return $stats;
         }
 
-        $DB->set_field_select('googlemeet_recordings', 'timedeleted', $now, 'deleted = 1 AND timedeleted = 0 AND trashreason = ?',
-            [self::TRASH_MANUAL]);
+        $DB->set_field_select(
+            'googlemeet_recordings',
+            'timedeleted',
+            $now,
+            'deleted = 1 AND timedeleted = 0 AND trashreason = ?',
+            [self::TRASH_MANUAL]
+        );
 
         $cutoff = $now - $retentiondays * DAYSECS;
-        $rows = $DB->get_records_select('googlemeet_recordings',
+        $rows = $DB->get_records_select(
+            'googlemeet_recordings',
             'deleted = 1 AND trashreason = ? AND timedeleted > 0 AND timedeleted < ?',
-            [self::TRASH_MANUAL, $cutoff], 'googlemeetid, id', 'id, googlemeetid', 0, self::PURGE_BATCH);
+            [self::TRASH_MANUAL, $cutoff],
+            'googlemeetid, id',
+            'id, googlemeetid',
+            0,
+            self::PURGE_BATCH
+        );
         $bygooglemeet = [];
         foreach ($rows as $row) {
             $bygooglemeet[(int)$row->googlemeetid][] = (int)$row->id;
@@ -484,35 +512,43 @@ class recording_cleanup {
         $orphans['recordings'] = self::ids_sql(
             "SELECT r.id FROM {googlemeet_recordings} r
           LEFT JOIN {googlemeet} g ON g.id = r.googlemeetid
-              WHERE g.id IS NULL");
+              WHERE g.id IS NULL"
+        );
 
         // Rows whose recording no longer exists.
-        foreach ([
+        foreach (
+            [
             'analysis' => 'googlemeet_ai_analysis',
             'progress' => 'googlemeet_recording_progress',
-        ] as $key => $table) {
+            ] as $key => $table
+        ) {
             $orphans[$key] = self::ids_sql(
                 "SELECT x.id FROM {{$table}} x
               LEFT JOIN {googlemeet_recordings} r ON r.id = x.recordingid
-                  WHERE r.id IS NULL");
+                  WHERE r.id IS NULL"
+            );
         }
         $orphans['attempts'] = self::ids_sql(
             "SELECT x.id FROM {googlemeet_practice_attempts} x
           LEFT JOIN {googlemeet_recordings} r ON r.id = x.recordingid
           LEFT JOIN {googlemeet} g ON g.id = x.googlemeetid
-              WHERE r.id IS NULL OR g.id IS NULL");
+              WHERE r.id IS NULL OR g.id IS NULL"
+        );
 
         // Rows whose activity no longer exists.
-        foreach ([
+        foreach (
+            [
             'subscriptions' => 'googlemeet_recording_subs',
             'events' => 'googlemeet_events',
             'holidays' => 'googlemeet_holidays',
             'cancelled' => 'googlemeet_cancelled',
-        ] as $key => $table) {
+            ] as $key => $table
+        ) {
             $orphans[$key] = self::ids_sql(
                 "SELECT x.id FROM {{$table}} x
               LEFT JOIN {googlemeet} g ON g.id = x.googlemeetid
-                  WHERE g.id IS NULL");
+                  WHERE g.id IS NULL"
+            );
         }
         // Rows whose session (or the session's activity) no longer exists: one pass is enough even
         // when the sessions themselves are orphans found above.
@@ -520,16 +556,20 @@ class recording_cleanup {
             "SELECT x.id FROM {googlemeet_notify_done} x
           LEFT JOIN {googlemeet_events} e ON e.id = x.eventid
           LEFT JOIN {googlemeet} g ON g.id = e.googlemeetid
-              WHERE e.id IS NULL OR g.id IS NULL");
-        foreach ([
+              WHERE e.id IS NULL OR g.id IS NULL"
+        );
+        foreach (
+            [
             'attendance' => 'googlemeet_attendance',
             'attendancesync' => 'googlemeet_attendance_sync',
-        ] as $key => $table) {
+            ] as $key => $table
+        ) {
             $orphans[$key] = self::ids_sql(
                 "SELECT x.id FROM {{$table}} x
               LEFT JOIN {googlemeet_events} e ON e.id = x.eventid
               LEFT JOIN {googlemeet} g ON g.id = x.googlemeetid
-                  WHERE e.id IS NULL OR g.id IS NULL");
+                  WHERE e.id IS NULL OR g.id IS NULL"
+            );
         }
 
         // Material files whose recording no longer exists.
@@ -537,14 +577,16 @@ class recording_cleanup {
             "SELECT f.id FROM {files} f
           LEFT JOIN {googlemeet_recordings} r ON r.id = f.itemid
               WHERE f.component = :component AND f.filearea = :filearea AND r.id IS NULL",
-            ['component' => 'mod_googlemeet', 'filearea' => 'recordingmaterial']);
+            ['component' => 'mod_googlemeet', 'filearea' => 'recordingmaterial']
+        );
 
         // Per-recording preferences whose recording no longer exists.
         $orphans['preferences'] = [];
         foreach (self::PREFERENCE_PREFIXES as $prefix) {
             $names = $DB->get_fieldset_sql(
                 'SELECT DISTINCT name FROM {user_preferences} WHERE ' . $DB->sql_like('name', ':prefix'),
-                ['prefix' => $DB->sql_like_escape($prefix) . '%']);
+                ['prefix' => $DB->sql_like_escape($prefix) . '%']
+            );
             $ids = [];
             foreach ($names as $name) {
                 $suffix = substr($name, strlen($prefix));
@@ -569,7 +611,8 @@ class recording_cleanup {
               WHERE ti.component = :component AND ti.itemtype = :itemtype
                 AND " . $DB->sql_like('t.name', ':prefix', false),
             ['component' => 'core_question', 'itemtype' => 'question',
-                'prefix' => $DB->sql_like_escape(question_service::TAG_PREFIX) . '%']);
+            'prefix' => $DB->sql_like_escape(question_service::TAG_PREFIX) . '%']
+        );
         $tagbyrecording = [];
         foreach ($tags as $tag) {
             $suffix = substr($tag->name, strlen(question_service::TAG_PREFIX));
@@ -596,7 +639,9 @@ class recording_cleanup {
                    JOIN {modules} m ON m.id = cm.module AND m.name = :modname
                   WHERE ti.tagid = :tagid AND ti.component = :component AND ti.itemtype = :itemtype",
                 ['ctxlevel' => CONTEXT_MODULE, 'modname' => 'googlemeet', 'tagid' => $tag->id,
-                    'component' => 'core_question', 'itemtype' => 'question']);
+                'component' => 'core_question',
+                'itemtype' => 'question']
+            );
             foreach ($questionids as $questionid) {
                 $orphans['questions'][(int)$questionid] = $tag->name;
             }
@@ -703,7 +748,7 @@ class recording_cleanup {
      * @return int[]
      */
     protected static function clean_ids(array $ids): array {
-        return array_values(array_unique(array_filter(array_map('intval', $ids), static function(int $id): bool {
+        return array_values(array_unique(array_filter(array_map('intval', $ids), static function (int $id): bool {
             return $id > 0;
         })));
     }

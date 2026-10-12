@@ -46,7 +46,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversFunction('googlemeet_print_recording_hub')]
 #[CoversFunction('googlemeet_get_continue_watching_context')]
 final class ai_review_test extends \advanced_testcase {
-
     /** @var \stdClass */
     private $course;
     /** @var \stdClass */
@@ -248,15 +247,19 @@ final class ai_review_test extends \advanced_testcase {
         $recording = $this->create_recording();
 
         $this->setUser($this->student);
-        $result = external_api::clean_returnvalue(\mod_googlemeet_external::get_ai_analysis_returns(),
-            \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id));
+        $result = external_api::clean_returnvalue(
+            \mod_googlemeet_external::get_ai_analysis_returns(),
+            \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id)
+        );
         $this->assertFalse($result['found']);
         $this->assertSame('', $result['summary']);
         $this->assertSame([], $result['topics']);
 
         $this->setUser($this->teacher);
-        $result = external_api::clean_returnvalue(\mod_googlemeet_external::get_ai_analysis_returns(),
-            \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id));
+        $result = external_api::clean_returnvalue(
+            \mod_googlemeet_external::get_ai_analysis_returns(),
+            \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id)
+        );
         $this->assertTrue($result['found']);
         $this->assertTrue($result['pendingreview']);
         $this->assertFalse($result['reviewed']);
@@ -272,8 +275,10 @@ final class ai_review_test extends \advanced_testcase {
             $recording = $this->create_recording(['status' => $status, 'error' => 'Bloqueado']);
 
             $this->setUser($this->student);
-            $result = external_api::clean_returnvalue(\mod_googlemeet_external::get_ai_analysis_returns(),
-                \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id));
+            $result = external_api::clean_returnvalue(
+                \mod_googlemeet_external::get_ai_analysis_returns(),
+                \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id)
+            );
             $this->assertSame($status, $result['status']);
             $this->assertSame('', $result['summary'], $status);
             $this->assertSame([], $result['keypoints'], $status);
@@ -281,8 +286,10 @@ final class ai_review_test extends \advanced_testcase {
 
             // Teachers keep seeing what is there (to fix or publish it).
             $this->setUser($this->teacher);
-            $result = external_api::clean_returnvalue(\mod_googlemeet_external::get_ai_analysis_returns(),
-                \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id));
+            $result = external_api::clean_returnvalue(
+                \mod_googlemeet_external::get_ai_analysis_returns(),
+                \mod_googlemeet_external::get_ai_analysis($recording->id, $this->cm->id)
+            );
             $this->assertStringContainsString('Resumen secreto', $result['summary']);
         }
     }
@@ -320,8 +327,10 @@ final class ai_review_test extends \advanced_testcase {
         }
 
         $this->setUser($this->teacher);
-        $result = external_api::clean_returnvalue(\mod_googlemeet\external\review_ai_analysis::execute_returns(),
-            \mod_googlemeet\external\review_ai_analysis::execute($this->cm->id, $one->id));
+        $result = external_api::clean_returnvalue(
+            \mod_googlemeet\external\review_ai_analysis::execute_returns(),
+            \mod_googlemeet\external\review_ai_analysis::execute($this->cm->id, $one->id)
+        );
         $this->assertTrue($result['success']);
         $row = $DB->get_record('googlemeet_ai_analysis', ['id' => $one->analysisid]);
         $this->assertEquals(1, $row->reviewed);
@@ -411,8 +420,11 @@ final class ai_review_test extends \advanced_testcase {
         \mod_googlemeet\privacy\provider::get_users_in_context($userlist);
         $this->assertContains((int)$this->teacher->id, array_map('intval', $userlist->get_userids()));
 
-        $approved = new \core_privacy\local\request\approved_contextlist($this->teacher, 'mod_googlemeet',
-            [$this->context->id]);
+        $approved = new \core_privacy\local\request\approved_contextlist(
+            $this->teacher,
+            'mod_googlemeet',
+            [$this->context->id]
+        );
         \mod_googlemeet\privacy\provider::export_user_data($approved);
         $writer = \core_privacy\local\request\writer::with_context($this->context);
         $data = $writer->get_related_data([get_string('privacy:aireviews', 'googlemeet')], 'recording_' . $recording->id);
@@ -434,8 +446,14 @@ final class ai_review_test extends \advanced_testcase {
         $pending = $this->create_recording(['summary' => 'Pendiente']);
         ai_review::mark_reviewed($reviewed->analysisid, (int)$this->teacher->id);
 
-        $bc = new \backup_controller(\backup::TYPE_1COURSE, $this->course->id, \backup::FORMAT_MOODLE,
-            \backup::INTERACTIVE_NO, \backup::MODE_GENERAL, $USER->id);
+        $bc = new \backup_controller(
+            \backup::TYPE_1COURSE,
+            $this->course->id,
+            \backup::FORMAT_MOODLE,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id
+        );
         $bc->get_plan()->get_setting('users')->set_value(true);
         $bc->execute_plan();
         $file = $bc->get_results()['backup_destination'];
@@ -443,8 +461,14 @@ final class ai_review_test extends \advanced_testcase {
         $backupdir = 'googlemeet-aireview-' . random_string(6);
         $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), make_backup_temp_directory($backupdir));
         $newcourseid = \restore_dbops::create_new_course('Copy', 'aireviewcopy', $this->course->category);
-        $rc = new \restore_controller($backupdir, $newcourseid, \backup::INTERACTIVE_NO, \backup::MODE_GENERAL,
-            $USER->id, \backup::TARGET_NEW_COURSE);
+        $rc = new \restore_controller(
+            $backupdir,
+            $newcourseid,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id,
+            \backup::TARGET_NEW_COURSE
+        );
         $this->assertTrue($rc->execute_precheck());
         $rc->execute_plan();
         $rc->destroy();

@@ -31,7 +31,7 @@ require_once(__DIR__ . '/../../../../lib/behat/behat_base.php');
  * Steps for mod_googlemeet.
  */
 class behat_mod_googlemeet extends behat_base {
-
+    // phpcs:disable moodle.Files.LineLength -- A step definition regex cannot be wrapped.
     /**
      * Visit a plugin script of an activity with an explicit recording id (e.g. a stale link).
      *
@@ -50,6 +50,7 @@ class behat_mod_googlemeet extends behat_base {
         $this->getSession()->visit($this->locate_path('/mod/googlemeet/' . $script . '?id=' . $cm->id .
             '&recording=' . $recordingid));
     }
+    // phpcs:enable
 
     /**
      * Configure an offline Google OAuth 2 issuer (no network) so the recordings list is rendered.
@@ -67,11 +68,13 @@ class behat_mod_googlemeet extends behat_base {
             'showonloginpage' => 0, 'basicauth' => 0, 'servicetype' => 'google',
         ]);
         $issuer->create();
-        foreach ([
+        foreach (
+            [
             'authorization_endpoint' => 'https://accounts.google.com/o/oauth2/v2/auth',
             'token_endpoint' => 'https://oauth2.googleapis.com/token',
             'userinfo_endpoint' => 'https://openidconnect.googleapis.com/v1/userinfo',
-        ] as $name => $url) {
+            ] as $name => $url
+        ) {
             (new \core\oauth2\endpoint(0, (object)['issuerid' => $issuer->get('id'), 'name' => $name, 'url' => $url]))->create();
         }
         set_config('issuerid', $issuer->get('id'), 'googlemeet');

@@ -36,17 +36,16 @@ use core_privacy\local\request\writer;
  */
 class provider implements
         // This plugin does store personal user data.
-        \core_privacy\local\metadata\provider,
-
-        // This plugin is a core_user_data_provider.
-        \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\metadata\provider,
 
         // This plugin is capable of determining which users have data within it.
-        \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\core_userlist_provider,
+
+        // This plugin is a core_user_data_provider.
+    \core_privacy\local\request\plugin\provider,
 
         // This plugin stores per-recording user preferences (last position jumped to, key points checklist).
-        \core_privacy\local\request\user_preference_provider {
-
+    \core_privacy\local\request\user_preference_provider {
     /** @var string Prefix of the per-recording "last jump" user preference. */
     const LASTJUMP_PREFIX = 'mod_googlemeet_lastjump_';
 
@@ -59,7 +58,7 @@ class provider implements
      * @param collection $collection a reference to the collection to use to store the metadata.
      * @return collection the updated collection of metadata items.
      */
-    public static function get_metadata(collection $collection) : collection {
+    public static function get_metadata(collection $collection): collection {
         // Per-user notification dispatch log.
         $collection->add_database_table(
             'googlemeet_notify_done',
@@ -199,10 +198,14 @@ class provider implements
             'privacy:metadata:google_calendar'
         );
 
-        $collection->add_user_preference(self::LASTJUMP_PREFIX . '<recordingid>',
-            'privacy:metadata:preference:lastjump');
-        $collection->add_user_preference(self::KEYPOINTS_PREFIX . '<recordingid>',
-            'privacy:metadata:preference:keypoints');
+        $collection->add_user_preference(
+            self::LASTJUMP_PREFIX . '<recordingid>',
+            'privacy:metadata:preference:lastjump'
+        );
+        $collection->add_user_preference(
+            self::KEYPOINTS_PREFIX . '<recordingid>',
+            'privacy:metadata:preference:keypoints'
+        );
 
         // Attendance read from the Google Meet REST API.
         \mod_googlemeet\local\attendance\privacy::add_metadata($collection);
@@ -216,7 +219,7 @@ class provider implements
      * @param   int           $userid       The user to search.
      * @return  contextlist   $contextlist  The list of contexts used in this plugin.
      */
-    public static function get_contexts_for_userid(int $userid) : contextlist {
+    public static function get_contexts_for_userid(int $userid): contextlist {
 
         $sql = "SELECT c.id
                   FROM {context} c
@@ -366,7 +369,7 @@ class provider implements
 
         $user = $contextlist->get_user();
 
-        list($contextsql, $contextparams) = $DB->get_in_or_equal($contextlist->get_contextids(), SQL_PARAMS_NAMED);
+        [$contextsql, $contextparams] = $DB->get_in_or_equal($contextlist->get_contextids(), SQL_PARAMS_NAMED);
 
         $sql = "SELECT cm.id AS cmid,
                        gnd.timesent
@@ -383,14 +386,14 @@ class provider implements
         $params = [
             'modname' => 'googlemeet',
             'contextlevel' => CONTEXT_MODULE,
-            'userid' => $user->id
+            'userid' => $user->id,
         ] + $contextparams;
 
         $notifications = $DB->get_recordset_sql($sql, $params);
 
         foreach ($notifications as $notification) {
             $notificationdata = [
-                'timesent' => \core_privacy\local\request\transform::datetime($notification->timesent)
+                'timesent' => \core_privacy\local\request\transform::datetime($notification->timesent),
             ];
 
             $context = \context_module::instance($notification->cmid);
@@ -580,7 +583,7 @@ class provider implements
 
         $recordingids = $DB->get_fieldset_select('googlemeet_recordings', 'id', 'googlemeetid = ?', [$cm->instance]);
         if (!empty($recordingids)) {
-            list($insql, $inparams) = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
+            [$insql, $inparams] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
             $DB->delete_records_select('googlemeet_recording_progress', "recordingid $insql", $inparams);
             $DB->delete_records_select('googlemeet_ai_analysis', "recordingid $insql", $inparams);
             $names = [];
@@ -614,7 +617,6 @@ class provider implements
 
         $userid = $contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
-
             if (!$context instanceof \context_module) {
                 continue;
             }
@@ -660,11 +662,13 @@ class provider implements
             return;
         }
         [$usql, $uparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'ru');
-        $DB->execute("UPDATE {googlemeet_ai_analysis}
+        $DB->execute(
+            "UPDATE {googlemeet_ai_analysis}
                          SET reviewedby = 0
                        WHERE reviewedby {$usql}
                          AND recordingid IN (SELECT id FROM {googlemeet_recordings} WHERE googlemeetid = :rgmid)",
-            $uparams + ['rgmid' => $googlemeetid]);
+            $uparams + ['rgmid' => $googlemeetid]
+        );
     }
 
     /**
@@ -715,7 +719,7 @@ class provider implements
             return;
         }
 
-        list($usersql, $userparams) = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
+        [$usersql, $userparams] = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
 
         $select = "eventid IN (SELECT id FROM {googlemeet_events} WHERE googlemeetid = :googlemeetid) AND userid $usersql";
         $params = ['googlemeetid' => $cm->instance] + $userparams;
@@ -743,15 +747,21 @@ class provider implements
         global $CFG, $DB;
         require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
-        $preferences = $DB->get_records_select('user_preferences',
+        $preferences = $DB->get_records_select(
+            'user_preferences',
             'userid = :userid AND ' . $DB->sql_like('name', ':prefix'),
             ['userid' => $userid, 'prefix' => $DB->sql_like_escape(self::LASTJUMP_PREFIX) . '%'],
-            'name', 'id, name, value');
+            'name',
+            'id, name, value'
+        );
         \mod_googlemeet\local\attendance\privacy::export_preferences($userid);
-        $kppreferences = $DB->get_records_select('user_preferences',
+        $kppreferences = $DB->get_records_select(
+            'user_preferences',
             'userid = :userid AND ' . $DB->sql_like('name', ':prefix'),
             ['userid' => $userid, 'prefix' => $DB->sql_like_escape(self::KEYPOINTS_PREFIX) . '%'],
-            'name', 'id, name, value');
+            'name',
+            'id, name, value'
+        );
         foreach ($kppreferences as $preference) {
             $recordingid = (int)substr($preference->name, strlen(self::KEYPOINTS_PREFIX));
             $recordingname = $DB->get_field('googlemeet_recordings', 'name', ['id' => $recordingid]);

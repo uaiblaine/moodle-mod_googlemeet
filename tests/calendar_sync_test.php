@@ -27,33 +27,7 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
-
-/**
- * Test double of \mod_googlemeet\rest: records calls, optionally throws.
- */
-class calendar_sync_test_fake_rest {
-    /** @var array Captured calls. */
-    public array $calls = [];
-
-    /** @var \Exception|null Thrown by call() when set. */
-    public ?\Exception $throw = null;
-
-    /**
-     * Fake core\oauth2\rest::call().
-     *
-     * @param string $api
-     * @param array $params
-     * @param mixed $rawpost
-     * @return \stdClass|null
-     */
-    public function call($api, $params, $rawpost = false) {
-        $this->calls[] = ['api' => $api, 'params' => $params, 'body' => $rawpost === false ? null : json_decode($rawpost, true)];
-        if ($this->throw) {
-            throw $this->throw;
-        }
-        return $api === 'deleteevent' ? null : (object)['id' => $params['eventid'] ?? ''];
-    }
-}
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/calendar_sync_test_fake_rest.php');
 
 /**
  * The Google Calendar event follows activity edits and deletion.
@@ -67,7 +41,6 @@ class calendar_sync_test_fake_rest {
 #[CoversClass(calendar_update_event::class)]
 #[CoversClass(calendar_delete_event::class)]
 final class calendar_sync_test extends \advanced_testcase {
-
     /** @var calendar_sync_test_fake_rest */
     private calendar_sync_test_fake_rest $rest;
 
@@ -82,7 +55,7 @@ final class calendar_sync_test extends \advanced_testcase {
         $this->resetAfterTest();
         $this->rest = new calendar_sync_test_fake_rest();
         $this->factoryusers = [];
-        calendar_sync::set_service_factory(function(\stdClass $user) {
+        calendar_sync::set_service_factory(function (\stdClass $user) {
             $this->factoryusers[] = (int)$user->id;
             return $this->rest;
         });
@@ -161,7 +134,7 @@ final class calendar_sync_test extends \advanced_testcase {
     public function test_decode_event_id(): void {
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc')));
         $this->assertSame('rawid_123', calendar_sync::decode_event_id('rawid_123'));
-        // htmlLink of a recurring event may carry the first instance: the series id is used.
+        // The htmlLink of a recurring event may carry the first instance: the series id is used.
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc_20260302T173000Z')));
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc_20260302')));
         $this->assertSame('evt0123abc', calendar_sync::series_id('evt0123abc'));
@@ -235,9 +208,21 @@ final class calendar_sync_test extends \advanced_testcase {
         ]);
         googlemeet_update_instance($data);
         // Saving twice in a row collapses into a single task.
-        googlemeet_update_instance($this->form_data($DB->get_record('googlemeet', ['id' => $record->id]), $cm,
+        googlemeet_update_instance($this->form_data(
+            $DB->get_record('googlemeet', ['id' => $record->id]),
+            $cm,
             ['name' => 'Derecho administrativo II', 'addmultiply' => 1, 'days' => ['Tue' => '1'], 'period' => 1,
-             'eventenddate' => make_timestamp(2026, 6, 30, 0, 0, 0, 'Europe/Madrid'), 'starthour' => 17]));
+            'eventenddate' => make_timestamp(
+                2026,
+                6,
+                30,
+                0,
+                0,
+                0,
+                'Europe/Madrid'
+            ),
+            'starthour' => 17]
+        ));
         $this->assertCount(1, \core\task\manager::get_adhoc_tasks(calendar_update_event::class));
         $this->assertEmpty($this->rest->calls, 'Nothing is sent to Google while saving.');
 

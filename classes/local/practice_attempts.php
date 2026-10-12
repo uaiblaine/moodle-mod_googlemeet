@@ -33,7 +33,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class practice_attempts {
-
     /** @var string Table name. */
     public const TABLE = 'googlemeet_practice_attempts';
 
@@ -57,8 +56,14 @@ class practice_attempts {
      * @param int|null $time Timestamp (defaults to now).
      * @return int New attempt id.
      */
-    public static function record(int $googlemeetid, int $recordingid, int $questionid, int $userid, bool $correct,
-            ?int $time = null): int {
+    public static function record(
+        int $googlemeetid,
+        int $recordingid,
+        int $questionid,
+        int $userid,
+        bool $correct,
+        ?int $time = null
+    ): int {
         global $DB;
 
         return (int)$DB->insert_record(self::TABLE, (object)[
@@ -172,8 +177,11 @@ class practice_attempts {
      * @param \context_module $context Module context.
      * @return array recordingid => number of ready questions
      */
-    public static function count_ready_questions_by_recording(stdClass $googlemeet, stdClass $cm,
-            \context_module $context): array {
+    public static function count_ready_questions_by_recording(
+        stdClass $googlemeet,
+        stdClass $cm,
+        \context_module $context
+    ): array {
         return array_count_values(self::get_ready_question_map($googlemeet, $cm, $context));
     }
 
@@ -186,8 +194,12 @@ class practice_attempts {
      * @param int $userid User id.
      * @return int
      */
-    public static function count_failed_questions(stdClass $googlemeet, stdClass $cm, \context_module $context,
-            int $userid): int {
+    public static function count_failed_questions(
+        stdClass $googlemeet,
+        stdClass $cm,
+        \context_module $context,
+        int $userid
+    ): int {
         $refs = self::get_failed_question_refs((int)$googlemeet->id, $userid);
         if (!$refs) {
             return 0;
@@ -238,7 +250,7 @@ class practice_attempts {
             }
         }
         $topics = array_values($topics);
-        usort($topics, static function($a, $b) {
+        usort($topics, static function ($a, $b) {
             return strnatcasecmp($a['topic'], $b['topic']);
         });
         return $topics;
@@ -259,8 +271,15 @@ class practice_attempts {
      * @param int $limit Maximum questions (0 = no limit).
      * @return array[] ['questionid', 'recordingid', 'recordingname', 'stem', 'options' => [...]]
      */
-    public static function get_session_questions(stdClass $googlemeet, stdClass $cm, \context_module $context,
-            int $userid, string $mode, string $topic = '', int $limit = self::SESSION_LIMIT): array {
+    public static function get_session_questions(
+        stdClass $googlemeet,
+        stdClass $cm,
+        \context_module $context,
+        int $userid,
+        string $mode,
+        string $topic = '',
+        int $limit = self::SESSION_LIMIT
+    ): array {
         $recordings = self::get_practice_recordings($googlemeet, $context);
 
         $wanted = null; // Null = every ready question of the selected recordings.
@@ -279,7 +298,7 @@ class practice_attempts {
             if (trim($topic) === '') {
                 return [];
             }
-            $recordingids = array_map(static function($r) {
+            $recordingids = array_map(static function ($r) {
                 return (int)$r->id;
             }, googlemeet_filter_recordings_by_topic(array_values($recordings), $topic));
         } else {
@@ -295,8 +314,11 @@ class practice_attempts {
                     continue;
                 }
                 $question['recordingid'] = $recordingid;
-                $question['recordingname'] = format_string(googlemeet_display_name((string)$recordings[$recordingid]->name),
-                    true, ['context' => $context]);
+                $question['recordingname'] = format_string(
+                    googlemeet_display_name((string)$recordings[$recordingid]->name),
+                    true,
+                    ['context' => $context]
+                );
                 $byid[$qid] = $question;
             }
         }
@@ -383,7 +405,7 @@ class practice_attempts {
         }
         $questionids = [];
         foreach ($byrecording as $recordingid => $rows) {
-            usort($rows, static function($a, $b) {
+            usort($rows, static function ($a, $b) {
                 return [$b['wrong'] / $b['attempts'], $b['wrong'], $a['questionid']]
                     <=> [$a['wrong'] / $a['attempts'], $a['wrong'], $b['questionid']];
             });
@@ -416,8 +438,12 @@ class practice_attempts {
      * @param int $userid User id.
      * @return array|null Null when there is nothing to practise or the user manages questions.
      */
-    public static function hero_cta_context(stdClass $googlemeet, stdClass $cm, \context_module $context,
-            int $userid): ?array {
+    public static function hero_cta_context(
+        stdClass $googlemeet,
+        stdClass $cm,
+        \context_module $context,
+        int $userid
+    ): ?array {
         if (has_capability('mod/googlemeet:managequestions', $context)) {
             return null;
         }
@@ -427,8 +453,10 @@ class practice_attempts {
         $failed = self::count_failed_questions($googlemeet, $cm, $context, $userid);
         return [
             'practiceurl' => (new \moodle_url('/mod/googlemeet/practice.php', ['id' => $cm->id]))->out(false),
-            'failedurl' => (new \moodle_url('/mod/googlemeet/practice.php',
-                ['id' => $cm->id, 'mode' => self::MODE_FAILED]))->out(false),
+            'failedurl' => (new \moodle_url(
+                '/mod/googlemeet/practice.php',
+                ['id' => $cm->id, 'mode' => self::MODE_FAILED]
+            ))->out(false),
             'hasfailed' => $failed > 0,
             'failedlabel' => get_string('practice_failed_button', 'googlemeet', $failed),
         ];

@@ -35,7 +35,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     $dbman = $DB->get_manager();
 
     if ($oldversion < 2023042200) {
-
         // Define field eventid to be added to googlemeet.
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('eventid', XMLDB_TYPE_CHAR, '100', null, null, null, null, 'timemodified');
@@ -50,7 +49,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121402) {
-
         // Define table googlemeet_holidays to be created.
         $table = new xmldb_table('googlemeet_holidays');
 
@@ -76,7 +74,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121403) {
-
         // Define table googlemeet_cancelled to be created.
         $table = new xmldb_table('googlemeet_cancelled');
 
@@ -101,7 +98,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121404) {
-
         // Define field maxupcomingevents to be added to googlemeet.
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('maxupcomingevents', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '3', 'eventid');
@@ -116,7 +112,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121500) {
-
         // Define table googlemeet_ai_analysis to be created.
         $table = new xmldb_table('googlemeet_ai_analysis');
 
@@ -171,7 +166,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121502) {
-
         // Define field maxrecordings to be added to googlemeet.
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('maxrecordings', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '5', 'maxupcomingevents');
@@ -194,7 +188,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121503) {
-
         // Increase eventid field length from 100 to 255 chars.
         // Google Calendar Event IDs can be up to 1024 chars.
         $table = new xmldb_table('googlemeet');
@@ -208,7 +201,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025121705) {
-
         // Define field recordingfilter to be added to googlemeet.
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('recordingfilter', XMLDB_TYPE_CHAR, '255', null, null, null, null, 'recordingsorder');
@@ -223,7 +215,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2025122900) {
-
         // Add missing indexes for performance optimization.
         // These indexes improve JOIN and WHERE clause performance on foreign key columns.
 
@@ -271,7 +262,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026042201) {
-
         // Add autosynchours to googlemeet (0 = disabled, else hours after session end to auto-sync).
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('autosynchours', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'recordingfilter');
@@ -342,9 +332,9 @@ function xmldb_googlemeet_upgrade($oldversion) {
         // were upgraded (rather than freshly installed) across earlier versions.
 
         // 1) googlemeet_notify_done: the composite UNIQUE (eventid, userid) index from install.xml
-        //    was never added by an upgrade step (only the single-column indexes were), so upgraded
-        //    sites lack it. Remove any duplicate (eventid, userid) rows first — keeping the lowest
-        //    id — so the unique index can be created safely, then add it if missing.
+        // was never added by an upgrade step (only the single-column indexes were), so upgraded
+        // sites lack it. Remove any duplicate (eventid, userid) rows first — keeping the lowest
+        // id — so the unique index can be created safely, then add it if missing.
         $DB->execute("DELETE FROM {googlemeet_notify_done}
                        WHERE id NOT IN (
                            SELECT minid FROM (
@@ -361,7 +351,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
         }
 
         // 2) googlemeet_events.syncattempts: align the integer length with install.xml (10) on
-        //    sites where it was created narrower.
+        // sites where it was created narrower.
         $table = new xmldb_table('googlemeet_events');
         $field = new xmldb_field('syncattempts', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'autosynced');
         if ($dbman->field_exists($table, $field)) {
@@ -516,8 +506,11 @@ function xmldb_googlemeet_upgrade($oldversion) {
         if (!$dbman->field_exists($table, $field)) {
             $dbman->add_field($table, $field);
         }
-        $index = new xmldb_index('googlemeetid_deleted_createdtime', XMLDB_INDEX_NOTUNIQUE,
-            ['googlemeetid', 'deleted', 'createdtime']);
+        $index = new xmldb_index(
+            'googlemeetid_deleted_createdtime',
+            XMLDB_INDEX_NOTUNIQUE,
+            ['googlemeetid', 'deleted', 'createdtime']
+        );
         if (!$dbman->index_exists($table, $index)) {
             $dbman->add_index($table, $index);
         }
@@ -550,9 +543,13 @@ function xmldb_googlemeet_upgrade($oldversion) {
             $dbman->add_field($table, $field);
         }
 
-        $records = $DB->get_records_select('config_plugins',
+        $records = $DB->get_records_select(
+            'config_plugins',
             'plugin = :plugin AND ' . $DB->sql_like('name', ':pattern'),
-            ['plugin' => 'googlemeet', 'pattern' => 'stalealert\_%'], '', 'id, name, value');
+            ['plugin' => 'googlemeet', 'pattern' => 'stalealert\_%'],
+            '',
+            'id, name, value'
+        );
         foreach ($records as $rec) {
             $gmid = substr($rec->name, strlen('stalealert_'));
             if (ctype_digit($gmid) && $DB->record_exists('googlemeet', ['id' => (int)$gmid])) {
@@ -612,8 +609,10 @@ function xmldb_googlemeet_upgrade($oldversion) {
         }
         // Analyses that exist at upgrade time are already visible to students, so mark them reviewed
         // (reviewedby 0 = system); only those (re)generated afterwards wait for a teacher review.
-        $DB->execute("UPDATE {googlemeet_ai_analysis} SET reviewed = 1, timereviewed = :now WHERE reviewed = 0",
-            ['now' => time()]);
+        $DB->execute(
+            "UPDATE {googlemeet_ai_analysis} SET reviewed = 1, timereviewed = :now WHERE reviewed = 0",
+            ['now' => time()]
+        );
         if (get_config('googlemeet', 'requireaireview') === false) {
             set_config('requireaireview', 1, 'googlemeet');
         }
@@ -714,7 +713,6 @@ function xmldb_googlemeet_upgrade($oldversion) {
 
         upgrade_mod_savepoint(true, 2026101141, 'googlemeet');
     }
-
 
     if ($oldversion < 2026101190) {
         // Only recordings a teacher moved to the trash by hand are purged automatically.

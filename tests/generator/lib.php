@@ -23,13 +23,10 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * mod_googlemeet test data generator class.
  */
 class mod_googlemeet_generator extends testing_module_generator {
-
     /**
      * Create a new googlemeet activity instance.
      *

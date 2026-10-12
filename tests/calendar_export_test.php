@@ -34,7 +34,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  */
 #[CoversClass(calendar_export::class)]
 final class calendar_export_test extends \advanced_testcase {
-
     /** @var int 2 November 2026 16:00 UTC (17:00 in Madrid, CET). */
     const SESSION1 = 1793635200;
 
@@ -53,7 +52,7 @@ final class calendar_export_test extends \advanced_testcase {
             'url' => 'https://meet.google.com/abc-defg-hij',
         ]);
         $now = self::SESSION1 - 2 * DAYSECS;
-        $insert = function(int $eventdate) use ($DB, $googlemeet, $now) {
+        $insert = function (int $eventdate) use ($DB, $googlemeet, $now) {
             return (int)$DB->insert_record('googlemeet_events', (object)[
                 'googlemeetid' => $googlemeet->id,
                 'eventdate' => $eventdate,
@@ -85,8 +84,14 @@ final class calendar_export_test extends \advanced_testcase {
 
         $events = calendar_export::get_upcoming_events((int)$googlemeet->id, $now);
         $this->assertCount(1, $events);
-        $ics = calendar_export::build_ics($googlemeet, (int)$googlemeet->cmid, 'Oposiciones; Auxiliar, 2026', $events,
-            $now, 'Europe/Madrid');
+        $ics = calendar_export::build_ics(
+            $googlemeet,
+            (int)$googlemeet->cmid,
+            'Oposiciones; Auxiliar, 2026',
+            $events,
+            $now,
+            'Europe/Madrid'
+        );
 
         $this->assertStringStartsWith("BEGIN:VCALENDAR\r\nVERSION:2.0\r\n", $ics);
         $this->assertStringEndsWith("END:VCALENDAR\r\n", $ics);
@@ -136,8 +141,10 @@ final class calendar_export_test extends \advanced_testcase {
         $context = calendar_export::hero_context($googlemeet, (int)$googlemeet->cmid, $now);
         $this->assertTrue($context['hascalendarlinks']);
         $this->assertTrue($context['hascalendargoogle']);
-        $this->assertStringContainsString('/mod/googlemeet/calendar.php?id=' . $googlemeet->cmid,
-            $context['calendaricsurl']);
+        $this->assertStringContainsString(
+            '/mod/googlemeet/calendar.php?id=' . $googlemeet->cmid,
+            $context['calendaricsurl']
+        );
 
         $url = $context['calendargoogleurl'];
         $this->assertStringStartsWith('https://calendar.google.com/calendar/render?action=TEMPLATE', $url);
@@ -145,7 +152,9 @@ final class calendar_export_test extends \advanced_testcase {
         $this->assertStringContainsString('location=' . rawurlencode('https://meet.google.com/abc-defg-hij'), $url);
 
         // No upcoming sessions: no links.
-        $this->assertSame(['hascalendarlinks' => false],
-            calendar_export::hero_context($googlemeet, (int)$googlemeet->cmid, self::SESSION1 + 30 * DAYSECS));
+        $this->assertSame(
+            ['hascalendarlinks' => false],
+            calendar_export::hero_context($googlemeet, (int)$googlemeet->cmid, self::SESSION1 + 30 * DAYSECS)
+        );
     }
 }

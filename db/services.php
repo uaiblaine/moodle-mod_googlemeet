@@ -24,152 +24,152 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$functions = array(
-    'mod_googlemeet_recording_edit_name' => array(
+$functions = [
+    'mod_googlemeet_recording_edit_name' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'recording_edit_name',
         'description' => 'Edit the name of a recording',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_showhide_recording' => array(
+    ],
+    'mod_googlemeet_showhide_recording' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'showhide_recording',
         'description' => 'Toggle the visibility of a recording',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_delete_all_recordings' => array(
+    ],
+    'mod_googlemeet_delete_all_recordings' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'delete_all_recordings',
         'description' => 'Move every active recording of a Google Meet activity to the teacher trash',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:removerecording',
-    ),
-    'mod_googlemeet_restore_recording' => array(
+    ],
+    'mod_googlemeet_restore_recording' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'restore_recording',
         'description' => 'Restore a recording from the Google Meet recording trash',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_trash_recording' => array(
+    ],
+    'mod_googlemeet_trash_recording' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'trash_recording',
         'description' => 'Move a Google Meet recording to the teacher trash',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_purge_recording' => array(
+    ],
+    'mod_googlemeet_purge_recording' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'purge_recording',
         'description' => 'Permanently delete a trashed Google Meet recording',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:removerecording',
-    ),
-    'mod_googlemeet_generate_ai_analysis' => array(
+    ],
+    'mod_googlemeet_generate_ai_analysis' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'generate_ai_analysis',
         'description' => 'Generate AI analysis for a recording',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:generateai',
-    ),
-    'mod_googlemeet_get_ai_analysis' => array(
+    ],
+    'mod_googlemeet_get_ai_analysis' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'get_ai_analysis',
         'description' => 'Get AI analysis for a recording',
         'type' => 'read',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
-    ),
-    'mod_googlemeet_save_ai_analysis' => array(
+    ],
+    'mod_googlemeet_save_ai_analysis' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'save_ai_analysis',
         'description' => 'Save AI analysis manually for a recording',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_analyze_transcript' => array(
+    ],
+    'mod_googlemeet_analyze_transcript' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'analyze_transcript',
         'description' => 'Analyze a pasted transcript using Gemini AI',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_publish_questions' => array(
+    ],
+    'mod_googlemeet_publish_questions' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'publish_questions',
         'description' => 'Publish Google Meet recording questions',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_publish_activity_drafts' => array(
+    ],
+    'mod_googlemeet_publish_activity_drafts' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'publish_activity_drafts',
         'description' => 'Publish every draft question of a Google Meet activity',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_unpublish_questions' => array(
+    ],
+    'mod_googlemeet_unpublish_questions' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'unpublish_questions',
         'description' => 'Unpublish Google Meet recording questions',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_discard_questions' => array(
+    ],
+    'mod_googlemeet_discard_questions' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'discard_questions',
         'description' => 'Discard draft Google Meet recording questions',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_update_question' => array(
+    ],
+    'mod_googlemeet_update_question' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'update_question',
         'description' => 'Update a Google Meet recording question',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_queue_generate_questions' => array(
+    ],
+    'mod_googlemeet_queue_generate_questions' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'queue_generate_questions',
         'description' => 'Queue AI question generation for a Google Meet recording',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_get_questions' => array(
+    ],
+    'mod_googlemeet_get_questions' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'get_questions',
         'description' => 'Get Google Meet recording questions',
         'type' => 'read',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:managequestions',
-    ),
-    'mod_googlemeet_get_practice_questions' => array(
+    ],
+    'mod_googlemeet_get_practice_questions' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'get_practice_questions',
         'description' => 'Get ready Google Meet recording questions for student practice',
         'type' => 'read',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
-    ),
-    'mod_googlemeet_check_practice_answer' => array(
+    ],
+    'mod_googlemeet_check_practice_answer' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'check_practice_answer',
         'description' => 'Check a Google Meet recording student practice answer',
@@ -177,8 +177,8 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
-    ),
-    'mod_googlemeet_mark_recording_progress' => array(
+    ],
+    'mod_googlemeet_mark_recording_progress' => [
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'mark_recording_progress',
         'description' => 'Mark Google Meet recording viewing progress for the current user',
@@ -186,41 +186,41 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
-    ),
-    'mod_googlemeet_get_practice_session' => array(
+    ],
+    'mod_googlemeet_get_practice_session' => [
         'classname' => 'mod_googlemeet\\external\\get_practice_session',
         'description' => 'Get an activity-wide practice session (failed questions or by topic)',
         'type' => 'read',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
-    ),
-    'mod_googlemeet_review_ai_analysis' => array(
+    ],
+    'mod_googlemeet_review_ai_analysis' => [
         'classname' => 'mod_googlemeet\\external\\review_ai_analysis',
         'description' => 'Publish the reviewed AI summary of a recording (or of every recording of the activity) to students',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_request_sync' => array(
+    ],
+    'mod_googlemeet_request_sync' => [
         'classname' => 'mod_googlemeet\\external\\request_sync',
-        'description' => 'Queue a background Google Drive sync of an activity (PERF-02)',
+        'description' => 'Queue a background Google Drive sync of an activity',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_get_sync_status' => array(
+    ],
+    'mod_googlemeet_get_sync_status' => [
         'classname' => 'mod_googlemeet\\external\\get_sync_status',
-        'description' => 'Status of the background Google Drive sync of an activity (PERF-02)',
+        'description' => 'Status of the background Google Drive sync of an activity',
         'type' => 'read',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
-    ),
-    'mod_googlemeet_log_room_entered' => array(
+    ],
+    'mod_googlemeet_log_room_entered' => [
         'classname' => 'mod_googlemeet\\external\\log_room_entered',
         'description' => 'Log that the user enters the live Google Meet room and return its URL',
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
         'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
-    ),
-);
+    ],
+];

@@ -35,7 +35,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 #[CoversFunction('googlemeet_hub_transcript')]
 #[CoversFunction('googlemeet_print_recording_hub')]
 final class recording_hub_test extends \advanced_testcase {
-
     /**
      * Analysis transcript wins; an empty one falls back to the recording transcript.
      */
@@ -47,8 +46,10 @@ final class recording_hub_test extends \advanced_testcase {
         $this->assertSame("0:08\nMeet transcript", googlemeet_hub_transcript($done(''), $recording));
         $this->assertSame("0:08\nMeet transcript", googlemeet_hub_transcript($done("  \n"), $recording));
         $this->assertSame("0:08\nMeet transcript", googlemeet_hub_transcript(false, $recording));
-        $this->assertSame("0:08\nMeet transcript",
-            googlemeet_hub_transcript((object)['status' => 'pending', 'transcript' => 'partial'], $recording));
+        $this->assertSame(
+            "0:08\nMeet transcript",
+            googlemeet_hub_transcript((object)['status' => 'pending', 'transcript' => 'partial'], $recording)
+        );
         $this->assertSame('', googlemeet_hub_transcript($done(''), (object)['transcripttext' => null]));
         $this->assertSame('', googlemeet_hub_transcript($done(''), (object)[]));
     }
@@ -86,7 +87,7 @@ final class recording_hub_test extends \advanced_testcase {
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $now = time();
-        $insert = function(string $transcripttext) use ($DB, $googlemeet, $now) {
+        $insert = function (string $transcripttext) use ($DB, $googlemeet, $now) {
             $id = $DB->insert_record('googlemeet_recordings', (object)[
                 'googlemeetid' => $googlemeet->id, 'recordingid' => uniqid('drive-', true), 'name' => 'Clase',
                 'createdtime' => $now, 'duration' => '01:00:00', 'webviewlink' => 'https://drive.google.com/file/d/x/view',

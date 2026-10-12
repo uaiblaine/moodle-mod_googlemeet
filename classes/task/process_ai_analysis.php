@@ -26,7 +26,6 @@ use mod_googlemeet\ai_service;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class process_ai_analysis extends \core\task\scheduled_task {
-
     /**
      * Return the task's name.
      *

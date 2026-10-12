@@ -29,7 +29,6 @@ namespace mod_googlemeet\local\attendance;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class scope {
-
     /** @var string Read-only scope of the Google Meet REST API (conferenceRecords + participants). */
     public const MEET_SCOPE = 'https://www.googleapis.com/auth/meetings.space.readonly';
 
@@ -82,8 +81,13 @@ class scope {
         if ($issuerid > 0) {
             // Core updates the row with the same scopehash in place, so the token just stored is the
             // most recently modified one, not necessarily the highest id.
-            $rows = $DB->get_records_select('oauth2_refresh_token', 'userid = ? AND issuerid = ?',
-                [$userid, $issuerid], 'timemodified DESC, id DESC', 'id');
+            $rows = $DB->get_records_select(
+                'oauth2_refresh_token',
+                'userid = ? AND issuerid = ?',
+                [$userid, $issuerid],
+                'timemodified DESC, id DESC',
+                'id'
+            );
             if (count($rows) > 1) {
                 $ids = array_map('intval', array_keys($rows));
                 array_shift($ids);
@@ -156,8 +160,10 @@ class scope {
     public static function needs_relink(\stdClass $googlemeet, \context_module $context, \stdClass $user): bool {
         global $DB;
 
-        if (!self::activity_enabled($googlemeet) || !has_capability('mod/googlemeet:viewreports', $context, $user)
-                || !self::is_organiser($googlemeet, $user)) {
+        if (
+            !self::activity_enabled($googlemeet) || !has_capability('mod/googlemeet:viewreports', $context, $user)
+                || !self::is_organiser($googlemeet, $user)
+        ) {
             return false;
         }
         if (!self::granted((int)$user->id)) {
@@ -176,8 +182,10 @@ class scope {
      */
     public static function organiser_relink_pending(\stdClass $googlemeet, \context_module $context, \stdClass $user): bool {
         global $DB;
-        if (!self::activity_enabled($googlemeet) || !has_capability('mod/googlemeet:viewreports', $context, $user)
-                || self::is_organiser($googlemeet, $user)) {
+        if (
+            !self::activity_enabled($googlemeet) || !has_capability('mod/googlemeet:viewreports', $context, $user)
+                || self::is_organiser($googlemeet, $user)
+        ) {
             return false;
         }
         return $DB->record_exists('googlemeet_attendance_sync', ['googlemeetid' => $googlemeet->id, 'status' => 'scope']);
@@ -196,14 +204,19 @@ class scope {
         if (!self::needs_relink($googlemeet, $context, $USER)) {
             if (self::organiser_relink_pending($googlemeet, $context, $USER)) {
                 // Informative only: unlinking this teacher's own account would not help.
-                return $OUTPUT->notification(get_string('attendance_relink_organiser', 'googlemeet',
-                    s((string)$googlemeet->creatoremail)), \core\output\notification::NOTIFY_INFO);
+                return $OUTPUT->notification(get_string(
+                    'attendance_relink_organiser',
+                    'googlemeet',
+                    s((string)$googlemeet->creatoremail)
+                ), \core\output\notification::NOTIFY_INFO);
             }
             return '';
         }
         $url = new \moodle_url('/mod/googlemeet/attendance.php', ['id' => $context->instanceid, 'action' => 'relink',
             'sesskey' => sesskey()]);
-        return $OUTPUT->notification(get_string('attendance_relink_notice', 'googlemeet', $url->out()),
-            \core\output\notification::NOTIFY_WARNING);
+        return $OUTPUT->notification(
+            get_string('attendance_relink_notice', 'googlemeet', $url->out()),
+            \core\output\notification::NOTIFY_WARNING
+        );
     }
 }

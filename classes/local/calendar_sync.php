@@ -39,7 +39,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class calendar_sync {
-
     /** @var string Calendar the events live on (same as creation). */
     public const CALENDAR_ID = 'primary';
 
@@ -237,8 +236,11 @@ class calendar_sync {
         if ($storedeventid === '') {
             return false;
         }
-        return $DB->record_exists_select('googlemeet', 'eventid = :eventid AND id <> :id',
-            ['eventid' => $storedeventid, 'id' => $excludeid]);
+        return $DB->record_exists_select(
+            'googlemeet',
+            'eventid = :eventid AND id <> :id',
+            ['eventid' => $storedeventid, 'id' => $excludeid]
+        );
     }
 
     /**
@@ -262,8 +264,11 @@ class calendar_sync {
             return false;
         }
         $like = $DB->sql_like('url', ':code', false);
-        return $DB->record_exists_select('googlemeet', "id <> :id AND {$like}",
-            ['id' => $excludeid, 'code' => '%' . $DB->sql_like_escape($code) . '%']);
+        return $DB->record_exists_select(
+            'googlemeet',
+            "id <> :id AND {$like}",
+            ['id' => $excludeid, 'code' => '%' . $DB->sql_like_escape($code) . '%']
+        );
     }
 
     /**
@@ -366,8 +371,10 @@ class calendar_sync {
      * @return int|null 0 when the course recycle bin is off, null when its items never expire.
      */
     public static function recyclebin_delay(): ?int {
-        if (!\core_component::get_component_directory('tool_recyclebin')
-                || !get_config('tool_recyclebin', 'coursebinenable')) {
+        if (
+            !\core_component::get_component_directory('tool_recyclebin')
+                || !get_config('tool_recyclebin', 'coursebinenable')
+        ) {
             return 0;
         }
         $expiry = (int)get_config('tool_recyclebin', 'coursebinexpiry');
@@ -405,14 +412,22 @@ class calendar_sync {
             return 'skipped';
         }
 
-        return self::with_creator($googlemeet, sync_log::KIND_CALENDAR_UPDATE, $editorid,
-            function($service, stdClass $creator) use ($googlemeet, $eventid, $DB) {
+        return self::with_creator(
+            $googlemeet,
+            sync_log::KIND_CALENDAR_UPDATE,
+            $editorid,
+            function ($service, stdClass $creator) use ($googlemeet, $eventid, $DB) {
                 $body = self::build_event_body($googlemeet, \core_date::get_user_timezone($creator));
-                helper::request($service, 'updateevent',
-                    ['calendarid' => self::CALENDAR_ID, 'eventid' => $eventid], json_encode($body));
+                helper::request(
+                    $service,
+                    'updateevent',
+                    ['calendarid' => self::CALENDAR_ID, 'eventid' => $eventid],
+                    json_encode($body)
+                );
                 // Drive names future recordings after the event summary.
                 $DB->set_field('googlemeet', 'originalname', $googlemeet->name, ['id' => $googlemeet->id]);
-            });
+            }
+        );
     }
 
     /**
@@ -440,8 +455,11 @@ class calendar_sync {
             return 'skipped';
         }
 
-        return self::with_creator($googlemeet, sync_log::KIND_CALENDAR_DELETE, (int)($data['editorid'] ?? 0),
-            function($service) use ($eventid) {
+        return self::with_creator(
+            $googlemeet,
+            sync_log::KIND_CALENDAR_DELETE,
+            (int)($data['editorid'] ?? 0),
+            function ($service) use ($eventid) {
                 try {
                     helper::request($service, 'deleteevent', ['calendarid' => self::CALENDAR_ID, 'eventid' => $eventid]);
                 } catch (\Exception $e) {
@@ -451,7 +469,8 @@ class calendar_sync {
                     }
                     throw $e;
                 }
-            });
+            }
+        );
     }
 
     /**
@@ -466,8 +485,13 @@ class calendar_sync {
     private static function with_creator(stdClass $googlemeet, string $kind, int $editorid, callable $callback): string {
         $creator = self::find_creator((string)$googlemeet->creatoremail, $editorid);
         if (!$creator) {
-            self::finish($googlemeet, $kind, 'error',
-                get_string('calsync_reason_nocreator', 'googlemeet', s($googlemeet->creatoremail)), $editorid);
+            self::finish(
+                $googlemeet,
+                $kind,
+                'error',
+                get_string('calsync_reason_nocreator', 'googlemeet', s($googlemeet->creatoremail)),
+                $editorid
+            );
             return 'error';
         }
 

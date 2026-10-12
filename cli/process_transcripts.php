@@ -31,17 +31,19 @@ require_once($CFG->libdir . '/clilib.php');
 require_once(__DIR__ . '/../classes/subtitle_extractor.php');
 
 // Transient Gemini failure policy; mirrors ai_service::record_transient_failure(), keep in step.
-// Back-off in seconds, indexed by the retrycount before this failure.
+/** @var int[] Back-off in seconds, indexed by the retrycount before this failure. */
 const TRANSIENT_BACKOFF = [
-    0 => 2 * 3600,    // 1st failure: retry in 2h.
-    1 => 4 * 3600,    // 2nd failure: retry in 4h.
-    2 => 8 * 3600,    // 3rd failure: retry in 8h.
-    3 => 24 * 3600,   // Not reached while MAX_RETRIES is 4.
+    0 => 2 * 3600, // 1st failure: retry in 2h.
+    1 => 4 * 3600, // 2nd failure: retry in 4h.
+    2 => 8 * 3600, // 3rd failure: retry in 8h.
+    3 => 24 * 3600, // Not reached while MAX_RETRIES is 4.
 ];
-const MAX_RETRIES = 4;            // The 4th transient failure gives up.
-const PERMANENT_RETRYCOUNT = 99;  // Sentinel retrycount: permanent error, never retried.
+/** @var int The 4th transient failure gives up. */
+const MAX_RETRIES = 4;
+/** @var int Sentinel retrycount: permanent error, never retried. */
+const PERMANENT_RETRYCOUNT = 99;
 
-list($options, $unrecognized) = cli_get_params([
+[$options, $unrecognized] = cli_get_params([
     'googlemeetid' => 0,
     'recordingid'  => 0,
     'dry-run'      => false,
@@ -295,30 +297,29 @@ foreach ($recordings as $recording) {
         $keypointscount = count($result->keypoints);
         $topicscount = count($result->topics);
         cli_writeln("  AI analysis complete: summary={$summarylen} chars, {$keypointscount} key points, {$topicscount} topics.");
-
     } catch (\mod_googlemeet\gemini_transient_exception $e) {
         // Transient error (rate limit / high demand) → schedule retry with back-off.
-        $new_rc = $rc + 1;
-        if ($new_rc >= MAX_RETRIES) {
+        $newrc = $rc + 1;
+        if ($newrc >= MAX_RETRIES) {
             // Retries exhausted: no nextretry, and the retrycount check above skips the row from now on.
-            $next_unix = 0;
-            $new_rc = MAX_RETRIES; // Capped: no further escalation.
-            $log_suffix = "Max retries reached, giving up.";
+            $nextunix = 0;
+            $newrc = MAX_RETRIES; // Capped: no further escalation.
+            $logsuffix = "Max retries reached, giving up.";
         } else {
-            $backoff = TRANSIENT_BACKOFF[$new_rc - 1] ?? 24 * 3600;
-            $next_unix = $now + $backoff;
-            $log_suffix = sprintf("Will retry at %s (in %d min).", userdate($next_unix, '%Y-%m-%d %H:%M'), (int)($backoff / 60));
+            $backoff = TRANSIENT_BACKOFF[$newrc - 1] ?? 24 * 3600;
+            $nextunix = $now + $backoff;
+            $logsuffix = sprintf("Will retry at %s (in %d min).", userdate($nextunix, '%Y-%m-%d %H:%M'), (int)($backoff / 60));
         }
         $DB->update_record('googlemeet_ai_analysis', (object)[
             'id' => $analysisid,
             'status' => 'failed',
             'error' => $e->getMessage(),
-            'retrycount' => $new_rc,
-            'nextretry' => $next_unix,
+            'retrycount' => $newrc,
+            'nextretry' => $nextunix,
             'timemodified' => $now,
         ]);
-        cli_writeln("  TRANSIENT ERROR (retrycount={$new_rc}): " . $e->getMessage());
-        cli_writeln("  " . $log_suffix);
+        cli_writeln("  TRANSIENT ERROR (retrycount={$newrc}): " . $e->getMessage());
+        cli_writeln("  " . $logsuffix);
         // Not a fatal error: the transcript is already saved.
     } catch (\moodle_exception $e) {
         // Permanent error → mark and don't retry.

@@ -37,7 +37,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversClass(\backup_googlemeet_activity_structure_step::class)]
 #[CoversClass(\restore_googlemeet_activity_structure_step::class)]
 final class backup_ai_analysis_test extends \advanced_testcase {
-
     /**
      * Course, activity, one recording with a completed analysis and one with a pending analysis.
      *
@@ -90,8 +89,12 @@ final class backup_ai_analysis_test extends \advanced_testcase {
      */
     private function copied_analysis(int $googlemeetid, string $driveid) {
         global $DB;
-        $recording = $DB->get_record('googlemeet_recordings', ['googlemeetid' => $googlemeetid, 'recordingid' => $driveid],
-            '*', MUST_EXIST);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['googlemeetid' => $googlemeetid, 'recordingid' => $driveid],
+            '*',
+            MUST_EXIST
+        );
         return $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recording->id]);
     }
 
@@ -130,8 +133,14 @@ final class backup_ai_analysis_test extends \advanced_testcase {
         global $DB, $USER;
         [$course] = $this->create_fixture();
 
-        $bc = new \backup_controller(\backup::TYPE_1COURSE, $course->id, \backup::FORMAT_MOODLE,
-            \backup::INTERACTIVE_NO, \backup::MODE_GENERAL, $USER->id);
+        $bc = new \backup_controller(
+            \backup::TYPE_1COURSE,
+            $course->id,
+            \backup::FORMAT_MOODLE,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id
+        );
         $bc->get_plan()->get_setting('users')->set_value(true);
         $bc->execute_plan();
         $file = $bc->get_results()['backup_destination'];
@@ -140,8 +149,14 @@ final class backup_ai_analysis_test extends \advanced_testcase {
         $backupdir = 'googlemeet-ai-' . random_string(6);
         $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), make_backup_temp_directory($backupdir));
         $newcourseid = \restore_dbops::create_new_course('Copy', 'aicopy', $course->category);
-        $rc = new \restore_controller($backupdir, $newcourseid, \backup::INTERACTIVE_NO, \backup::MODE_GENERAL,
-            $USER->id, \backup::TARGET_NEW_COURSE);
+        $rc = new \restore_controller(
+            $backupdir,
+            $newcourseid,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id,
+            \backup::TARGET_NEW_COURSE
+        );
         $this->assertTrue($rc->execute_precheck());
         $rc->execute_plan();
         $rc->destroy();

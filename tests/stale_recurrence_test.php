@@ -16,6 +16,10 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\task\check_stale_recurrence;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversFunction;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -30,8 +34,10 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class stale_recurrence_test extends \advanced_testcase {
-
+#[CoversFunction('googlemeet_get_stale_recurrences')]
+#[CoversFunction('googlemeet_send_stale_alert')]
+#[CoversClass(check_stale_recurrence::class)]
+final class stale_recurrence_test extends \advanced_testcase {
     /**
      * Insert a two-hour googlemeet_events row.
      *
@@ -181,7 +187,9 @@ class stale_recurrence_test extends \advanced_testcase {
         $this->assertStringContainsString('update=456', $messages[0]->fullmessagehtml);
     }
 
-    /** Run the scheduled task, swallowing its mtrace output. */
+    /**
+     * Run the scheduled task, swallowing its mtrace output.
+     */
     private function run_task(): void {
         $task = new \mod_googlemeet\task\check_stale_recurrence();
         ob_start();

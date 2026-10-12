@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<ruleset name="mod_googlemeet">
+    <description>PHPCS rules for mod_googlemeet.</description>
+
+    <rule ref="moodle" />
+
+    <exclude-pattern>*/node_modules/*</exclude-pattern>
+    <exclude-pattern>*/vendor/*</exclude-pattern>
+</ruleset>

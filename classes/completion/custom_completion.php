@@ -36,7 +36,6 @@ use core_completion\activity_custom_completion;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class custom_completion extends activity_custom_completion {
-
     /**
      * Fetches the completion state for a given completion rule.
      *
@@ -160,12 +159,21 @@ class custom_completion extends activity_custom_completion {
     public function get_custom_rule_descriptions(): array {
         $rules = $this->cm->customdata['customcompletionrules'] ?? [];
         return [
-            'completionrecordings' => get_string('completiondetail:recordings', 'googlemeet',
-                (int)($rules['completionrecordings'] ?? 0)),
-            'completionwatchpercent' => get_string('completiondetail:watchpercent', 'googlemeet',
-                (int)($rules['completionwatchpercent'] ?? 0)),
-            'completionpractice' => get_string('completiondetail:practice', 'googlemeet',
-                (int)($rules['completionpractice'] ?? 0)),
+            'completionrecordings' => get_string(
+                'completiondetail:recordings',
+                'googlemeet',
+                (int)($rules['completionrecordings'] ?? 0)
+            ),
+            'completionwatchpercent' => get_string(
+                'completiondetail:watchpercent',
+                'googlemeet',
+                (int)($rules['completionwatchpercent'] ?? 0)
+            ),
+            'completionpractice' => get_string(
+                'completiondetail:practice',
+                'googlemeet',
+                (int)($rules['completionpractice'] ?? 0)
+            ),
         ];
     }
 

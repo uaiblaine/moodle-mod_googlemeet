@@ -34,7 +34,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  */
 #[CoversClass(mobile::class)]
 final class mobile_test extends \advanced_testcase {
-
     /** @var \stdClass */
     private $course;
     /** @var \stdClass */
@@ -159,7 +158,10 @@ final class mobile_test extends \advanced_testcase {
             'summary' => "Primer párrafo.\n\nSegundo párrafo.",
             'keypoints' => json_encode(['Elementos del acto', 'Eficacia']),
             'topics' => json_encode(['Acto administrativo']),
-            'chapters' => json_encode([['title' => 'Introducción', 'start' => '00:00'], ['title' => 'Eficacia', 'start' => '12:30']]),
+            'chapters' => json_encode([
+                ['title' => 'Introducción', 'start' => '00:00'],
+                ['title' => 'Eficacia', 'start' => '12:30'],
+            ]),
             'status' => 'completed',
             // Published by a teacher: students see it.
             'reviewed' => 1,

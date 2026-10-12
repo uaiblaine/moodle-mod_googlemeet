@@ -33,7 +33,6 @@ use mod_googlemeet\local\room_entry;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class log_room_entered extends external_api {
-
     /**
      * Parameters.
      *

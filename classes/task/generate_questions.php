@@ -28,7 +28,6 @@ use mod_googlemeet\gemini_transient_exception;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class generate_questions extends adhoc_task {
-
     /**
      * Get the task name.
      *

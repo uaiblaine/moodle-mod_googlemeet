@@ -27,24 +27,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/course/lib.php');
 require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
-
-/**
- * Test wrapper exposing the Drive recording filter of the client.
- */
-class backup_restore_testable_client extends client {
-    /**
-     * Expose filter_recordings_for_activity() for unit tests.
-     *
-     * @param array $recordings Drive recordings.
-     * @param string $meetingcode Meeting code.
-     * @param string $activityname Activity name.
-     * @param int $googlemeetid Activity id.
-     * @return array
-     */
-    public function filter_for_test(array $recordings, string $meetingcode, string $activityname, int $googlemeetid): array {
-        return $this->filter_recordings_for_activity($recordings, $meetingcode, $activityname, $googlemeetid);
-    }
-}
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/backup_restore_testable_client.php');
 
 /**
  * Backup/restore and duplication of the AI practice questions, and the Google state a copy must not inherit.
@@ -58,7 +41,6 @@ class backup_restore_testable_client extends client {
 #[CoversClass(\backup_googlemeet_activity_task::class)]
 #[CoversClass(question_service::class)]
 final class backup_restore_test extends \advanced_testcase {
-
     /**
      * Build a course with one googlemeet, three recordings (one in the trash), questions and events.
      *
@@ -100,8 +82,12 @@ final class backup_restore_test extends \advanced_testcase {
         $service->create_draft_multichoice($googlemeet, $cm, $context, $recc, $this->question_data('C one'));
         // Publish directly (the optional local_questions leak gate is not under test here).
         foreach ([$qa1, $qb1] as $questionid) {
-            $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_READY,
-                ['questionid' => $questionid]);
+            $DB->set_field(
+                'question_versions',
+                'status',
+                question_version_status::QUESTION_STATUS_READY,
+                ['questionid' => $questionid]
+            );
         }
 
         // Events: one past session already auto-synced, one future session wrongly flagged as synced.
@@ -177,13 +163,23 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertEquals(question_service::category_idnumber((int)$newcm->id), $category->idnumber);
         $this->assertEquals($newcontext->id, $category->contextid);
 
-        $newa = (int)$DB->get_field('googlemeet_recordings', 'id', ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-A']);
-        $newb = (int)$DB->get_field('googlemeet_recordings', 'id', ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-B']);
+        $newa = (int)$DB->get_field(
+            'googlemeet_recordings',
+            'id',
+            ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-A']
+        );
+        $newb = (int)$DB->get_field(
+            'googlemeet_recordings',
+            'id',
+            ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-B']
+        );
         $this->assertGreaterThan(0, $newa);
         $this->assertGreaterThan(0, $newb);
         // The trashed recording is not part of the backup.
-        $this->assertFalse($DB->record_exists('googlemeet_recordings',
-            ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-C']));
+        $this->assertFalse($DB->record_exists(
+            'googlemeet_recordings',
+            ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-C']
+        ));
 
         // Questions travel with their status and are bound to the new recording ids.
         $questionsa = $service->get_questions($newgooglemeet, $newcm, $newcontext, $newa);
@@ -198,7 +194,8 @@ final class backup_restore_test extends \advanced_testcase {
                JOIN {tag} t ON t.id = ti.tagid
               WHERE ti.component = 'core_question' AND ti.itemtype = 'question'
                 AND ti.contextid = ? AND " . $DB->sql_like('t.name', '?'),
-            [$newcontext->id, question_service::ORPHAN_TAG_PREFIX . '%']);
+            [$newcontext->id, question_service::ORPHAN_TAG_PREFIX . '%']
+        );
         $this->assertEquals(1, $orphans);
 
         // The copy never points at the original's Google Calendar event nor its sync state.
@@ -254,7 +251,9 @@ final class backup_restore_test extends \advanced_testcase {
             "SELECT COUNT(1)
                FROM {question_bank_entries} qbe
                JOIN {question_categories} qc ON qc.id = qbe.questioncategoryid
-              WHERE qc.contextid = ?", [$newcontext->id]));
+              WHERE qc.contextid = ?",
+            [$newcontext->id]
+        ));
     }
 
     /**
@@ -265,19 +264,33 @@ final class backup_restore_test extends \advanced_testcase {
 
         [$course, $googlemeet, $cm, $context, $recs] = $this->create_fixture();
 
-        $bc = new \backup_controller(\backup::TYPE_1COURSE, $course->id, \backup::FORMAT_MOODLE,
-            \backup::INTERACTIVE_NO, \backup::MODE_GENERAL, $USER->id);
+        $bc = new \backup_controller(
+            \backup::TYPE_1COURSE,
+            $course->id,
+            \backup::FORMAT_MOODLE,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id
+        );
         $bc->execute_plan();
         $file = $bc->get_results()['backup_destination'];
         $bc->destroy();
 
         $backupdir = 'googlemeet-dat02-' . random_string(6);
-        $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'),
-            make_backup_temp_directory($backupdir));
+        $file->extract_to_pathname(
+            get_file_packer('application/vnd.moodle.backup'),
+            make_backup_temp_directory($backupdir)
+        );
 
         $newcourseid = \restore_dbops::create_new_course('Copy', 'dstcourse', $course->category);
-        $rc = new \restore_controller($backupdir, $newcourseid, \backup::INTERACTIVE_NO, \backup::MODE_GENERAL,
-            $USER->id, \backup::TARGET_NEW_COURSE);
+        $rc = new \restore_controller(
+            $backupdir,
+            $newcourseid,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id,
+            \backup::TARGET_NEW_COURSE
+        );
         $this->assertTrue($rc->execute_precheck());
         $rc->execute_plan();
         $rc->destroy();
@@ -304,13 +317,19 @@ final class backup_restore_test extends \advanced_testcase {
         [, $googlemeet, $cm, $context] = $this->create_fixture();
         $service = new question_service();
         $category = $service->get_category($googlemeet, $cm, $context, false);
-        $DB->set_field('question_categories', 'idnumber', question_service::category_idnumber(999999),
-            ['id' => $category->id]);
+        $DB->set_field(
+            'question_categories',
+            'idnumber',
+            question_service::category_idnumber(999999),
+            ['id' => $category->id]
+        );
 
         $adopted = $service->get_category($googlemeet, $cm, $context, false);
         $this->assertEquals($category->id, $adopted->id);
-        $this->assertEquals(question_service::category_idnumber((int)$cm->id),
-            $DB->get_field('question_categories', 'idnumber', ['id' => $category->id]));
+        $this->assertEquals(
+            question_service::category_idnumber((int)$cm->id),
+            $DB->get_field('question_categories', 'idnumber', ['id' => $category->id])
+        );
     }
 
     /**

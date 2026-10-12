@@ -34,7 +34,6 @@ use mod_googlemeet\local\practice_attempts;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_practice_session extends external_api {
-
     /**
      * Parameters.
      *
@@ -74,8 +73,15 @@ class get_practice_session extends external_api {
         require_capability('mod/googlemeet:view', $context);
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
 
-        $questions = practice_attempts::get_session_questions($googlemeet, $cm, $context, (int)$USER->id,
-            $params['mode'], $params['topic'], 0);
+        $questions = practice_attempts::get_session_questions(
+            $googlemeet,
+            $cm,
+            $context,
+            (int)$USER->id,
+            $params['mode'],
+            $params['topic'],
+            0
+        );
         if ($params['mode'] === practice_attempts::MODE_TOPIC) {
             shuffle($questions);
         }

@@ -24,7 +24,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$messageproviders = array(
+$messageproviders = [
     'notification' => [
         'defaults' => [
             'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
@@ -57,4 +57,4 @@ $messageproviders = array(
             'airnotifier' => MESSAGE_PERMITTED,
         ],
     ],
-);
+];

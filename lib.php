@@ -96,7 +96,7 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
         $fs = get_file_storage();
         $relativepath = implode('/', $args);
         $fullpath = "/$context->id/mod_googlemeet/attachment/$relativepath";
-        if (!$file = $fs->get_file_by_hash(sha1($fullpath)) or $file->is_directory()) {
+        if (!($file = $fs->get_file_by_hash(sha1($fullpath))) || $file->is_directory()) {
             return false;
         }
         send_stored_file($file, 86400, 0, $forcedownload, $options);
@@ -112,8 +112,11 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
         return false;
     }
 
-    $recording = $DB->get_record('googlemeet_recordings',
-        ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0], 'id, visible');
+    $recording = $DB->get_record(
+        'googlemeet_recordings',
+        ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+        'id, visible'
+    );
     if (!$recording) {
         return false;
     }
@@ -125,7 +128,7 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
     $fs = get_file_storage();
     $relativepath = implode('/', $args);
     $fullpath = "/$context->id/mod_googlemeet/recordingmaterial/$recordingid/$relativepath";
-    if (!$file = $fs->get_file_by_hash(sha1($fullpath)) or $file->is_directory()) {
+    if (!($file = $fs->get_file_by_hash(sha1($fullpath))) || $file->is_directory()) {
         return false;
     }
 
@@ -334,11 +337,13 @@ function googlemeet_delete_instance($id) {
 function googlemeet_get_coursemodule_info($coursemodule) {
     global $CFG, $DB;
 
-    if (!$googlemeet = $DB->get_record(
-        'googlemeet',
-        ['id' => $coursemodule->instance],
-        'id, name, url, intro, introformat, completionrecordings, completionwatchpercent, completionpractice'
-    )) {
+    if (
+        !$googlemeet = $DB->get_record(
+            'googlemeet',
+            ['id' => $coursemodule->instance],
+            'id, name, url, intro, introformat, completionrecordings, completionwatchpercent, completionpractice'
+        )
+    ) {
         return null;
     }
 
@@ -401,8 +406,11 @@ function mod_googlemeet_get_completion_active_rule_descriptions($cm) {
  * @param int $userid User id to use for visibility checks.
  * @return \core_calendar\local\event\entities\action_interface|null
  */
-function mod_googlemeet_core_calendar_provide_event_action(calendar_event $event,
-        \core_calendar\action_factory $factory, int $userid = 0) {
+function mod_googlemeet_core_calendar_provide_event_action(
+    calendar_event $event,
+    \core_calendar\action_factory $factory,
+    int $userid = 0
+) {
     global $USER;
 
     if ($event->eventtype !== \mod_googlemeet\helper::GOOGLEMEET_EVENT_START) {
@@ -448,10 +456,10 @@ function mod_googlemeet_core_calendar_provide_event_action(calendar_event $event
 function googlemeet_view($googlemeet, $course, $cm, $context) {
 
     // Trigger course_module_viewed event.
-    $params = array(
+    $params = [
         'context' => $context,
-        'objectid' => $googlemeet->id
-    );
+        'objectid' => $googlemeet->id,
+    ];
 
     $event = \mod_googlemeet\event\course_module_viewed::create($params);
     $event->add_record_snapshot('course_modules', $cm);
@@ -501,7 +509,7 @@ function googlemeet_list_recordings($params, $includeai = false, $order = 'DESC'
     // Fetch AI analysis data if enabled and there are recordings.
     $aidata = [];
     if ($includeai && !empty($recordingids)) {
-        list($insql, $inparams) = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
+        [$insql, $inparams] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
         $sql = "SELECT recordingid, summary, keypoints, topics, status, error, aimodel, timemodified, retrycount, nextretry,
                        reviewed
                 FROM {googlemeet_ai_analysis}
@@ -706,7 +714,7 @@ function googlemeet_keypoints_preference_name(int $recordingid): string {
  * @return string 8 hex characters.
  */
 function googlemeet_keypoints_hash(array $keypoints): string {
-    $normalised = array_map(static function($point): string {
+    $normalised = array_map(static function ($point): string {
         return trim(preg_replace('/\s+/u', ' ', (string)$point));
     }, array_values($keypoints));
     return sprintf('%08x', crc32(implode("\n", $normalised)));
@@ -742,7 +750,7 @@ function googlemeet_user_preferences(): array {
             'null' => NULL_NOT_ALLOWED,
             'default' => 0,
             'permissioncallback' => [core_user::class, 'is_current_user'],
-            'cleancallback' => static function($value) {
+            'cleancallback' => static function ($value) {
                 return max(0, (int)$value);
             },
         ],
@@ -752,7 +760,7 @@ function googlemeet_user_preferences(): array {
             'null' => NULL_NOT_ALLOWED,
             'default' => '',
             'permissioncallback' => [core_user::class, 'is_current_user'],
-            'cleancallback' => static function($value) {
+            'cleancallback' => static function ($value) {
                 $value = (string)$value;
                 if ($value !== '' && !preg_match('/^[0-9a-f]{8}:[01]{1,200}$/', $value)) {
                     throw new invalid_parameter_exception('Invalid key points state');
@@ -823,7 +831,7 @@ function googlemeet_normalise_chapters($rawchapters): array {
         ];
     }
 
-    usort($chapters, static function(array $a, array $b): int {
+    usort($chapters, static function (array $a, array $b): int {
         return $a['startseconds'] <=> $b['startseconds'];
     });
 
@@ -964,9 +972,9 @@ function googlemeet_assign_lesson_titles(array $items, array $genericnames): arr
     foreach ($items as $id => $item) {
         $display = $displaynames[$id];
         $key = googlemeet_fold($display);
-        $topics = array_values(array_filter(array_map(static function($topic) {
+        $topics = array_values(array_filter(array_map(static function ($topic) {
             return trim((string)$topic);
-        }, (array)($item['topics'] ?? [])), static function($topic) {
+        }, (array)($item['topics'] ?? [])), static function ($topic) {
             return $topic !== '';
         }));
         $isgeneric = isset($generic[$key]) || $namecounts[$key] > 1;
@@ -1035,8 +1043,10 @@ function googlemeet_get_lesson_titles(stdClass $googlemeet, bool $includehidden)
         $items[$row->id] = ['name' => (string)$row->name, 'topics' => $topics];
     }
 
-    $titles = googlemeet_assign_lesson_titles($items,
-        [(string)($googlemeet->name ?? ''), (string)($googlemeet->originalname ?? '')]);
+    $titles = googlemeet_assign_lesson_titles(
+        $items,
+        [(string)($googlemeet->name ?? ''), (string)($googlemeet->originalname ?? '')]
+    );
     $cache->set($cachekey, $titles);
     return $titles;
 }
@@ -1205,7 +1215,7 @@ function googlemeet_filter_recordings_by_query(array $recordings, string $query,
         }
 
         if ($includeprivatecontent) {
-            // clean_text() stored entities like &amp; in notestext; decode them so the
+            // The clean_text() call stored entities like &amp; in notestext; decode them so the
             // snippet reads naturally and searches for "&"-style terms can match.
             $notes = html_entity_decode(strip_tags((string)($r->notestext ?? '')), ENT_QUOTES | ENT_HTML5, 'UTF-8');
             if (core_text::strpos(googlemeet_fold($notes), $needle) !== false) {
@@ -1239,7 +1249,7 @@ function googlemeet_filter_recordings_by_topic(array $recordings, string $topic)
     if ($foldedtopic === '') {
         return $recordings;
     }
-    return array_values(array_filter($recordings, static function($r) use ($foldedtopic) {
+    return array_values(array_filter($recordings, static function ($r) use ($foldedtopic) {
         foreach (($r->aitopics ?? []) as $t) {
             if (googlemeet_fold(trim((string)$t)) === $foldedtopic) {
                 return true;
@@ -1384,7 +1394,7 @@ function googlemeet_topic_preview(array $topics, int $max = 3): array {
 function mod_googlemeet_get_fontawesome_icon_map() {
     return [
         'mod_googlemeet:logout' => 'fa-sign-out',
-        'mod_googlemeet:play' => 'fa-play'
+        'mod_googlemeet:play' => 'fa-play',
     ];
 }
 
@@ -1468,8 +1478,10 @@ function googlemeet_sync_recordings($googlemeetid, $files, bool $deferenrichment
         // Backfill notes for an active recording that just received them (Gemini notes are often
         // published after the recording first synced). Notes are the only field refreshed on
         // active rows; their Drive metadata is not updated.
-        if (empty($googlemeetrecording->notestext)
-                && !empty($fileidsmap[$googlemeetrecording->recordingid])) {
+        if (
+            empty($googlemeetrecording->notestext)
+                && !empty($fileidsmap[$googlemeetrecording->recordingid])
+        ) {
             $incoming = $filesbyid[$googlemeetrecording->recordingid] ?? null;
             if ($incoming && !empty($incoming->notestext)) {
                 $DB->update_record('googlemeet_recordings', (object)[
@@ -1485,7 +1497,7 @@ function googlemeet_sync_recordings($googlemeetid, $files, bool $deferenrichment
     $stats['updated'] = $updatednotes;
 
     if ($trashrecordings) {
-        list($insql, $inparams) = $DB->get_in_or_equal($trashrecordings, SQL_PARAMS_NAMED);
+        [$insql, $inparams] = $DB->get_in_or_equal($trashrecordings, SQL_PARAMS_NAMED);
         $now = time();
         $params = $inparams + [
             'deleted' => 1,
@@ -1779,21 +1791,36 @@ function googlemeet_extend_settings_navigation(settings_navigation $settingsnav,
     $context = context_module::instance($cm->id);
 
     if (has_capability('mod/googlemeet:view', $context) && !has_capability('mod/googlemeet:managequestions', $context)) {
-        $googlemeetnode->add(get_string('practice_page_title', 'googlemeet'),
+        $googlemeetnode->add(
+            get_string('practice_page_title', 'googlemeet'),
             new moodle_url('/mod/googlemeet/practice.php', ['id' => $cm->id]),
-            navigation_node::TYPE_SETTING, null, 'mod_googlemeet_practice', new pix_icon('i/questions', ''));
+            navigation_node::TYPE_SETTING,
+            null,
+            'mod_googlemeet_practice',
+            new pix_icon('i/questions', '')
+        );
     }
     if (has_capability('mod/googlemeet:viewreports', $context)) {
-        $googlemeetnode->add(get_string('report_title', 'googlemeet'),
+        $googlemeetnode->add(
+            get_string('report_title', 'googlemeet'),
             new moodle_url('/mod/googlemeet/report.php', ['id' => $cm->id]),
-            navigation_node::TYPE_SETTING, null, 'mod_googlemeet_report', new pix_icon('i/report', ''));
+            navigation_node::TYPE_SETTING,
+            null,
+            'mod_googlemeet_report',
+            new pix_icon('i/report', '')
+        );
     }
     // Attendance read from Google Meet: shown when the site enables it; attendance.php explains a
     // missing activity opt-in.
     if (has_capability('mod/googlemeet:viewreports', $context) && \mod_googlemeet\local\attendance\scope::site_enabled()) {
-        $googlemeetnode->add(get_string('attendance_title', 'googlemeet'),
+        $googlemeetnode->add(
+            get_string('attendance_title', 'googlemeet'),
             new moodle_url('/mod/googlemeet/attendance.php', ['id' => $cm->id]),
-            navigation_node::TYPE_SETTING, null, 'mod_googlemeet_attendance', new pix_icon('i/users', ''));
+            navigation_node::TYPE_SETTING,
+            null,
+            'mod_googlemeet_attendance',
+            new pix_icon('i/users', '')
+        );
     }
 }
 

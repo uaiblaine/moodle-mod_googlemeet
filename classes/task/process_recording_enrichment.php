@@ -16,8 +16,6 @@
 
 namespace mod_googlemeet\task;
 
-defined('MOODLE_INTERNAL') || die();
-
 use mod_googlemeet\ai_service;
 use mod_googlemeet\client;
 
@@ -33,7 +31,6 @@ use mod_googlemeet\client;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class process_recording_enrichment extends \core\task\adhoc_task {
-
     /**
      * Get the task name.
      *
@@ -187,8 +184,10 @@ class process_recording_enrichment extends \core\task\adhoc_task {
         global $DB;
 
         $recordingids = array_values(array_unique(array_filter(array_map('intval', $recordingids))));
-        if (empty($recordingids)
-                || !$DB->record_exists('googlemeet_recording_subs', ['googlemeetid' => $googlemeetid])) {
+        if (
+            empty($recordingids)
+                || !$DB->record_exists('googlemeet_recording_subs', ['googlemeetid' => $googlemeetid])
+        ) {
             return;
         }
 

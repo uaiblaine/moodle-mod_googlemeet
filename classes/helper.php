@@ -28,7 +28,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class helper {
-
     /** @var string Calendar eventtype of the event that mirrors one session (googlemeet_events row). */
     public const GOOGLEMEET_EVENT_START = 'googlemeet_event';
 

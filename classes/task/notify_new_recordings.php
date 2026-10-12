@@ -38,7 +38,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class notify_new_recordings extends \core\task\adhoc_task {
-
     /** @var int Longest time the notice waits for a pending AI analysis. */
     const AI_WAIT_MAX = 3 * HOURSECS;
 
@@ -92,11 +91,17 @@ class notify_new_recordings extends \core\task\adhoc_task {
 
         foreach ($subscribers as $subscriber) {
             try {
-                $user = $DB->get_record('user', ['id' => $subscriber->userid, 'deleted' => 0, 'suspended' => 0], '*',
-                    IGNORE_MISSING);
-                if (!$user || !is_enrolled($context, $user, 'mod/googlemeet:view', true) ||
+                $user = $DB->get_record(
+                    'user',
+                    ['id' => $subscriber->userid, 'deleted' => 0, 'suspended' => 0],
+                    '*',
+                    IGNORE_MISSING
+                );
+                if (
+                    !$user || !is_enrolled($context, $user, 'mod/googlemeet:view', true) ||
                         !has_capability('mod/googlemeet:view', $context, $user) ||
-                        !\core_availability\info_module::is_user_visible($cm, $user->id, false)) {
+                        !\core_availability\info_module::is_user_visible($cm, $user->id, false)
+                ) {
                     continue;
                 }
                 message_send(self::build_message($user, $googlemeet, $cm, $newcount, $lessons));
@@ -122,8 +127,11 @@ class notify_new_recordings extends \core\task\adhoc_task {
         [$insql, $params] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
         $params['pending'] = 'pending';
         $params['processing'] = 'processing';
-        return $DB->record_exists_select('googlemeet_ai_analysis',
-            "recordingid $insql AND status IN (:pending, :processing)", $params);
+        return $DB->record_exists_select(
+            'googlemeet_ai_analysis',
+            "recordingid $insql AND status IN (:pending, :processing)",
+            $params
+        );
     }
 
     /**
@@ -165,17 +173,26 @@ class notify_new_recordings extends \core\task\adhoc_task {
 
         [$insql, $params] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
         $params['googlemeetid'] = (int)$googlemeet->id;
-        $recordings = $DB->get_records_select('googlemeet_recordings',
-            "googlemeetid = :googlemeetid AND deleted = 0 AND visible = 1 AND id $insql", $params,
-            'createdtime ASC, id ASC', 'id, name, createdtime');
+        $recordings = $DB->get_records_select(
+            'googlemeet_recordings',
+            "googlemeetid = :googlemeetid AND deleted = 0 AND visible = 1 AND id $insql",
+            $params,
+            'createdtime ASC, id ASC',
+            'id, name, createdtime'
+        );
         if (!$recordings) {
             return [];
         }
 
         [$insql2, $params2] = $DB->get_in_or_equal(array_keys($recordings), SQL_PARAMS_NAMED);
         $analyses = [];
-        foreach ($DB->get_records_select('googlemeet_ai_analysis', "recordingid $insql2 AND status = 'completed'",
-                $params2) as $analysis) {
+        foreach (
+            $DB->get_records_select(
+                'googlemeet_ai_analysis',
+                "recordingid $insql2 AND status = 'completed'",
+                $params2
+            ) as $analysis
+        ) {
             $analyses[(int)$analysis->recordingid] = $analysis;
         }
 
@@ -191,8 +208,13 @@ class notify_new_recordings extends \core\task\adhoc_task {
             $analysis = $analyses[$id] ?? null;
             if ($analysis && \mod_googlemeet\local\ai_review::is_visible_to_students($analysis)) {
                 $summary = self::summary_excerpt((string)($analysis->summary ?? ''));
-                foreach (array_slice(\googlemeet_normalise_chapters($analysis->chapters ?? null), 0,
-                        self::MAX_CHAPTERS) as $chapter) {
+                foreach (
+                    array_slice(
+                        \googlemeet_normalise_chapters($analysis->chapters ?? null),
+                        0,
+                        self::MAX_CHAPTERS
+                    ) as $chapter
+                ) {
                     $chapters[] = ['start' => $chapter['start'], 'title' => $chapter['title']];
                 }
             }
@@ -235,8 +257,10 @@ class notify_new_recordings extends \core\task\adhoc_task {
             }
             $items[$row->id] = ['name' => (string)$row->name, 'topics' => $topics];
         }
-        return \googlemeet_assign_lesson_titles($items,
-            [(string)($googlemeet->name ?? ''), (string)($googlemeet->originalname ?? '')]);
+        return \googlemeet_assign_lesson_titles(
+            $items,
+            [(string)($googlemeet->name ?? ''), (string)($googlemeet->originalname ?? '')]
+        );
     }
 
     /**
@@ -247,7 +271,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
      */
     public static function summary_excerpt(string $summary): string {
         $text = html_to_text($summary, 0, false);
-        $text = preg_replace('/[*_#`>]+/u', '', $text);
+        $text = preg_replace('/[*_#\x60>]+/u', '', $text);
         $text = trim(preg_replace('/\s+/u', ' ', $text));
         if ($text === '') {
             return '';
@@ -265,8 +289,13 @@ class notify_new_recordings extends \core\task\adhoc_task {
      * @param array[] $lessons Lessons from get_lessons() (may be empty for legacy notices).
      * @return \core\message\message
      */
-    public static function build_message(\stdClass $user, \stdClass $googlemeet, $cm, int $newcount,
-            array $lessons): \core\message\message {
+    public static function build_message(
+        \stdClass $user,
+        \stdClass $googlemeet,
+        $cm,
+        int $newcount,
+        array $lessons
+    ): \core\message\message {
         global $PAGE;
 
         $previouslang = null;
@@ -344,8 +373,10 @@ class notify_new_recordings extends \core\task\adhoc_task {
                 try {
                     $html = \local_achievements\email_template::wrap($title, $inner);
                 } catch (\Throwable $e) {
-                    debugging('mod_googlemeet: branded recording notice wrapper failed: ' . $e->getMessage(),
-                        DEBUG_DEVELOPER);
+                    debugging(
+                        'mod_googlemeet: branded recording notice wrapper failed: ' . $e->getMessage(),
+                        DEBUG_DEVELOPER
+                    );
                     $html = $inner;
                 }
             }

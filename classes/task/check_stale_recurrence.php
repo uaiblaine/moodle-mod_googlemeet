@@ -33,7 +33,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * Weekly check that warns site admins when a googlemeet recurrence looks abandoned.
  */
 class check_stale_recurrence extends \core\task\scheduled_task {
-
     /**
      * Task name.
      *
