@@ -638,6 +638,7 @@ function googlemeet_get_classroom_hero_context(
         'hasscheduleevents' => !empty($scheduleevents),
         'scheduleevents' => $scheduleevents,
         'courseid' => (int)$cm->course,
+        'calendarurl' => (new moodle_url('/calendar/view.php', ['view' => 'upcoming', 'course' => (int)$cm->course]))->out(false),
         'hascontinue' => false,
         'hasroomcta' => false,
         // Activity-wide practice entry point; null (hidden) for question managers or without ready questions.
@@ -2207,15 +2208,8 @@ function googlemeet_get_upcoming_events($googlemeetid, $maxevents = 3, bool $nol
             $end = $event->eventdate + $event->duration;
             $duration = $event->duration;
 
-            $datetime = new DateTime();
-            $datetime->setTimestamp($now);
-            $nowdate = $datetime->format('Y-m-d');
-
-            $datetime->setTimestamp($start);
-            $startdate = $datetime->format('Y-m-d');
-
             $upcomingevent = new stdClass();
-            $upcomingevent->today = ($nowdate === $startdate);
+            $upcomingevent->today = (googlemeet_session_day($now) === googlemeet_session_day((int)$start));
             $upcomingevent->startdate = userdate($start, get_string('strftimedmy', 'googlemeet'), $USER->timezone);
             $upcomingevent->compactdate = googlemeet_format_date_chip(
                 userdate($start, get_string('strftimedmweekday', 'googlemeet'), $USER->timezone)

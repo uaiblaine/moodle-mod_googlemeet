@@ -251,12 +251,16 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $holidayelements[] = $mform->createElement(
             'date_selector',
             'holidaystartdate',
-            get_string('holidaystartdate', 'googlemeet')
+            get_string('holidaystartdate', 'googlemeet'),
+            // A day of the site calendar, compared through googlemeet_session_day().
+            ['timezone' => core_date::get_server_timezone()]
         );
         $holidayelements[] = $mform->createElement(
             'date_selector',
             'holidayenddate',
-            get_string('holidayenddate', 'googlemeet')
+            get_string('holidayenddate', 'googlemeet'),
+            // A day of the site calendar, compared through googlemeet_session_day().
+            ['timezone' => core_date::get_server_timezone()]
         );
 
         // Determine the number of existing holiday periods.
@@ -305,7 +309,9 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $cancelledelements[] = $mform->createElement(
             'date_selector',
             'cancelleddate',
-            get_string('cancelleddate', 'googlemeet')
+            get_string('cancelleddate', 'googlemeet'),
+            // A day of the site calendar, compared through googlemeet_session_day().
+            ['timezone' => core_date::get_server_timezone()]
         );
         $cancelledelements[] = $mform->createElement(
             'text',
