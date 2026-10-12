@@ -71,7 +71,7 @@ Plugin CLI scripts (all `CLI_SCRIPT`, run from the Moodle root): `cli/backfill_c
 lib.php, locallib.php        legacy API callbacks + page builders (large; new logic goes to classes/local)
 classes/client.php           Google OAuth 2 client (Calendar, Drive), per-teacher tokens
 classes/rest.php             \core\oauth2\rest endpoints for Calendar/Drive/Meet
-classes/gemini_client.php    Gemini REST + File API upload (one raw curl, see gotchas)
+classes/gemini_client.php    Gemini REST + File API upload (core \curl::put, see gotchas)
 classes/ai_service.php       analysis orchestration; classes/question_service.php practice questions
 classes/external.php         legacy WS class (mod_googlemeet_external); classes/external/* newer WS
 classes/local/               sync_manager, calendar_sync, attendance/*, ai_review, report_builder,
@@ -90,11 +90,18 @@ plus `CHANGELOG.md` in the same commit as JS rebuilds, services or DB changes.
 
 ## Architecture gotchas
 
+- The organiser is `googlemeet.creatoruserid`, resolved only through `classes/local/creator.php`;
+  add, edit and restore accept an organiser e-mail only when the acting user may name it, and
+  `resolve()` never writes. Cron impersonates whoever it returns, so never bypass it.
+- The activity declares FEATURE_GROUPS/GROUPINGS false: `cm->groupmode` is always 0, so group fences
+  read the COURSE group mode (`report_builder::is_fenced()`).
 - `install.xml` must never declare `DEFAULT=""` on a `char NOT NULL` column: XMLDB prints a
   debugging message on install, and moodle-plugin-ci's `phpunit --install` aborts on it.
-- `gemini_client.php` streams the File API upload with native `curl_init()` because
-  `\curl::post()` overrides `CURLOPT_INFILE`; proxy and `curlsecurityblockedhosts` must be
-  applied by hand there, and the upload URL comes from Google's response header.
+- `gemini_client.php` streams the File API upload through core `\curl::put()` turned into a POST
+  (`CURLOPT_CUSTOMREQUEST`), so core applies the proxy, `curlsecurityblockedhosts` and DNS pinning;
+  `CURLOPT_FOLLOWLOCATION` stays off (core's emulated redirect would replay the API key). The upload
+  URL comes from Google's response header: `is_trusted_upload_url()` (https, exactly
+  generativelanguage.googleapis.com, `/upload/` path) must keep guarding it.
 - Cron acts as the activity's creator (`classes/local/impersonation.php`): it impersonates the
   teacher to use their Google refresh token. Restore `$USER`/`$SESSION` in a `finally`.
 - AI output, transcripts and recording names are untrusted text; templates triple-stash some of

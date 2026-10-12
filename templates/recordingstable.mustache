@@ -145,14 +145,18 @@
         </div>
         {{/alltopics.0}}
         <div class="googlemeet-filters-group googlemeet-recordings-controls">
+          {{! Sort and page links extend the current filter URL (built with moodle_url, so the search and the topic
+              arrive URL-encoded): Mustache only HTML-escapes. allfilterurl and pendingfilterurl already carry
+              rorder; PHP keeps the last of two equal parameters, so the appended rorder wins. Neither carries
+              rpage: sorting returns to the first page. }}
           <span class="googlemeet-filters-label small text-muted">{{# str }} recordings_sort_by, mod_googlemeet {{/ str }}:</span>
           <div class="btn-group btn-group-sm googlemeet-sort-toggle" role="group" aria-label="{{# str }} recordings_sort_by, mod_googlemeet {{/ str }}">
-            <a href="?id={{coursemoduleid}}&rorder=DESC&rpage=0&rq={{recordingquery}}&topic={{selectedtopic}}&rpending={{pendingparam}}"
+            <a href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rorder=DESC"
                class="btn {{#isorderdesc}}btn-primary{{/isorderdesc}}{{^isorderdesc}}btn-outline-secondary{{/isorderdesc}}" {{#isorderdesc}}aria-current="true"{{/isorderdesc}}>
               <span class="googlemeet-sort-label-full">{{# str }} recordingsorder_desc, mod_googlemeet {{/ str }}</span>
               <span class="googlemeet-sort-label-short">{{# str }} recordingsorder_desc_short, mod_googlemeet {{/ str }}</span>
             </a>
-            <a href="?id={{coursemoduleid}}&rorder=ASC&rpage=0&rq={{recordingquery}}&topic={{selectedtopic}}&rpending={{pendingparam}}"
+            <a href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rorder=ASC"
                class="btn {{#isorderasc}}btn-primary{{/isorderasc}}{{^isorderasc}}btn-outline-secondary{{/isorderasc}}" {{#isorderasc}}aria-current="true"{{/isorderasc}}>
               <span class="googlemeet-sort-label-full">{{# str }} recordingsorder_asc, mod_googlemeet {{/ str }}</span>
               <span class="googlemeet-sort-label-short">{{# str }} recordingsorder_asc_short, mod_googlemeet {{/ str }}</span>
@@ -500,7 +504,7 @@
     <ul class="pagination pagination-sm justify-content-center mb-0">
       {{#hasprevious}}
       <li class="page-item">
-        <a class="page-link" href="?id={{coursemoduleid}}&rpage={{previouspage}}&rorder={{currentorder}}&rq={{recordingquery}}&topic={{selectedtopic}}&rpending={{pendingparam}}">
+        <a class="page-link" href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rpage={{previouspage}}">
           &laquo; {{# str }} recordings_page_previous, mod_googlemeet {{/ str }}
         </a>
       </li>
@@ -517,14 +521,14 @@
         <span class="page-link">{{number}}</span>
         {{/active}}
         {{^active}}
-        <a class="page-link" href="?id={{coursemoduleid}}&rpage={{page}}&rorder={{currentorder}}&rq={{recordingquery}}&topic={{selectedtopic}}&rpending={{pendingparam}}">{{number}}</a>
+        <a class="page-link" href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rpage={{page}}">{{number}}</a>
         {{/active}}
       </li>
       {{/pages}}
 
       {{#hasnext}}
       <li class="page-item">
-        <a class="page-link" href="?id={{coursemoduleid}}&rpage={{nextpage}}&rorder={{currentorder}}&rq={{recordingquery}}&topic={{selectedtopic}}&rpending={{pendingparam}}">
+        <a class="page-link" href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rpage={{nextpage}}">
           {{# str }} recordings_page_next, mod_googlemeet {{/ str }} &raquo;
         </a>
       </li>
@@ -883,12 +887,14 @@ require([
             card.addClass('googlemeet-recording-hidden');
             if (isListRow) {
               if (!card.find('.googlemeet-listitem-hidden-tag').length) {
-                var hiddentag = '<span class="googlemeet-listitem-hidden-tag">{{# str }} recording_hidden, mod_googlemeet {{/ str }}</span>';
+                var hiddentag = $('<span class="googlemeet-listitem-hidden-tag"></span>')
+                  .text({{# quote }}{{# str }} recording_hidden, mod_googlemeet {{/ str }}{{/ quote }});
                 card.find('.googlemeet-listitem-title').prepend(hiddentag);
               }
             } else {
               if (!card.find('.googlemeet-recording-hidden-badge').length) {
-                card.prepend('<div class="googlemeet-recording-hidden-badge">{{# str }} recording_hidden, mod_googlemeet {{/ str }}</div>');
+                card.prepend($('<div class="googlemeet-recording-hidden-badge"></div>')
+                  .text({{# quote }}{{# str }} recording_hidden, mod_googlemeet {{/ str }}{{/ quote }}));
               }
             }
           }
@@ -922,9 +928,9 @@ require([
         // A rejection before the confirmation is the dialogue being cancelled: nothing to report.
         var confirmed = false;
         Notification.saveCancelPromise(
-          '{{# str }} recording_purge, mod_googlemeet {{/ str }}',
-          '{{# str }} recording_purge_confirm, mod_googlemeet {{/ str }}',
-          '{{# str }} recording_purge, mod_googlemeet {{/ str }}',
+          {{# quote }}{{# str }} recording_purge, mod_googlemeet {{/ str }}{{/ quote }},
+          {{# quote }}{{# str }} recording_purge_confirm, mod_googlemeet {{/ str }}{{/ quote }},
+          {{# quote }}{{# str }} recording_purge, mod_googlemeet {{/ str }}{{/ quote }},
           {triggerElement: btn.get(0)}
         ).then(function() {
           confirmed = true;
@@ -952,9 +958,9 @@ require([
         // A rejection before the confirmation is the dialogue being cancelled: nothing to report.
         var confirmed = false;
         Notification.saveCancelPromise(
-          '{{# str }} recording_trash, mod_googlemeet {{/ str }}',
-          '{{# str }} recording_trash_confirm, mod_googlemeet {{/ str }}',
-          '{{# str }} recording_trash, mod_googlemeet {{/ str }}',
+          {{# quote }}{{# str }} recording_trash, mod_googlemeet {{/ str }}{{/ quote }},
+          {{# quote }}{{# str }} recording_trash_confirm, mod_googlemeet {{/ str }}{{/ quote }},
+          {{# quote }}{{# str }} recording_trash, mod_googlemeet {{/ str }}{{/ quote }},
           {triggerElement: btn.get(0)}
         ).then(function() {
           confirmed = true;

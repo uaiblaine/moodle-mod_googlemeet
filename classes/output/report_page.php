@@ -94,7 +94,7 @@ class report_page implements \renderable, \templatable {
                 'name' => format_string(
                     googlemeet_display_name((string)$recording->name),
                     true,
-                    ['context' => $this->context]
+                    ['context' => $this->context, 'escape' => false]
                 ),
                 'date' => userdate($recording->createdtime, get_string('strftimedateshort', 'langconfig')),
                 'hidden' => empty($recording->visible),
@@ -138,7 +138,7 @@ class report_page implements \renderable, \templatable {
             }
             $identity = [];
             foreach ($this->identityfields as $field) {
-                $identity[] = ['value' => s((string)($row['user']->$field ?? ''))];
+                $identity[] = ['value' => (string)($row['user']->$field ?? '')];
             }
             $rows[] = [
                 'fullname' => fullname($row['user']),
@@ -190,7 +190,7 @@ class report_page implements \renderable, \templatable {
                 'name' => format_string(
                     googlemeet_display_name((string)$recording->name),
                     true,
-                    ['context' => $this->context]
+                    ['context' => $this->context, 'escape' => false]
                 ),
                 'url' => (new moodle_url(
                     '/mod/googlemeet/view.php',

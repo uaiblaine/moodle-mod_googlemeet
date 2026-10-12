@@ -680,6 +680,13 @@ class mod_googlemeet_external extends external_api {
             ];
         }
 
+        // The stored error can be the provider's raw message (API details, quota, key problems): only users
+        // who act on a failure read it, the others get the generic text.
+        $error = (string)($analysis->error ?? '');
+        if (trim($error) !== '' && !$canreview) {
+            $error = get_string('ai_error_generic', 'googlemeet');
+        }
+
         // Prefer the analysis transcript; fall back to the recording's own transcript when empty.
         $transcript = $analysis->transcript ?? '';
         if (trim((string)$transcript) === '') {
@@ -696,7 +703,7 @@ class mod_googlemeet_external extends external_api {
             'transcript' => $cantranscript ? $transcript : '',
             'language' => $analysis->language ?? 'es',
             'status' => $analysis->status,
-            'error' => $analysis->error ?? '',
+            'error' => $error,
             'aimodel' => $analysis->aimodel ?? '',
             'timecreated' => $analysis->timecreated,
             'timemodified' => $analysis->timemodified,

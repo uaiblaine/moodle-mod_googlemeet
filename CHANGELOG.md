@@ -3,6 +3,54 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.4 (unreleased)
+- Neither Gemini upload request follows redirects (the API key would travel with them); the Drive
+  confirm-token probe fetches only the first MiB; multi-account Drive links (`/u/<n>/file/d/...`) parse.
+- Practice questions: lists, publish batches and the per-recording published counts read only the
+  latest version of each question bank entry. Editing a question in the core question bank no longer
+  shows and counts the old and the new version side by side; a newer draft hides the older published
+  version until it is published.
+- "Generating questions" no longer shows for recording 1 while a generation of recording 10, 12 or
+  100 is queued: the queued task's recording is matched exactly.
+- Cancelled dates, holidays and the "Today" label take the day of a session in the site's default
+  timezone, for every viewer and for cron. A viewer in a distant timezone no longer sees a session
+  late on a cancelled day as scheduled, and reminders and auto-sync skip the same day the page shows.
+- The hero's "campus calendar" link is built from wwwroot, so it works on a site served under a path.
+- A restored session's attendance shows its real "matched of participants" counts, counted from the
+  restored attendance rows, instead of "0 matched of 0".
+- The holiday and cancelled-date pickers of the activity form read the day in the site timezone, the
+  same calendar the sessions are matched against, so an editor in another timezone saves the day they
+  picked.
+- The Gemini File API video upload goes through Moodle's HTTP client: it uses the site's outbound
+  proxy (and proxy bypass list) and the cURL blocked-hosts and allowed-ports rules, follows no
+  redirect, and is refused unless the upload URL Google returns is https on
+  generativelanguage.googleapis.com, so the API key is never sent to another host.
+- A Gemini model fallback during a web request (AJAX or web service) no longer prints its message
+  into the JSON response; it still goes to debugging(), and to the task output under cron.
+- Video analysis downloads: the Drive file id is read only from drive.google.com links, the confirm
+  token from Drive's interstitial page is URL-encoded, and every download stops at 2 GB instead of
+  writing the whole body first. A download cut short (size cap, timeout) fails instead of uploading
+  a truncated video.
+- Durations and subtitle timestamps with fractional seconds no longer raise the PHP 8.1+ "implicit
+  conversion from float" deprecation.
+- Names with "&" or "<" are no longer shown escaped twice ("A &amp; B"): the practice session's
+  "From" line, the progress report (recording columns, most-failed sections, identity columns), the
+  Moodle App class list and class page (titles, key points, chapters) and the OAuth issuer select of
+  the plugin settings.
+- Students no longer receive the stored error text of a failed AI analysis (it can carry the
+  provider's raw message) through mod_googlemeet_get_ai_analysis: they get the generic "Error
+  generating analysis" message; users who can edit recordings still read the stored text.
+- A manual Drive sync that fails unexpectedly reports a stable "error communicating with the server"
+  message instead of the raw exception text, which could also make the status web service fail as a
+  whole; the detail stays in the task log and the developer debugging output. The plugin's own
+  messages (account not linked, not the organiser's account, user missing) are kept.
+- The recordings list's sort and page links keep a search or topic containing "&", "#", "+" or "%":
+  they extend the URL built in PHP instead of pasting the text unencoded.
+- The confirmation and "Hidden" texts of the recordings list's inline script are JSON-quoted, so a
+  translation with an apostrophe can no longer break the teacher actions.
+- Practice topic and "failed questions" counts read only the latest version of each question, like
+  the practice session itself.
+
 ## 2.30.1+uai.3 (unreleased)
 - Attendance: new capability `mod/googlemeet:manageattendance` (write, editing teachers and managers,
   RISK_PERSONAL). Linking or unlinking a Meet participant and refetching a session now need it;

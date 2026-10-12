@@ -277,13 +277,13 @@ class report_builder {
      *
      * @param stdClass $course Course record.
      * @param int $userid Current user id.
-     * @return array groupid => name ([] when the course has no groups)
+     * @return array groupid => plain-text name, escaped by the template ([] when the course has no groups)
      */
     public function get_allowed_groups(stdClass $course, int $userid): array {
         $groups = groups_get_all_groups($course->id, $this->is_fenced($course, $userid) ? $userid : 0);
         $out = [];
         foreach ($groups as $group) {
-            $out[(int)$group->id] = format_string($group->name, true, ['context' => $this->context]);
+            $out[(int)$group->id] = format_string($group->name, true, ['context' => $this->context, 'escape' => false]);
         }
         return $out;
     }
