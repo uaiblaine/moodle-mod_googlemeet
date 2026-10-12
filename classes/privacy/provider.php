@@ -119,13 +119,15 @@ class provider implements
         );
 
         // The googlemeet table stores the email address of the Google account that created
-        // the Meet room (creatoremail). It is an activity-level property rather than a record
-        // keyed to a Moodle userid, so it cannot be reliably exported or deleted per user; it
-        // is declared here for transparency.
+        // the Meet room (creatoremail) and the Moodle user who owns it (creatoruserid), whose
+        // Google token background tasks use. Both are activity properties the room needs to reach
+        // Google, so they are not exported or erased per user; clearing creatoruserid alone would
+        // also let creator::resolve() bind the email again. Declared here for transparency.
         $collection->add_database_table(
             'googlemeet',
             [
                 'creatoremail' => 'privacy:metadata:googlemeet:creatoremail',
+                'creatoruserid' => 'privacy:metadata:googlemeet:creatoruserid',
             ],
             'privacy:metadata:googlemeet'
         );

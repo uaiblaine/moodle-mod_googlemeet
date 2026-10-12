@@ -40,6 +40,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'originalname',
             'url',
             'creatoremail',
+            'creatoruserid',
             'intro',
             'introformat',
             'lastsync',
@@ -245,6 +246,8 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
 
         // Define id annotations.
         if ($userinfo) {
+            // The organiser travels with the users; the restore maps it, or stores 0 when unmapped.
+            $googlemeet->annotate_ids('user', 'creatoruserid');
             $recordingprogress->annotate_ids('user', 'userid');
             $recordingsub->annotate_ids('user', 'userid');
             $practiceattempt->annotate_ids('user', 'userid');

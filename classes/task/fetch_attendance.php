@@ -25,8 +25,8 @@ use mod_googlemeet\local\attendance\source;
  *
  * Does nothing unless the site setting googlemeet/attendanceenabled is on; only activities that
  * opted in (googlemeet.attendanceenabled) are processed. Calls run with the Google token of the
- * room organiser (creatoremail), because the API only lists conferences organised by the
- * authenticated account.
+ * room organiser (creatoruserid, the owner of creatoremail), because the API only lists
+ * conferences organised by the authenticated account.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -104,7 +104,7 @@ class fetch_attendance extends \core\task\scheduled_task {
                     $row,
                     service::STATUS_ERROR,
                     [],
-                    'No single active Moodle user with the organiser e-mail.',
+                    'No active organiser: the recorded creator is gone, or no single active user has the e-mail.',
                     $now
                 );
             }
@@ -139,28 +139,13 @@ class fetch_attendance extends \core\task\scheduled_task {
     }
 
     /**
-     * The Moodle user behind creatoremail (only when exactly one active user has it).
+     * The Moodle user who organises the activity ({@see \mod_googlemeet\local\creator::resolve()}).
      *
      * @param \stdClass $googlemeet Activity record.
      * @return \stdClass|null
      */
     protected function get_organiser(\stdClass $googlemeet): ?\stdClass {
-        global $DB;
-
-        $email = trim((string)($googlemeet->creatoremail ?? ''));
-        if ($email === '') {
-            return null;
-        }
-        $users = $DB->get_records_select(
-            'user',
-            'LOWER(email) = LOWER(:email) AND deleted = 0 AND suspended = 0',
-            ['email' => $email],
-            'id',
-            '*',
-            0,
-            2
-        );
-        return count($users) === 1 ? reset($users) : null;
+        return \mod_googlemeet\local\creator::resolve($googlemeet);
     }
 
     /**

@@ -70,14 +70,14 @@ class process_recording_enrichment extends \core\task\adhoc_task {
             return;
         }
 
-        if (empty($googlemeet->creatoremail)) {
+        if (empty($googlemeet->creatoremail) && empty($googlemeet->creatoruserid)) {
             mtrace("mod_googlemeet enrichment: activity #{$googlemeetid} has no creator email; not retrying.");
             return;
         }
 
-        $creator = $DB->get_record('user', ['email' => $googlemeet->creatoremail, 'deleted' => 0, 'suspended' => 0]);
+        $creator = \mod_googlemeet\local\creator::resolve($googlemeet);
         if (!$creator) {
-            mtrace("mod_googlemeet enrichment: no active Moodle user for {$googlemeet->creatoremail}; not retrying.");
+            mtrace("mod_googlemeet enrichment: no active creator for {$googlemeet->creatoremail}; not retrying.");
             return;
         }
 

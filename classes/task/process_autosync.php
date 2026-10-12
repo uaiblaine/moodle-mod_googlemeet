@@ -227,13 +227,16 @@ class process_autosync extends \core\task\scheduled_task {
             $identitymissing = false;
             $authfailure = false;
 
-            if (empty($creatoremail)) {
+            if (empty($creatoremail) && empty($googlemeet->creatoruserid)) {
                 mtrace("  no creatoremail recorded for this activity.");
                 $identitymissing = true;
             } else {
-                $creator = $DB->get_record('user', ['email' => $creatoremail, 'deleted' => 0, 'suspended' => 0]);
+                // The recorded creator, or the single active owner of the e-mail while none is recorded.
+                $creator = \mod_googlemeet\local\creator::resolve($googlemeet);
                 if (!$creator) {
-                    mtrace("  no active Moodle user with email {$creatoremail}.");
+                    mtrace(empty($googlemeet->creatoruserid)
+                        ? "  no single active Moodle user with email {$creatoremail}."
+                        : "  the recorded creator (user #{$googlemeet->creatoruserid}) is deleted or suspended.");
                     $identitymissing = true;
                 } else {
                     // Impersonate so core\oauth2\client resolves the refresh token for this user; the

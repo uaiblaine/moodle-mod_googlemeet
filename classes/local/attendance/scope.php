@@ -132,18 +132,17 @@ class scope {
     }
 
     /**
-     * Whether $user is the organiser of the activity (creatoremail).
+     * Whether $user is the organiser of the activity: the Moodle user recorded in creatoruserid.
+     *
+     * The profile e-mail is editable, so it only decides while no id is recorded, and then only for
+     * the single active user who has the organiser e-mail ({@see \mod_googlemeet\local\creator::is_creator()}).
      *
      * @param \stdClass $googlemeet Activity record.
      * @param \stdClass $user User.
      * @return bool
      */
     public static function is_organiser(\stdClass $googlemeet, \stdClass $user): bool {
-        if (empty($googlemeet->creatoremail) || empty($user->email)) {
-            return false;
-        }
-        return \core_text::strtolower(trim((string)$googlemeet->creatoremail))
-            === \core_text::strtolower(trim((string)$user->email));
+        return \mod_googlemeet\local\creator::is_creator($googlemeet, $user);
     }
 
     /**

@@ -366,6 +366,7 @@ class calendar_sync {
             'eventid' => (string)$googlemeet->eventid,
             'url' => (string)($googlemeet->url ?? ''),
             'creatoremail' => (string)$googlemeet->creatoremail,
+            'creatoruserid' => (int)($googlemeet->creatoruserid ?? 0),
             'name' => (string)$googlemeet->name,
             'course' => (int)$googlemeet->course,
             'editorid' => $editorid,
@@ -454,6 +455,9 @@ class calendar_sync {
             'id' => (int)($data['googlemeetid'] ?? 0),
             'eventid' => (string)($data['eventid'] ?? ''),
             'creatoremail' => (string)($data['creatoremail'] ?? ''),
+            // Tasks queued before creatoruserid existed carry none: creator::resolve() falls back
+            // to the e-mail.
+            'creatoruserid' => (int)($data['creatoruserid'] ?? 0),
             'name' => (string)($data['name'] ?? ''),
             'course' => (int)($data['course'] ?? 0),
         ];
@@ -489,14 +493,14 @@ class calendar_sync {
     /**
      * Run $callback impersonating the room creator, with a REST service authenticated as them.
      *
-     * @param stdClass $googlemeet Activity data (id, name, course, creatoremail).
+     * @param stdClass $googlemeet Activity data (id, name, course, creatoremail, creatoruserid).
      * @param string $kind sync_log kind.
      * @param int $editorid User to notify on failure.
      * @param callable $callback fn(object $service, stdClass $creator): void, throws on failure.
      * @return string Outcome: success or error.
      */
     private static function with_creator(stdClass $googlemeet, string $kind, int $editorid, callable $callback): string {
-        $creator = self::find_creator((string)$googlemeet->creatoremail, $editorid);
+        $creator = self::find_creator($googlemeet);
         if (!$creator) {
             self::finish(
                 $googlemeet,
@@ -555,22 +559,14 @@ class calendar_sync {
     /**
      * Moodle user owning the Google account that created the room.
      *
-     * Prefers the editor when their email matches (shared emails are possible in Moodle).
+     * The recorded creatoruserid; while none is recorded, the single active user with the
+     * organiser e-mail ({@see creator::resolve()}). Never a guess among users sharing the e-mail.
      *
-     * @param string $email
-     * @param int $preferuserid
+     * @param stdClass $googlemeet Activity data (id, creatoremail, creatoruserid).
      * @return stdClass|null
      */
-    public static function find_creator(string $email, int $preferuserid = 0): ?stdClass {
-        global $DB;
-        if ($email === '') {
-            return null;
-        }
-        $users = $DB->get_records('user', ['email' => $email, 'deleted' => 0, 'suspended' => 0], 'id ASC');
-        if (!$users) {
-            return null;
-        }
-        return $users[$preferuserid] ?? reset($users);
+    public static function find_creator(stdClass $googlemeet): ?stdClass {
+        return creator::resolve($googlemeet);
     }
 
     /**
