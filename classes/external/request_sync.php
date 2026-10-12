@@ -58,6 +58,8 @@ class request_sync extends external_api {
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
+        // The sync itself runs googlemeet_sync_recordings(), which requires syncgoogledrive.
+        require_capability('mod/googlemeet:syncgoogledrive', $context);
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
 
         $queued = sync_manager::request($googlemeet, (int)$USER->id);

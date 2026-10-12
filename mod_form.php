@@ -25,6 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 use mod_googlemeet\client;
+use mod_googlemeet\local\creator;
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
@@ -50,8 +51,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $mform = $this->_form;
         $client = new client();
 
-        $logout = optional_param('logout', 0, PARAM_BOOL);
-        if ($logout) {
+        if (self::logout_requested()) {
             $client->logout();
         }
 
@@ -581,6 +581,13 @@ class mod_googlemeet_mod_form extends moodleform_mod {
                 }
             }
 
+            // Server-side twin of googlemeet_add_instance()'s rule: a typed organiser e-mail (also the
+            // read-only field of a Google-logged editor, which a request can alter) must be the
+            // editor's own account unless they hold the administrator override.
+            if (!isset($errors['creatoremail']) && !creator::may_name_email((string)($data['creatoremail'] ?? ''))) {
+                $errors['creatoremail'] = get_string('creatoremail_notyours', 'googlemeet');
+            }
+
             // Forces an error if the Google session expired after submitting the form.
             if (!$isgooglelogged && $clientislogged) {
                 $errors['client_islogged'] = '';
@@ -599,12 +606,33 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     }
 
     /**
+     * Whether this request asks to unlink the Google account: logout=1 with the session key.
+     *
+     * The logout link of {@see client::print_user_info()} carries sesskey; without it a cross-site
+     * link to the settings page would unlink the teacher's account. Mirrors the view page's check in
+     * googlemeet_handle_view_actions().
+     *
+     * @return bool
+     */
+    public static function logout_requested(): bool {
+        if (!optional_param('logout', 0, PARAM_BOOL)) {
+            return false;
+        }
+        // Read optionally: confirm_sesskey() without a key would throw on a missing parameter, and a
+        // link without one is simply not a logout request.
+        $sesskey = optional_param('sesskey', '', PARAM_RAW);
+        return $sesskey !== '' && confirm_sesskey($sesskey);
+    }
+
+    /**
      * Whether the current user may set the organizer email of an existing instance.
      *
-     * Background tasks act on the organizer's Google Drive by looking up the Moodle user with that
-     * email, so an editor must not be able to point an activity at someone else's linked account.
-     * A change is allowed only for site administrators (moodle/site:config) or when the new email
-     * is the Google account the editor has linked right now.
+     * A new email names a new creator (googlemeet_update_instance() records its owner in
+     * creatoruserid), whose Google token background tasks then use, so an editor must not be able
+     * to point an activity at someone else's linked account.
+     * A change is allowed for site administrators (moodle/site:config), or when the new email is the
+     * Google account the editor has linked right now or their own Moodle email: the rule of a new
+     * activity ({@see \mod_googlemeet\local\creator::may_name_email()}).
      *
      * @param string $newemail Submitted organizer email.
      * @param client $client Google client for the current user.
@@ -624,12 +652,9 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         if (has_capability('moodle/site:config', context_system::instance())) {
             return true;
         }
-        if ($isgooglelogged) {
-            // Served from the session userinfo cache, normally no HTTP request.
-            $linked = $client->get_email();
-            return $linked !== '' && $normalise($linked) === $normalise($newemail);
-        }
-        return false;
+        // Served from the session userinfo cache, normally no HTTP request.
+        $linked = $isgooglelogged ? (string)$client->get_email() : '';
+        return \mod_googlemeet\local\creator::is_editors_own_email($newemail, $linked);
     }
 
     /**

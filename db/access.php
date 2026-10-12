@@ -57,7 +57,9 @@ $capabilities = [
         ],
     ],
 
+    // Uploads recording materials and edits recording names and transcripts shown to students.
     'mod/googlemeet:editrecording' => [
+        'riskbitmask' => RISK_XSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
@@ -114,6 +116,17 @@ $capabilities = [
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
             'teacher' => CAP_ALLOW,
+            'editingteacher' => CAP_ALLOW,
+            'manager' => CAP_ALLOW,
+        ],
+    ],
+
+    // Attendance writes on attendance.php: link or unlink a Meet participant to a Moodle user, refetch a session.
+    'mod/googlemeet:manageattendance' => [
+        'riskbitmask' => RISK_PERSONAL,
+        'captype' => 'write',
+        'contextlevel' => CONTEXT_MODULE,
+        'archetypes' => [
             'editingteacher' => CAP_ALLOW,
             'manager' => CAP_ALLOW,
         ],

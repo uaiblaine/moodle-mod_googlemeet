@@ -112,10 +112,33 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         // The copy must never act on the source activity's Google Calendar event: eventid is the
         // original's event (a later Calendar update or delete would hit it), so drop it. The Meet URL
         // is kept so the copy uses the same room; lastsync describes the original's Drive sync.
-        // Keep creatoremail: it identifies the Google account that owns the Meet room and its Drive
-        // recordings, and without it autosync closes every event of the copy as a permanent failure.
         $data->eventid = null;
         $data->lastsync = null;
+        // Cron acts as the creator with their Google token, and a backup can carry any user id or
+        // e-mail (user mapping matches on values an .mbz can be edited to hold). So the restoring user
+        // must be allowed to name the creator, as in the add form: a mapped creator (restore with
+        // users) is kept only when it is the restorer or the restorer holds moodle/site:config.
+        // Otherwise creatoremail is kept only when the restorer could have typed it: their own e-mail
+        // (recorded as the creator) or, for an administrator, any e-mail (recorded as its single active
+        // owner). Anything else is blanked and auto-sync switched off: the copy then acts as nobody
+        // until its teacher links a Google account. Backups older than the column carry no id.
+        $restorerid = (int)$this->get_task()->get_userid();
+        $creatoruserid = (int)($data->creatoruserid ?? 0);
+        $mappedid = $creatoruserid > 0 ? (int)$this->get_mappingid('user', $creatoruserid) : 0;
+        $restorerisadmin = has_capability('moodle/site:config', \context_system::instance(), $restorerid);
+        $data->creatoruserid = ($mappedid > 0 && ($mappedid === $restorerid || $restorerisadmin)) ? $mappedid : 0;
+        if ($data->creatoruserid === 0) {
+            $email = trim((string)($data->creatoremail ?? ''));
+            if ($email !== '' && \mod_googlemeet\local\creator::may_user_name_email($restorerid, $email)) {
+                $own = (string)$DB->get_field('user', 'email', ['id' => $restorerid, 'deleted' => 0]);
+                $data->creatoruserid = \mod_googlemeet\local\creator::same_email($email, $own)
+                    ? $restorerid
+                    : \mod_googlemeet\local\creator::userid_for_email($email, '', 0);
+            } else if ($email !== '') {
+                $data->creatoremail = '';
+                $data->autosynchours = 0;
+            }
+        }
         // A copy without user data (new course edition, duplicate) shares the Meet room of the
         // original; reading attendance must be switched on again deliberately by its teacher.
         if (!$this->userinfo) {

@@ -766,5 +766,26 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101203, 'googlemeet');
     }
 
+    if ($oldversion < 2026101300) {
+        // The organiser is identified by a Moodle user id from now on, not by the editable e-mail.
+        $table = new xmldb_table('googlemeet');
+        $field = new xmldb_field('creatoruserid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'creatoremail');
+        if (!$dbman->field_exists($table, $field)) {
+            $dbman->add_field($table, $field);
+        }
+        $index = new xmldb_index('creatoruserid', XMLDB_INDEX_NOTUNIQUE, ['creatoruserid']);
+        if (!$dbman->index_exists($table, $index)) {
+            $dbman->add_index($table, $index);
+        }
+
+        // Backfill only where creatoremail names exactly one active user (case-insensitive). With
+        // no such user, or several sharing the e-mail, the id stays 0 and the runtime fallback
+        // resolves it later under the same single-match rule.
+        require_once(__DIR__ . '/upgradelib.php');
+        mod_googlemeet_backfill_creatoruserid();
+
+        upgrade_mod_savepoint(true, 2026101300, 'googlemeet');
+    }
+
     return true;
 }

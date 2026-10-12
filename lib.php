@@ -23,6 +23,8 @@
  */
 
 use mod_googlemeet\client;
+use mod_googlemeet\local\creator;
+use mod_googlemeet\local\file_serving;
 
 /**
  * Return if the plugin supports $feature.
@@ -99,7 +101,7 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
         if (!($file = $fs->get_file_by_hash(sha1($fullpath))) || $file->is_directory()) {
             return false;
         }
-        send_stored_file($file, 86400, 0, $forcedownload, $options);
+        send_stored_file($file, 86400, 0, file_serving::force_download($file, (bool)$forcedownload), $options);
         return true;
     }
 
@@ -132,7 +134,7 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
         return false;
     }
 
-    send_stored_file($file, 0, 0, $forcedownload, $options);
+    send_stored_file($file, 0, 0, file_serving::force_download($file, (bool)$forcedownload), $options);
 }
 
 /**
@@ -147,8 +149,11 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
  * @return int The id of the newly inserted record.
  */
 function googlemeet_add_instance($googlemeet, $mform = null) {
-    global $DB, $CFG;
+    global $DB, $CFG, $USER;
     require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+
+    // The creator is derived below from who linked or owns the organiser e-mail, never taken from the data.
+    unset($googlemeet->creatoruserid);
 
     $client = new client();
 
@@ -167,6 +172,8 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
             $googlemeet->eventid = $link->get_param('eid');
             $googlemeet->originalname = $calendarevent->summary;
             $googlemeet->creatoremail = $calendarevent->creator->email;
+            // The event was created with this user's Google token, so they own the organiser account.
+            $googlemeet->creatoruserid = (int)$USER->id;
         } catch (\Throwable $e) {
             debugging('mod_googlemeet: Google Calendar event creation failed during add_instance: ' .
                 $e->getMessage(), DEBUG_DEVELOPER);
@@ -174,6 +181,20 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
             if (!isset($googlemeet->url)) {
                 $googlemeet->url = '';
             }
+        }
+    }
+
+    // Without a Calendar event the organiser e-mail was typed. It names the user whose Google token
+    // background tasks will use, so it must be the editor's own account (an administrator may name
+    // anyone, and then the single active owner is recorded). Restore and the upgrade do not come here.
+    if (!isset($googlemeet->creatoruserid)) {
+        $typed = (string)($googlemeet->creatoremail ?? '');
+        if (creator::is_editors_own_email($typed, creator::linked_email())) {
+            $googlemeet->creatoruserid = (int)$USER->id;
+        } else if (creator::may_name_email($typed)) {
+            $googlemeet->creatoruserid = creator::userid_for_email($typed, '', 0);
+        } else {
+            throw new \moodle_exception('creatoremail_notyours', 'googlemeet');
         }
     }
 
@@ -224,10 +245,12 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
  * @return bool True if successful, false otherwise.
  */
 function googlemeet_update_instance($googlemeet, $mform = null) {
-    global $DB, $CFG;
+    global $DB, $CFG, $USER;
     require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
     $googlemeet->id = $googlemeet->instance;
+    // The stored creator stays unless the organiser e-mail changes (below); the data never names it.
+    unset($googlemeet->creatoruserid);
 
     if (isset($googlemeet->addmultiply)) {
         if (isset($googlemeet->days)) {
@@ -251,6 +274,23 @@ function googlemeet_update_instance($googlemeet, $mform = null) {
 
     // Snapshot what the Google Calendar event mirrors before overwriting it.
     $calendarbefore = $DB->get_record('googlemeet', ['id' => $googlemeet->id]);
+
+    // A new organiser e-mail names a new creator: the editor when it is their linked Google account
+    // or their own Moodle e-mail, else its single active owner, else nobody yet. The rule of mod_form::can_change_creatoremail()
+    // is enforced here too, so a caller that skips the form cannot bind someone else's account.
+    if (
+        $calendarbefore && isset($googlemeet->creatoremail)
+            && !creator::same_email((string)$googlemeet->creatoremail, (string)$calendarbefore->creatoremail)
+    ) {
+        if (!creator::may_change_to_email((string)$googlemeet->creatoremail)) {
+            throw new \moodle_exception('creatoremail_notyours', 'googlemeet');
+        }
+        $googlemeet->creatoruserid = creator::userid_for_email(
+            (string)$googlemeet->creatoremail,
+            creator::linked_email(),
+            (int)$USER->id
+        );
+    }
 
     $googlemeetupdated = $DB->update_record('googlemeet', $googlemeet);
 

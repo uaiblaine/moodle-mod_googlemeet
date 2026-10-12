@@ -171,13 +171,14 @@ default). Use `--help` on each.
 |---|---|---|
 | `mod/googlemeet:view` | guest, student, teacher, editing teacher, manager | View the activity |
 | `mod/googlemeet:addinstance` | editing teacher, manager | Add the activity |
-| `mod/googlemeet:syncgoogledrive` | editing teacher, manager | Sync recordings with Drive |
+| `mod/googlemeet:syncgoogledrive` | editing teacher, manager | Sync recordings with Drive (the manual sync also needs `editrecording`) |
 | `mod/googlemeet:editrecording` | editing teacher, manager | Rename/show/hide recordings, manage materials, view transcripts |
 | `mod/googlemeet:removerecording` | editing teacher, manager | Trash and delete recordings |
 | `mod/googlemeet:generateai` | editing teacher, manager | Run and edit AI analysis |
 | `mod/googlemeet:managequestions` | teacher, editing teacher, manager | Generate, review and publish practice questions |
 | `mod/googlemeet:subscriberecordings` | student, teacher, editing teacher, manager | Subscribe to new-recording notifications |
-| `mod/googlemeet:viewreports` | teacher, editing teacher, manager | Viewing/practice report and attendance |
+| `mod/googlemeet:viewreports` | teacher, editing teacher, manager | Viewing/practice report and attendance (read and download) |
+| `mod/googlemeet:manageattendance` | editing teacher, manager | Link/unlink Meet participants to users, refetch a session's attendance |
 
 ## Privacy and GDPR
 

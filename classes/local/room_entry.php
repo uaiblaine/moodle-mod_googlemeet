@@ -68,13 +68,18 @@ class room_entry {
     /**
      * Trigger the room_entered event.
      *
+     * Nothing is logged for the guest user: its one account is shared by every guest.
+     *
      * @param \stdClass $googlemeet Activity record.
      * @param \stdClass|\cm_info $cm Course module.
      * @param \context_module $context Module context.
      * @param string $via "web" or "mobile".
-     * @return int Session id logged (0 when no session is live and none starts within EARLY_WINDOW).
+     * @return int Session id logged (0 when no session is live and none starts within EARLY_WINDOW, or for a guest).
      */
     public static function log(\stdClass $googlemeet, $cm, \context_module $context, string $via = 'web'): int {
+        if (isguestuser()) {
+            return 0;
+        }
         $session = self::current_session((int)$googlemeet->id);
         $sessionid = $session ? (int)$session->id : 0;
 

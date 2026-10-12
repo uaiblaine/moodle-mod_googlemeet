@@ -1571,6 +1571,10 @@ class mod_googlemeet_external extends external_api {
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:view', $context);
+        // Guests share one account: progress stored under it would be every guest's at once.
+        if (isguestuser()) {
+            throw new \moodle_exception('guestsarenotallowed', 'error');
+        }
 
         $recording = $DB->get_record(
             'googlemeet_recordings',
@@ -1787,6 +1791,10 @@ class mod_googlemeet_external extends external_api {
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:view', $context);
+        // Guests share one account: attempts stored under it would be every guest's at once.
+        if (isguestuser()) {
+            throw new \moodle_exception('guestsarenotallowed', 'error');
+        }
 
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
         $recording = $DB->get_record(

@@ -206,14 +206,14 @@ $functions = [
         'description' => 'Queue a background Google Drive sync of an activity',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/googlemeet:editrecording',
+        'capabilities' => 'mod/googlemeet:editrecording, mod/googlemeet:syncgoogledrive',
     ],
     'mod_googlemeet_get_sync_status' => [
         'classname' => 'mod_googlemeet\\external\\get_sync_status',
         'description' => 'Status of the background Google Drive sync of an activity',
         'type' => 'read',
         'ajax' => true,
-        'capabilities' => 'mod/googlemeet:editrecording',
+        'capabilities' => 'mod/googlemeet:editrecording, mod/googlemeet:syncgoogledrive',
     ],
     'mod_googlemeet_log_room_entered' => [
         'classname' => 'mod_googlemeet\\external\\log_room_entered',

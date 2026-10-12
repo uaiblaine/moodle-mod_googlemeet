@@ -26,6 +26,7 @@
     "islogged": true,
     "syncbutton": "html",
     "isloggedcreatoremail": true,
+    "cansync": true,
     "cmid": 1,
     "syncactive": false,
     "syncstatusmessage": ""
@@ -41,9 +42,11 @@
         </div>
 
         {{#isloggedcreatoremail}}
-          <div class="googlemeet-sync-action" data-googlemeet-async-sync="{{cmid}}">
-            {{{syncbutton}}}
-          </div>
+          {{#cansync}}
+            <div class="googlemeet-sync-action" data-googlemeet-async-sync="{{cmid}}">
+              {{{syncbutton}}}
+            </div>
+          {{/cansync}}
         {{/isloggedcreatoremail}}
 
         {{^isloggedcreatoremail}}
@@ -101,8 +104,10 @@
 </div>
 {{#js}}
 {{#islogged}}
+{{#cansync}}
 require(['mod_googlemeet/sync'], function(m) {
     m.initSyncPanel({{cmid}}, {{#syncactive}}true{{/syncactive}}{{^syncactive}}false{{/syncactive}});
 });
+{{/cansync}}
 {{/islogged}}
 {{/js}}

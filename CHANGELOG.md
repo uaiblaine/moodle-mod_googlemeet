@@ -3,6 +3,51 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.3 (unreleased)
+- Attendance: new capability `mod/googlemeet:manageattendance` (write, editing teachers and managers,
+  RISK_PERSONAL). Linking or unlinking a Meet participant and refetching a session now need it;
+  viewing the attendance and downloading it still need `mod/googlemeet:viewreports`, so
+  non-editing teachers keep a read-only view. Refetch is a POST button instead of a link carrying
+  the sesskey, and every write is POST only. "Link Google again" (relink) is unchanged: it only
+  forgets the organiser's own Google token. In a course in separate groups, a user without
+  "Access all groups" sees only the attendance of the members of their own groups; unmatched
+  participants are shown to such a user only when they can manage attendance, and they can link
+  a participant only to a member of their own groups and unlink only rows they are shown.
+- Manual Drive sync: queueing (view page, `mod_googlemeet_request_sync`) and polling
+  (`mod_googlemeet_get_sync_status`) now need `mod/googlemeet:syncgoogledrive` as well as
+  `mod/googlemeet:editrecording`, so the request fails at once instead of in the queued task; the
+  sync button and its script are hidden from users without it.
+- Guests can still view the activity and enter the room, but write nothing under the shared guest
+  account: `mod_googlemeet_mark_recording_progress`, `mod_googlemeet_check_practice_answer` and
+  `mod_googlemeet_log_room_entered` refuse them (`guestsarenotallowed`), and entering the room from
+  the web page logs no "room entered" event for them.
+- `mod/googlemeet:editrecording` is flagged RISK_XSS: it uploads recording materials and edits the
+  recording names and transcripts students see.
+- Recording materials and attachments that a browser would run as a page (HTML, XHTML, SVG, XML)
+  are always sent as downloads; PDFs and images still open inline.
+- The Google logout on the activity settings page needs the session key its link already carries;
+  a link without it no longer unlinks the teacher's Google account.
+
+
+- Organiser identity. The Moodle user who owns the organiser Google account is now recorded in the
+  new column `googlemeet.creatoruserid`, and every background task that acts as the organiser
+  (auto-sync, recording enrichment, Calendar updates and deletions, the attendance fetch) and the
+  attendance pages use that id instead of looking a user up by `creatoremail`.
+  - Who may name the organiser: on add, on edit and on restore the organiser e-mail must be the
+    acting user's own (their linked Google account or their Moodle e-mail) unless they hold
+    `moodle/site:config`. The form reports `creatoremail_notyours`; `googlemeet_add_instance()` and
+    `googlemeet_update_instance()` throw it too. Before, a teacher could type another user's e-mail
+    (or restore a crafted backup carrying it) and cron would then use that user's Google token.
+  - A restore keeps a mapped creator (backup with users) only when the restoring user is that
+    creator or holds `moodle/site:config`, and otherwise keeps the e-mail only when the restoring
+    user may name it (then records them, or for an administrator the single active owner); anything
+    else blanks the e-mail and turns auto-sync off, so a copy restored by someone else needs its
+    teacher to link a Google account again.
+  - The upgrade backfills the id when exactly one active user has the e-mail (case-insensitive),
+    else leaves 0. An activity with no recorded id still answers with that single owner, but the
+    answer is never written back (read paths used to persist it, binding the wrong user for good
+    when an e-mail changed hands).
+
 ## 2.30.1+uai.2 (unreleased)
 - Teacher report: in separate-groups mode, a user without "Access all groups" sees only the students
   of their own groups within the activity's grouping, and nobody when they belong to no group (the
