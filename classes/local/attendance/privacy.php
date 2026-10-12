@@ -23,14 +23,13 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
 /**
- * Privacy API parts of real attendance (ANA-03), called from \mod_googlemeet\privacy\provider.
+ * Privacy API parts of the attendance read from Google Meet, called from {@see \mod_googlemeet\privacy\provider}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class privacy {
-
     /**
      * Declare the stored data.
      *
@@ -109,8 +108,10 @@ class privacy {
                  WHERE c.id {$csql} AND ga.userid = :userid
               ORDER BY cm.id, ga.timejoined";
         $grouped = [];
-        foreach ($DB->get_records_sql($sql, ['contextlevel' => CONTEXT_MODULE, 'modname' => 'googlemeet',
-                'userid' => $userid] + $cparams) as $row) {
+        foreach (
+            $DB->get_records_sql($sql, ['contextlevel' => CONTEXT_MODULE, 'modname' => 'googlemeet',
+                'userid' => $userid] + $cparams) as $row
+        ) {
             $grouped[(int)$row->cmid][] = [
                 'session' => $row->eventdate ? transform::datetime($row->eventdate) : '',
                 'meetname' => $row->displayname,
@@ -123,7 +124,9 @@ class privacy {
         }
         foreach ($grouped as $cmid => $sessions) {
             writer::with_context(\context_module::instance($cmid))->export_data(
-                [get_string('privacy:attendance', 'googlemeet')], (object)['sessions' => $sessions]);
+                [get_string('privacy:attendance', 'googlemeet')],
+                (object)['sessions' => $sessions]
+            );
         }
     }
 
@@ -136,9 +139,12 @@ class privacy {
     public static function export_preferences(int $userid): void {
         $value = get_user_preferences(scope::PREF_GRANTED, null, $userid);
         if ($value !== null) {
-            writer::export_user_preference('mod_googlemeet', scope::PREF_GRANTED,
+            writer::export_user_preference(
+                'mod_googlemeet',
+                scope::PREF_GRANTED,
                 $value ? transform::datetime((int)$value) : '0',
-                get_string('privacy:metadata:preference:meetscope', 'googlemeet'));
+                get_string('privacy:metadata:preference:meetscope', 'googlemeet')
+            );
         }
     }
 

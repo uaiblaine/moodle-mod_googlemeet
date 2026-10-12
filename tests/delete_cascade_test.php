@@ -29,7 +29,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 require_once($CFG->dirroot . '/course/lib.php');
 
 /**
- * Central cascade delete (DAT-01), trash retention (OPS-03), orphan cleanup and course reset.
+ * Recording cascade delete, trash retention, orphan cleanup and course reset.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -39,7 +39,6 @@ require_once($CFG->dirroot . '/course/lib.php');
 #[CoversClass(recording_cleanup::class)]
 #[CoversClass(task\purge_trash::class)]
 final class delete_cascade_test extends \advanced_testcase {
-
     /**
      * Course + activity.
      *
@@ -91,8 +90,13 @@ final class delete_cascade_test extends \advanced_testcase {
      * @param int $userid Student id.
      * @return int[] Question ids [free, used in a quiz].
      */
-    private function add_dependents(\stdClass $googlemeet, \stdClass $cm, \context_module $context,
-            int $recordingid, int $userid): array {
+    private function add_dependents(
+        \stdClass $googlemeet,
+        \stdClass $cm,
+        \context_module $context,
+        int $recordingid,
+        int $userid
+    ): array {
         global $DB;
 
         $DB->insert_record('googlemeet_ai_analysis', (object)[
@@ -115,8 +119,12 @@ final class delete_cascade_test extends \advanced_testcase {
         $free = $service->create_draft_multichoice($googlemeet, $cm, $context, $recordingid, ['stem' => 'Free'] + $data);
         $used = $service->create_draft_multichoice($googlemeet, $cm, $context, $recordingid, ['stem' => 'Used'] + $data);
         foreach ([$free, $used] as $questionid) {
-            $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_READY,
-                ['questionid' => $questionid]);
+            $DB->set_field(
+                'question_versions',
+                'status',
+                question_version_status::QUESTION_STATUS_READY,
+                ['questionid' => $questionid]
+            );
         }
         // Simulate the question being used by a quiz slot.
         $qv = $DB->get_record('question_versions', ['questionid' => $used], 'questionbankentryid, version', MUST_EXIST);
@@ -144,15 +152,18 @@ final class delete_cascade_test extends \advanced_testcase {
             'analysis' => $DB->count_records('googlemeet_ai_analysis', ['recordingid' => $recordingid]),
             'progress' => $DB->count_records('googlemeet_recording_progress', ['recordingid' => $recordingid]),
             'attempts' => $DB->count_records('googlemeet_practice_attempts', ['recordingid' => $recordingid]),
-            'files' => $DB->count_records_select('files',
+            'files' => $DB->count_records_select(
+                'files',
                 "component = 'mod_googlemeet' AND filearea = 'recordingmaterial' AND itemid = ? AND filename <> '.'",
-                [$recordingid]),
+                [$recordingid]
+            ),
             'preferences' => $DB->count_records_select('user_preferences', 'name = ? OR name = ?', [
                 googlemeet_lastjump_preference_name($recordingid), googlemeet_keypoints_preference_name($recordingid)]),
             'tagged' => $DB->count_records_sql(
                 "SELECT COUNT(1) FROM {tag_instance} ti JOIN {tag} t ON t.id = ti.tagid
                   WHERE ti.component = 'core_question' AND t.name = ?",
-                [question_service::tag_for_recording($recordingid)]),
+                [question_service::tag_for_recording($recordingid)]
+            ),
         ];
     }
 
@@ -174,17 +185,23 @@ final class delete_cascade_test extends \advanced_testcase {
         $this->assertTrue($result['success']);
 
         $this->assertFalse($DB->record_exists('googlemeet_recordings', ['id' => $purged]));
-        $this->assertSame(array_fill_keys(['analysis', 'progress', 'attempts', 'files', 'preferences', 'tagged'], 0),
-            $this->count_dependents($purged));
+        $this->assertSame(
+            array_fill_keys(['analysis', 'progress', 'attempts', 'files', 'preferences', 'tagged'], 0),
+            $this->count_dependents($purged)
+        );
         $this->assertFalse($DB->record_exists('question', ['id' => $free]));
         $this->assertTrue($DB->record_exists('question', ['id' => $used]));
-        $this->assertEquals(question_version_status::QUESTION_STATUS_HIDDEN,
-            $DB->get_field('question_versions', 'status', ['questionid' => $used]));
+        $this->assertEquals(
+            question_version_status::QUESTION_STATUS_HIDDEN,
+            $DB->get_field('question_versions', 'status', ['questionid' => $used])
+        );
 
         // The other recording is untouched.
         $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $kept]));
-        $this->assertSame(['analysis' => 1, 'progress' => 1, 'attempts' => 1, 'files' => 1, 'preferences' => 2, 'tagged' => 2],
-            $this->count_dependents($kept));
+        $this->assertSame(
+            ['analysis' => 1, 'progress' => 1, 'attempts' => 1, 'files' => 1, 'preferences' => 2, 'tagged' => 2],
+            $this->count_dependents($kept)
+        );
     }
 
     /**
@@ -209,8 +226,10 @@ final class delete_cascade_test extends \advanced_testcase {
         $this->assertSame(recording_cleanup::TRASH_MANUAL, $row->trashreason);
         $this->assertGreaterThan(0, (int)$row->timedeleted);
         // Rows already in the trash keep their reason and date.
-        $this->assertSame(recording_cleanup::TRASH_SYNC,
-            $DB->get_field('googlemeet_recordings', 'trashreason', ['id' => $synctrashed]));
+        $this->assertSame(
+            recording_cleanup::TRASH_SYNC,
+            $DB->get_field('googlemeet_recordings', 'trashreason', ['id' => $synctrashed])
+        );
         // Nothing is deleted: dependents and practice questions stay.
         foreach ([$a, $synctrashed] as $id) {
             $this->assertSame(['analysis' => 1, 'progress' => 1, 'attempts' => 1, 'files' => 1, 'preferences' => 2,
@@ -252,7 +271,7 @@ final class delete_cascade_test extends \advanced_testcase {
         $alive = $this->create_recording($googlemeet->id);
         [$free, $used] = $this->add_dependents($googlemeet, $cm, $context, $gone, $student->id);
         $this->add_dependents($googlemeet, $cm, $context, $alive, $student->id);
-        // Legacy bug: the recording row went away without its dependents.
+        // Delete the recording row alone, leaving its dependents behind.
         $DB->delete_records('googlemeet_recordings', ['id' => $gone]);
         // Rows of an activity that no longer exists.
         $DB->insert_record('googlemeet_recording_subs', (object)['googlemeetid' => 987654, 'userid' => $student->id,
@@ -280,8 +299,10 @@ final class delete_cascade_test extends \advanced_testcase {
 
         // Idempotent: nothing left, and live data was not touched.
         $this->assertSame(0, array_sum(array_map('count', recording_cleanup::find_orphans())));
-        $this->assertSame(['analysis' => 1, 'progress' => 1, 'attempts' => 1, 'files' => 1, 'preferences' => 2, 'tagged' => 2],
-            $this->count_dependents($alive));
+        $this->assertSame(
+            ['analysis' => 1, 'progress' => 1, 'attempts' => 1, 'files' => 1, 'preferences' => 2, 'tagged' => 2],
+            $this->count_dependents($alive)
+        );
     }
 
     /**
@@ -343,13 +364,18 @@ final class delete_cascade_test extends \advanced_testcase {
         $this->resetAfterTest();
         $now = make_timestamp(2026, 10, 9, 12);
         $this->assertSame('', recording_cleanup::purge_notice($now, 0, $now));
-        $expected = get_string('recordings_trash_purgeon', 'googlemeet',
-            userdate($now + 30 * DAYSECS, get_string('trash_purge_dateformat', 'googlemeet')));
+        $expected = get_string(
+            'recordings_trash_purgeon',
+            'googlemeet',
+            userdate($now + 30 * DAYSECS, get_string('trash_purge_dateformat', 'googlemeet'))
+        );
         $this->assertSame($expected, recording_cleanup::purge_notice($now, 30, $now));
-        // userdate() drops the leading zero of the day.
+        // The userdate() call drops the leading zero of the day.
         $this->assertStringContainsString('8/11', $expected);
-        $this->assertSame(get_string('recordings_trash_purgesoon', 'googlemeet'),
-            recording_cleanup::purge_notice($now - 40 * DAYSECS, 30, $now));
+        $this->assertSame(
+            get_string('recordings_trash_purgesoon', 'googlemeet'),
+            recording_cleanup::purge_notice($now - 40 * DAYSECS, 30, $now)
+        );
         // Sync-trashed recordings are never purged, so no notice.
         $this->assertSame('', recording_cleanup::purge_notice($now - 40 * DAYSECS, 30, $now, recording_cleanup::TRASH_SYNC));
     }
@@ -366,7 +392,7 @@ final class delete_cascade_test extends \advanced_testcase {
         $this->add_dependents($googlemeet, $cm, $context, $a, $student->id);
         $DB->insert_record('googlemeet_recording_subs', (object)['googlemeetid' => $googlemeet->id,
             'userid' => $student->id, 'timecreated' => time()]);
-        // ANA-03 attendance of a past session.
+        // Attendance of a past session.
         $eventid = $DB->insert_record('googlemeet_events', (object)['googlemeetid' => $googlemeet->id,
             'eventdate' => time() - DAYSECS, 'duration' => 3600, 'timemodified' => time()]);
         $DB->insert_record('googlemeet_attendance', (object)['googlemeetid' => $googlemeet->id, 'eventid' => $eventid,

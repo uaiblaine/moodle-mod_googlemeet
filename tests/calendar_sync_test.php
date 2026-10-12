@@ -27,36 +27,10 @@ defined('MOODLE_INTERNAL') || die();
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/calendar_sync_test_fake_rest.php');
 
 /**
- * Test double of \mod_googlemeet\rest: records calls, optionally throws.
- */
-class calendar_sync_test_fake_rest {
-    /** @var array Captured calls. */
-    public array $calls = [];
-
-    /** @var \Exception|null Thrown by call() when set. */
-    public ?\Exception $throw = null;
-
-    /**
-     * Fake core\oauth2\rest::call().
-     *
-     * @param string $api
-     * @param array $params
-     * @param mixed $rawpost
-     * @return \stdClass|null
-     */
-    public function call($api, $params, $rawpost = false) {
-        $this->calls[] = ['api' => $api, 'params' => $params, 'body' => $rawpost === false ? null : json_decode($rawpost, true)];
-        if ($this->throw) {
-            throw $this->throw;
-        }
-        return $api === 'deleteevent' ? null : (object)['id' => $params['eventid'] ?? ''];
-    }
-}
-
-/**
- * DAT-04: Google Calendar event follows activity edits and deletion.
+ * The Google Calendar event follows activity edits and deletion.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -67,24 +41,29 @@ class calendar_sync_test_fake_rest {
 #[CoversClass(calendar_update_event::class)]
 #[CoversClass(calendar_delete_event::class)]
 final class calendar_sync_test extends \advanced_testcase {
-
     /** @var calendar_sync_test_fake_rest */
     private calendar_sync_test_fake_rest $rest;
 
     /** @var array Users the fake factory was asked for. */
     private array $factoryusers = [];
 
+    /**
+     * Route every Google call through the fake REST service and record which user it was built for.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
         $this->rest = new calendar_sync_test_fake_rest();
         $this->factoryusers = [];
-        calendar_sync::set_service_factory(function(\stdClass $user) {
+        calendar_sync::set_service_factory(function (\stdClass $user) {
             $this->factoryusers[] = (int)$user->id;
             return $this->rest;
         });
     }
 
+    /**
+     * Restore the default service factory (it is static state shared by every test).
+     */
     protected function tearDown(): void {
         calendar_sync::set_service_factory(null);
         parent::tearDown();
@@ -105,6 +84,7 @@ final class calendar_sync_test extends \advanced_testcase {
      *
      * @param \stdClass $creator
      * @param string $eventid
+     * @param string $url Meet room URL; '' gives the activity a room of its own.
      * @return array [googlemeet record, cm]
      */
     private function make_linked_activity(\stdClass $creator, string $eventid = 'evt0123abc', string $url = ''): array {
@@ -148,10 +128,13 @@ final class calendar_sync_test extends \advanced_testcase {
         return $data;
     }
 
+    /**
+     * The stored htmlLink "eid" decodes to the Google event id, and an instance id to its series id.
+     */
     public function test_decode_event_id(): void {
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc')));
         $this->assertSame('rawid_123', calendar_sync::decode_event_id('rawid_123'));
-        // htmlLink of a recurring event may carry the first instance: the series id is used.
+        // The htmlLink of a recurring event may carry the first instance: the series id is used.
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc_20260302T173000Z')));
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc_20260302')));
         $this->assertSame('evt0123abc', calendar_sync::series_id('evt0123abc'));
@@ -188,6 +171,10 @@ final class calendar_sync_test extends \advanced_testcase {
         $this->assertSame([], calendar_sync::build_event_body($gm, 'Europe/Madrid')['recurrence']);
     }
 
+    /**
+     * Only fields mirrored in the Google event need a patch; the description and an equivalent
+     * encoding of the same weekdays do not.
+     */
     public function test_needs_patch(): void {
         $old = (object)['name' => 'A', 'eventdate' => 100, 'eventenddate' => 200, 'starthour' => 10, 'startminute' => 0,
             'endhour' => 11, 'endminute' => 0, 'addmultiply' => 1, 'days' => '{"Mon":"1"}', 'period' => 1, 'intro' => 'x'];
@@ -221,9 +208,21 @@ final class calendar_sync_test extends \advanced_testcase {
         ]);
         googlemeet_update_instance($data);
         // Saving twice in a row collapses into a single task.
-        googlemeet_update_instance($this->form_data($DB->get_record('googlemeet', ['id' => $record->id]), $cm,
+        googlemeet_update_instance($this->form_data(
+            $DB->get_record('googlemeet', ['id' => $record->id]),
+            $cm,
             ['name' => 'Derecho administrativo II', 'addmultiply' => 1, 'days' => ['Tue' => '1'], 'period' => 1,
-             'eventenddate' => make_timestamp(2026, 6, 30, 0, 0, 0, 'Europe/Madrid'), 'starthour' => 17]));
+            'eventenddate' => make_timestamp(
+                2026,
+                6,
+                30,
+                0,
+                0,
+                0,
+                'Europe/Madrid'
+            ),
+            'starthour' => 17]
+        ));
         $this->assertCount(1, \core\task\manager::get_adhoc_tasks(calendar_update_event::class));
         $this->assertEmpty($this->rest->calls, 'Nothing is sent to Google while saving.');
 

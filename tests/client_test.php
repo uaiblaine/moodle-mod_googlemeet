@@ -16,92 +16,15 @@
 
 namespace mod_googlemeet;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 defined('MOODLE_INTERNAL') || die();
 
-/**
- * Test wrapper exposing selected protected client helpers.
- */
-class client_testable_client extends client {
-    /**
-     * Expose Drive pagination for unit tests.
-     *
-     * @param object $service Fake REST service.
-     * @param array $params Request params.
-     * @return array
-     */
-    public function list_all_pages_for_test($service, array $params): array {
-        return $this->list_all_pages($service, $params);
-    }
-}
-
-/**
- * Minimal fake REST service used by helper::request().
- */
-class client_test_fake_drive_service {
-    /** @var array Queued responses. */
-    private array $responses;
-
-    /** @var array Captured calls. */
-    public array $calls = [];
-
-    /**
-     * @param array $responses Responses returned by call().
-     */
-    public function __construct(array $responses) {
-        $this->responses = $responses;
-    }
-
-    /**
-     * Fake core\oauth2\rest::call().
-     *
-     * @param string $api API name.
-     * @param array $params Request params.
-     * @param mixed $rawpost Raw body.
-     * @return \stdClass
-     */
-    public function call($api, $params, $rawpost = false): \stdClass {
-        $this->calls[] = ['api' => $api, 'params' => $params, 'rawpost' => $rawpost];
-        return (object)array_shift($this->responses);
-    }
-}
-
-/**
- * Fake core\oauth2\client counting userinfo requests (PERF-01 cache tests).
- */
-class client_test_fake_oauth_client {
-    /** @var int Number of get_userinfo() calls (each one is an HTTP round-trip in real life). */
-    public static int $userinfocalls = 0;
-
-    /** @var bool Whether the fake user is logged in. */
-    public static bool $loggedin = true;
-
-    /**
-     * @return bool
-     */
-    public function is_logged_in(): bool {
-        return self::$loggedin;
-    }
-
-    /**
-     * @return array
-     */
-    public function get_userinfo(): array {
-        self::$userinfocalls++;
-        return ['username' => 'teacher@example.com', 'firstname' => 'Ana', 'lastname' => 'Docente', 'picture' => 'JPEGDATA'];
-    }
-}
-
-/**
- * Client whose OAuth client is the counting fake.
- */
-class client_userinfo_testable_client extends client {
-    /**
-     * @return client_test_fake_oauth_client
-     */
-    protected function get_user_oauth_client() {
-        return new client_test_fake_oauth_client();
-    }
-}
+global $CFG;
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/client_testable_client.php');
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/client_test_fake_drive_service.php');
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/client_test_fake_oauth_client.php');
+require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/client_userinfo_testable_client.php');
 
 /**
  * Unit tests for mod_googlemeet\client helpers.
@@ -111,8 +34,8 @@ class client_userinfo_testable_client extends client {
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class client_test extends \advanced_testcase {
-
+#[CoversClass(client::class)]
+final class client_test extends \advanced_testcase {
     /**
      * Build a client without running the OAuth constructor.
      *

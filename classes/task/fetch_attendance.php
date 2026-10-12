@@ -21,18 +21,18 @@ use mod_googlemeet\local\attendance\service;
 use mod_googlemeet\local\attendance\source;
 
 /**
- * Read real attendance of finished sessions from the Google Meet REST API (ANA-03).
+ * Read real attendance of finished sessions from the Google Meet REST API.
  *
  * Does nothing unless the site setting googlemeet/attendanceenabled is on; only activities that
- * opted in are processed. Calls run with the Google token of the room organiser (creatoremail),
- * because the API only lists conferences organised by the authenticated account.
+ * opted in (googlemeet.attendanceenabled) are processed. Calls run with the Google token of the
+ * room organiser (creatoremail), because the API only lists conferences organised by the
+ * authenticated account.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class fetch_attendance extends \core\task\scheduled_task {
-
     /**
      * Task name.
      *
@@ -100,8 +100,13 @@ class fetch_attendance extends \core\task\scheduled_task {
         $organiser = $this->get_organiser($googlemeet);
         if (!$organiser) {
             foreach ($rows as $row) {
-                service::record_outcome($row, service::STATUS_ERROR, [],
-                    'No single active Moodle user with the organiser e-mail.', $now);
+                service::record_outcome(
+                    $row,
+                    service::STATUS_ERROR,
+                    [],
+                    'No single active Moodle user with the organiser e-mail.',
+                    $now
+                );
             }
             return;
         }
@@ -111,8 +116,13 @@ class fetch_attendance extends \core\task\scheduled_task {
             $source = $this->get_source();
             if (!$source) {
                 foreach ($rows as $row) {
-                    service::record_outcome($row, service::STATUS_SCOPE, [],
-                        'The organiser is not linked to Google.', $now);
+                    service::record_outcome(
+                        $row,
+                        service::STATUS_SCOPE,
+                        [],
+                        'The organiser is not linked to Google.',
+                        $now
+                    );
                 }
                 return;
             }
@@ -141,8 +151,15 @@ class fetch_attendance extends \core\task\scheduled_task {
         if ($email === '') {
             return null;
         }
-        $users = $DB->get_records_select('user', 'LOWER(email) = LOWER(:email) AND deleted = 0 AND suspended = 0',
-            ['email' => $email], 'id', '*', 0, 2);
+        $users = $DB->get_records_select(
+            'user',
+            'LOWER(email) = LOWER(:email) AND deleted = 0 AND suspended = 0',
+            ['email' => $email],
+            'id',
+            '*',
+            0,
+            2
+        );
         return count($users) === 1 ? reset($users) : null;
     }
 

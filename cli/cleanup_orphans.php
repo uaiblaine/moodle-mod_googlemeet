@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Find (and optionally delete) data left behind by recordings or activities that no longer exist (DAT-01).
+ * Find (and optionally delete) data left behind by recordings or activities that no longer exist.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -29,7 +29,7 @@ define('CLI_SCRIPT', true);
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
-list($options, $unrecognized) = cli_get_params([
+[$options, $unrecognized] = cli_get_params([
     'dry-run' => false,
     'execute' => false,
     'verbose' => false,

@@ -34,12 +34,11 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[CoversClass(\mod_googlemeet\question_service::class)]
-class question_service_test extends \advanced_testcase {
-
+final class question_service_test extends \advanced_testcase {
     /**
      * Create a course, googlemeet module and module context.
      *
-     * @return array
+     * @return array [course, googlemeet, cm, context]
      */
     private function create_googlemeet_fixture(): array {
         $this->setAdminUser();
@@ -178,7 +177,7 @@ class question_service_test extends \advanced_testcase {
 
         $answers = $DB->get_records('question_answers', ['question' => $questionid], 'id ASC', 'id, fraction');
         $this->assertCount(4, $answers);
-        $correct = array_filter($answers, static function($answer): bool {
+        $correct = array_filter($answers, static function ($answer): bool {
             return (float)$answer->fraction === 1.0;
         });
         $this->assertCount(1, $correct);
@@ -237,14 +236,26 @@ class question_service_test extends \advanced_testcase {
         $recordingid = $this->create_recording($googlemeet->id);
         $service = new question_service();
 
-        $draftid = $this->create_draft_question($service, $googlemeet, $cm, $context, $recordingid,
-            $this->question_data('Draft to discard'));
+        $draftid = $this->create_draft_question(
+            $service,
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            $this->question_data('Draft to discard')
+        );
         $draftrows = $service->require_questions_for_recording($googlemeet, $cm, $context, $recordingid, [$draftid]);
         $this->assertEquals(1, $service->discard_drafts($draftrows));
         $this->assertEmpty($service->get_questions($googlemeet, $cm, $context, $recordingid));
 
-        $readyid = $this->create_draft_question($service, $googlemeet, $cm, $context, $recordingid,
-            $this->question_data('Ready to keep'));
+        $readyid = $this->create_draft_question(
+            $service,
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            $this->question_data('Ready to keep')
+        );
         $readyrows = $service->require_questions_for_recording($googlemeet, $cm, $context, $recordingid, [$readyid]);
         $service->set_status($readyrows, question_version_status::QUESTION_STATUS_READY);
         $readyrows = $service->require_questions_for_recording($googlemeet, $cm, $context, $recordingid, [$readyid]);
@@ -287,10 +298,22 @@ class question_service_test extends \advanced_testcase {
         [, $googlemeet, $cm, $context] = $this->create_googlemeet_fixture();
         $recordingid = $this->create_recording($googlemeet->id);
         $service = new question_service();
-        $draftid = $this->create_draft_question($service, $googlemeet, $cm, $context, $recordingid,
-            $this->question_data('Draft hidden from practice'));
-        $readyid = $this->create_draft_question($service, $googlemeet, $cm, $context, $recordingid,
-            $this->question_data('Ready practice question'));
+        $draftid = $this->create_draft_question(
+            $service,
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            $this->question_data('Draft hidden from practice')
+        );
+        $readyid = $this->create_draft_question(
+            $service,
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            $this->question_data('Ready practice question')
+        );
         $rows = $service->require_questions_for_recording($googlemeet, $cm, $context, $recordingid, [$readyid]);
         $service->set_status($rows, question_version_status::QUESTION_STATUS_READY);
 
@@ -316,12 +339,29 @@ class question_service_test extends \advanced_testcase {
         [, $googlemeet, $cm, $context] = $this->create_googlemeet_fixture();
         $recordingid = $this->create_recording($googlemeet->id);
         $service = new question_service();
-        $questionid = $this->create_draft_question($service, $googlemeet, $cm, $context, $recordingid,
-            $this->question_data('Ready validation question', 1));
-        $otherquestionid = $this->create_draft_question($service, $googlemeet, $cm, $context, $recordingid,
-            $this->question_data('Other validation question', 0));
-        $rows = $service->require_questions_for_recording($googlemeet, $cm, $context, $recordingid,
-            [$questionid, $otherquestionid]);
+        $questionid = $this->create_draft_question(
+            $service,
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            $this->question_data('Ready validation question', 1)
+        );
+        $otherquestionid = $this->create_draft_question(
+            $service,
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            $this->question_data('Other validation question', 0)
+        );
+        $rows = $service->require_questions_for_recording(
+            $googlemeet,
+            $cm,
+            $context,
+            $recordingid,
+            [$questionid, $otherquestionid]
+        );
         $service->set_status($rows, question_version_status::QUESTION_STATUS_READY);
         $answerids = $this->get_answer_ids($questionid);
         $otheranswerids = $this->get_answer_ids($otherquestionid);

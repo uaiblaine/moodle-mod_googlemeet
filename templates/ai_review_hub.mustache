@@ -17,7 +17,9 @@
 {{!
     @template mod_googlemeet/ai_review_hub
 
-    Teacher-only notices above the hub summary: IA-04 "pending review" banner and F-8 "stuck" alert.
+    Teacher-only notices above the hub summary: "pending review" banner and "analysis stuck" alert.
+    aireviewseen is the timemodified of the content on screen, so publishing never approves a newer
+    rewrite ({@see \mod_googlemeet\local\ai_review::hub_context()}).
 
     Example context (json):
     {
@@ -45,9 +47,13 @@
 {{/aistatusisstuck}}
 {{#js}}
 {{#aipendingreview}}
-require(['mod_googlemeet/ai_review'], function(m) { m.init(); });
+require(['mod_googlemeet/ai_review'], function(m) {
+    m.init();
+});
 {{/aipendingreview}}
 {{^aipendingreview}}{{#aistatusisstuck}}
-require(['mod_googlemeet/ai_review'], function(m) { m.init(); });
+require(['mod_googlemeet/ai_review'], function(m) {
+    m.init();
+});
 {{/aistatusisstuck}}{{/aipendingreview}}
 {{/js}}

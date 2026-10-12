@@ -36,8 +36,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 #[CoversFunction('googlemeet_filter_recordings_by_topic')]
 #[CoversFunction('googlemeet_list_recordings')]
 #[CoversFunction('googlemeet_load_recording_search_content')]
-class search_test extends \advanced_testcase {
-
+final class search_test extends \advanced_testcase {
     /**
      * Build a minimal recording stdClass for pure filter tests.
      *
@@ -104,11 +103,17 @@ class search_test extends \advanced_testcase {
         return (int)$DB->insert_record('googlemeet_recordings', $record);
     }
 
+    /**
+     * Folding lowercases and strips Spanish accents, and leaves plain text alone.
+     */
     public function test_fold_handles_spanish_accents_and_plain_text(): void {
         $this->assertSame('cardiologia nandu unguento arbol', googlemeet_fold('CARDIOLOGÍA ÑANDÚ UNGÜENTO Árbol'));
         $this->assertSame('clase 123 sin cambios', googlemeet_fold('clase 123 sin cambios'));
     }
 
+    /**
+     * A title match is accent-insensitive in both directions and carries no match hint.
+     */
     public function test_filter_by_query_matches_names_with_and_without_accents(): void {
         $out = googlemeet_filter_recordings_by_query(
             [$this->rec('Clase de Cardiología'), $this->rec('Clase de traumatología')],
@@ -126,6 +131,9 @@ class search_test extends \advanced_testcase {
         $this->assertSame('Clase de cardiologia', $out[0]->name);
     }
 
+    /**
+     * A transcript-only match names its source and returns a snippet around the term.
+     */
     public function test_filter_by_query_matches_transcript_only_with_source_and_snippet(): void {
         $recording = $this->rec('Clase sin pista');
         $recording->transcripttext = str_repeat('previo ', 20)
@@ -139,6 +147,9 @@ class search_test extends \advanced_testcase {
         $this->assertStringContainsString('cardiología', $out[0]->matchsnippet);
     }
 
+    /**
+     * AI summary and topic matches name their source; a display-title match does not.
+     */
     public function test_filter_by_query_reports_summary_and_topic_matches(): void {
         $summary = $this->rec('Clase 7', true, ['Derecho sanitario'], 'Repaso de la Ley General de Sanidad y sus competencias.');
         $topic = $this->rec('Clase 8', true, ['Ley de Transparencia'], 'Sin el termino.');
@@ -155,6 +166,9 @@ class search_test extends \advanced_testcase {
         $this->assertSame('', $out[2]->matchsource, 'A display-title match needs no hint');
     }
 
+    /**
+     * A notes-only match names its source and returns a snippet without HTML tags.
+     */
     public function test_filter_by_query_matches_notes_only_with_source_and_plain_snippet(): void {
         $recording = $this->rec('Clase sin pista');
         $recording->notestext = '<p>Resumen docente: la arritmía ventricular aparece en las notas.</p>';
@@ -167,6 +181,9 @@ class search_test extends \advanced_testcase {
         $this->assertStringNotContainsString('<p>', $out[0]->matchsnippet);
     }
 
+    /**
+     * A trashed recording's transcript cannot be found, because the listing drops it before the search content loads.
+     */
     public function test_deleted_recording_transcript_is_not_searchable_after_listing(): void {
         $this->resetAfterTest();
         $googlemeet = $this->create_googlemeet();
@@ -189,6 +206,9 @@ class search_test extends \advanced_testcase {
         $this->assertCount(0, $out);
     }
 
+    /**
+     * The topic filter compares exact topics accent- and case-insensitively.
+     */
     public function test_filter_by_topic_matches_accents(): void {
         $out = googlemeet_filter_recordings_by_topic(
             [$this->rec('a', true, ['Cardiología']), $this->rec('b', true, ['Trauma'])],
@@ -201,6 +221,9 @@ class search_test extends \advanced_testcase {
         $this->assertCount(1, $out);
     }
 
+    /**
+     * The base listing leaves out the large notes and transcript columns.
+     */
     public function test_list_recordings_base_query_excludes_notes_and_transcript_fields(): void {
         $this->resetAfterTest();
         $googlemeet = $this->create_googlemeet();

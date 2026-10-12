@@ -1,0 +1,15 @@
+# Mustache Lint baseline
+#
+# Mustache Lint messages accepted for this plugin's templates. Read by the Mustache Lint step of the
+# moodle-an-hochschulen/moodle-workflows Moodle Plugin CI workflow.
+#
+# Format: one message per line as "<template path>: <message>", the message normalised as the
+# workflow log prints it (no line number, no HTML extract in parentheses).
+# Lines starting with # and empty lines are ignored.
+
+# The Moodle App view is Ionic/Angular markup, not HTML: *ngIf is an Angular structural directive.
+templates/mobile_view_page.mustache: WARNING: HTML Validation error: Attribute “*ngif” not allowed on element “div” at this point.
+
+# The row actions partial points its AI toggle at the AI panel row that the calling template
+# (mod_googlemeet/recordingstable) renders after the card or list item.
+templates/local/recording_row_actions.mustache: WARNING: HTML Validation error: The “aria-controls” attribute must point to an element in the same document.

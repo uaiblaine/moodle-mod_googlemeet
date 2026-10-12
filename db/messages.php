@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Google Meet message provider.
+ * Google Meet message providers.
  *
  * @package     mod_googlemeet
  * @copyright   2020 Rone Santos <ronefel@hotmail.com>
@@ -24,12 +24,13 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-$messageproviders = array(
+$messageproviders = [
     'notification' => [
         'defaults' => [
             'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
             'email' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
-            // NOT-03: push to the Moodle app (requires airnotifier configured on the site).
+            // Push to the Moodle app (requires airnotifier configured on the site). Defaults only
+            // reach new providers: the 2026101191 upgrade step enables it on existing sites.
             'airnotifier' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
         ],
     ],
@@ -37,7 +38,6 @@ $messageproviders = array(
         'defaults' => [
             'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
             'email' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
-            // NOT-03: push to the Moodle app (requires airnotifier configured on the site).
             'airnotifier' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
         ],
     ],
@@ -48,7 +48,8 @@ $messageproviders = array(
             'airnotifier' => MESSAGE_DISALLOWED,
         ],
     ],
-    // NOT-05: teachers are told when auto-sync gave up without finding a recording.
+    // Sent to teachers when auto-sync gives up without finding a recording;
+    // see \mod_googlemeet\task\process_autosync::notify_no_recording().
     'autosyncfailed' => [
         'defaults' => [
             'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
@@ -56,4 +57,4 @@ $messageproviders = array(
             'airnotifier' => MESSAGE_PERMITTED,
         ],
     ],
-);
+];

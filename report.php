@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Teacher viewing report (ANA-04): students x recordings, inactivity filter, most failed questions.
+ * Teacher viewing report: students x recordings, inactivity filter, most failed questions.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -47,8 +47,10 @@ $groups = $builder->get_allowed_groups($course, (int)$USER->id);
 if ($groupid && !isset($groups[$groupid])) {
     $groupid = 0;
 }
-if (!$groupid && $groups && !has_capability('moodle/site:accessallgroups', $context)
-        && (int)$course->groupmode === SEPARATEGROUPS) {
+if (
+    !$groupid && $groups && !has_capability('moodle/site:accessallgroups', $context)
+        && (int)$course->groupmode === SEPARATEGROUPS
+) {
     // Separate groups without access to all: never show students outside the user's groups.
     $groupid = (int)array_key_first($groups);
 }
@@ -93,7 +95,11 @@ if ($data['totalstudents'] > $perpage) {
     echo $OUTPUT->paging_bar($data['totalstudents'], $page, $perpage, new moodle_url('/mod/googlemeet/report.php', $urlparams));
 }
 if ($data['totalstudents'] > 0) {
-    echo $OUTPUT->download_dataformat_selector(get_string('report_download', 'googlemeet'),
-        '/mod/googlemeet/report.php', 'download', $urlparams);
+    echo $OUTPUT->download_dataformat_selector(
+        get_string('report_download', 'googlemeet'),
+        '/mod/googlemeet/report.php',
+        'download',
+        $urlparams
+    );
 }
 echo $OUTPUT->footer();

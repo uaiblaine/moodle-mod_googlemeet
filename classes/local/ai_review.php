@@ -20,23 +20,24 @@ use context_module;
 use stdClass;
 
 /**
- * IA-04: teacher review of AI-generated content before students see it.
+ * Teacher review of AI-generated content before students see it.
  *
- * Single source of truth for the review rule, so every surface (hub, list, search, topic chips,
- * lesson titles, "continue watching", web services, notifications) applies the same test:
+ * Single source of truth for the review rule, so every surface that shows AI content (hub, list,
+ * search, topic chips, lesson titles, "continue watching", web services, mobile, notifications)
+ * applies the same test:
  *
  *     visible to students  <=>  status = 'completed' AND (NOT requireaireview OR reviewed = 1)
  *
  * Config: googlemeet/requireaireview (default 1). Column: googlemeet_ai_analysis.reviewed
  * (+ timereviewed, reviewedby). A row's "reviewed" flag means "a person approved the CURRENT
- * content": every AI (re)write clears it, a manual teacher edit sets it.
+ * content": every AI (re)write clears it ({@see self::unreviewed_fields()}), a manual teacher
+ * edit sets it ({@see self::reviewed_fields()}).
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class ai_review {
-
     /** @var string Capability that lets a user see unreviewed content and publish it. */
     const CAPABILITY = 'mod/googlemeet:editrecording';
 
@@ -218,7 +219,7 @@ class ai_review {
     }
 
     /**
-     * Template context for the hub: content visibility, the teacher review banner and the F-8 stuck alert.
+     * Template context for the hub: content visibility, the teacher review banner and the stuck-analysis alert.
      *
      * @param stdClass|null|false $analysis googlemeet_ai_analysis row.
      * @param \context $context Module context.
@@ -236,11 +237,14 @@ class ai_review {
             'aipendingreview' => $pending && $canreview,
             'aireviewcmid' => $cmid,
             'aireviewrecordingid' => $analysis ? (int)$analysis->recordingid : 0,
-            // IA-04: version of the content on screen, so publishing never approves a newer rewrite.
+            // Version of the content on screen, so publishing never approves a newer rewrite.
             'aireviewseen' => $analysis ? (int)($analysis->timemodified ?? 0) : 0,
             'aistatusisstuck' => $stuck,
-            'aistuckmessage' => $stuck ? get_string('ai_status_stuck', 'googlemeet',
-                (int)round(\mod_googlemeet\ai_service::get_stuck_threshold() / MINSECS)) : '',
+            'aistuckmessage' => $stuck ? get_string(
+                'ai_status_stuck',
+                'googlemeet',
+                (int)round(\mod_googlemeet\ai_service::get_stuck_threshold() / MINSECS)
+            ) : '',
         ];
     }
 

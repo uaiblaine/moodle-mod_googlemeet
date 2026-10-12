@@ -24,7 +24,6 @@ namespace mod_googlemeet\local\attendance;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 interface source {
-
     /**
      * Conferences held in the room with this meeting code that started in [$from, $to].
      *

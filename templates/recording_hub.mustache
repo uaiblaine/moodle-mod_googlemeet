@@ -16,9 +16,131 @@
 }}
 {{!
   @template mod_googlemeet/recording_hub
+
+  Lesson page of one recording: player and chapters, viewing progress, and the Summary, Questions,
+  Materials, Transcript and Notes tabs. Built by googlemeet_print_recording_hub() (locallib.php);
+  the teacher review notices come from mod_googlemeet/ai_review_hub.
+
+  Example context (json):
+  {
+    "cmid": 5,
+    "recordingid": 12,
+    "sesskey": "abc123",
+    "name": "Tema 4: el acto administrativo",
+    "originalname": "Clases - 2026/11/10 09:00 CET - Recording",
+    "hassubtitle": true,
+    "subtitle": "Second part",
+    "datelabel": "Tuesday, 10 November 2026",
+    "datetimeiso": "2026-11-10T09:00:00+01:00",
+    "duration": "1:02:00",
+    "durationseconds": 3720,
+    "starttime": 0,
+    "huburl": "https://example.com/mod/googlemeet/view.php?id=5&recording=12",
+    "backurl": "https://example.com/mod/googlemeet/view.php?id=5",
+    "webviewlink": "https://drive.google.com/file/d/xxx/view",
+    "canembed": true,
+    "playerurl": "https://drive.google.com/file/d/xxx/preview",
+    "embedurl": "https://drive.google.com/file/d/xxx/preview",
+    "hasresume": true,
+    "resumeseconds": 842,
+    "resumelabel": "Continue at 14:02",
+    "haschapters": true,
+    "chaptercount": 2,
+    "chapters": [
+      {"start": "00:00", "startseconds": 0, "title": "Introduction", "chapterarialabel": "Go to 00:00: Introduction"},
+      {"start": "14:02", "startseconds": 842, "title": "Validity of the act", "chapterarialabel": "Go to 14:02: Validity of the act"}
+    ],
+    "progresscompleted": false,
+    "progresspartial": true,
+    "progressunseen": false,
+    "progresswatchedseconds": 1500,
+    "progressthresholdseconds": 2976,
+    "progressstatuslabel": "In progress",
+    "progressarialabel": "Viewing progress: 40%",
+    "showprogressbar": true,
+    "progresspct": 40,
+    "progresspcttext": "40%",
+    "progressbarstyle": "width: 40%;",
+    "caneditrecording": true,
+    "canmanagequestions": true,
+    "visibilitybuttonlabel": "Hide from students",
+    "aienabled": true,
+    "aipendingreview": true,
+    "aistatusisstuck": false,
+    "aistuckmessage": "",
+    "aireviewcmid": 5,
+    "aireviewrecordingid": 12,
+    "aireviewseen": 1795424400,
+    "hasanalysis": true,
+    "aistatusisprocessing": false,
+    "aistatusispending": false,
+    "aistatusisfailed": false,
+    "aierror": "",
+    "summary": "<p>Elements, effects and validity of the administrative act.</p>",
+    "keypointcount": 2,
+    "keypointshash": "a1b2c3",
+    "keypointsstate": "",
+    "keypoints": [
+      {"number": 1, "text": "An administrative act is presumed valid."},
+      {"number": 2, "text": "Defects can be cured by the issuing body."}
+    ],
+    "topics": [
+      {"text": "Validity", "url": "https://example.com/mod/googlemeet/view.php?id=5&topic=Validity"}
+    ],
+    "summaryactive": true,
+    "showquestionstab": true,
+    "questionsactive": false,
+    "questioncount": 1,
+    "hasquestions": true,
+    "draftcount": 1,
+    "publishedcount": 0,
+    "hasdrafts": true,
+    "activitydraftcount": 3,
+    "generationqueued": false,
+    "questions": [
+      {
+        "id": 31,
+        "isdraft": true,
+        "isready": false,
+        "statuslabel": "Draft",
+        "stem": "Which body can cure a defective act?",
+        "stemplain": "Which body can cure a defective act?",
+        "correctindex": 0,
+        "answers": [
+          {"index": 0, "text": "The issuing body", "plain": "The issuing body", "correct": true},
+          {"index": 1, "text": "Any court", "plain": "Any court", "correct": false}
+        ],
+        "haspracticestats": true,
+        "practicestatslabel": "62% correct in 8 attempts by 5 students",
+        "practicestatslow": false,
+        "generalfeedback": "<p>The issuing body may validate it.</p>",
+        "generalfeedbackplain": "The issuing body may validate it.",
+        "advancedurl": "https://example.com/question/bank/editquestion/question.php?id=31"
+      }
+    ],
+    "showmaterials": true,
+    "materialsactive": false,
+    "hasmaterials": true,
+    "materialcount": 1,
+    "managematerialsurl": "https://example.com/mod/googlemeet/material.php?id=5&recording=12",
+    "materials": [
+      {"name": "slides.pdf", "size": "1.2 MB", "modified": "10/11/26, 09:30", "filepath": "",
+       "icon": "https://example.com/theme/image.php/boost/core/1/f/pdf", "url": "https://example.com/pluginfile.php/1/mod_googlemeet/material/12/slides.pdf"}
+    ],
+    "hastranscript": true,
+    "transcript": "<p>Good morning, today we look at the administrative act.</p>",
+    "hasnotes": true,
+    "notes": "<p>Summary written by Gemini in Meet.</p>",
+    "hasrecordingnav": true,
+    "haspreviousrecording": true,
+    "previousrecordingurl": "https://example.com/mod/googlemeet/view.php?id=5&recording=11",
+    "previousrecordingtitle": "Tema 3",
+    "previousrecordingdate": "03/11/2026",
+    "hasnextrecording": false
+  }
 }}
 <div id="googlemeet-recording-hub" class="googlemeet-recording-hub" data-cmid="{{cmid}}" data-recordingid="{{recordingid}}" data-duration-seconds="{{durationseconds}}" data-hub-url="{{huburl}}" data-start-seconds="{{starttime}}">
-  <div class="googlemeet-hub-nav mb-3">
+  <div class="googlemeet-hub-nav d-print-none">
     <a href="{{backurl}}" class="googlemeet-hub-back"><span aria-hidden="true">&lsaquo;</span> {{# str }} hub_back_to_recordings, mod_googlemeet {{/ str }}</a>
   </div>
 
@@ -26,7 +148,7 @@
     <h3 class="googlemeet-hub-title">
       <span class="recording-name-text" title="{{originalname}}" data-originalname="{{originalname}}">{{name}}</span>
       {{#caneditrecording}}
-        <button type="button" class="recordingeditname googlemeet-edit-btn googlemeet-button-reset ms-1" data-id="{{recordingid}}" title="{{# str }} edit {{/ str }}" aria-label="{{# str }} edit {{/ str }}">
+        <button type="button" class="recordingeditname googlemeet-edit-btn googlemeet-button-reset ms-1 d-print-none" data-id="{{recordingid}}" title="{{# str }} edit {{/ str }}" aria-label="{{# str }} edit {{/ str }}">
           {{# pix }} i/edit, core {{/ pix }}
         </button>
       {{/caneditrecording}}
@@ -41,8 +163,8 @@
 
   <div class="googlemeet-hub-media-layout {{#haschapters}}googlemeet-hub-media-with-chapters{{/haschapters}}">
     {{#canembed}}
-      <div class="googlemeet-player-column">
-        <div class="ratio ratio-16x9 mb-3 googlemeet-recording-player">
+      <div class="googlemeet-player-column d-print-none">
+        <div class="ratio ratio-16x9 googlemeet-recording-player">
           <iframe src="{{playerurl}}" data-region="recording-player-iframe" data-embed-base="{{embedurl}}" allow="autoplay; encrypted-media" allowfullscreen loading="lazy" referrerpolicy="strict-origin-when-cross-origin" title="{{originalname}}"></iframe>
         </div>
         <div class="googlemeet-player-fallback mb-3">
@@ -63,7 +185,7 @@
       </div>
     {{/canembed}}
     {{^canembed}}
-      <div class="googlemeet-recording-player-empty mb-3">
+      <div class="googlemeet-recording-player-empty mb-3 d-print-none">
         <div class="googlemeet-recording-player-empty-icon" aria-hidden="true">{{# pix }} i/externallink, core {{/ pix }}</div>
         <p>{{# str }} recording_embed_unavailable, mod_googlemeet {{/ str }}</p>
         <p class="googlemeet-recording-player-empty-help">{{# str }} recording_embed_unavailable_help, mod_googlemeet {{/ str }}</p>
@@ -74,10 +196,10 @@
     <aside class="googlemeet-chapters-panel mb-3" aria-labelledby="googlemeet-chapters-title">
       <div class="googlemeet-chapters-header">
         <h4 id="googlemeet-chapters-title">{{# str }} hub_chapters_heading, mod_googlemeet {{/ str }} <span class="googlemeet-chapters-count">({{chaptercount}})</span></h4>
-        <button type="button" class="btn btn-outline-secondary btn-sm googlemeet-chapters-toggle" aria-expanded="true" aria-controls="googlemeet-chapters-body" data-label-show="{{# str }} chapters_show, mod_googlemeet {{/ str }}" data-label-hide="{{# str }} chapters_hide, mod_googlemeet {{/ str }}">{{# str }} chapters_hide, mod_googlemeet {{/ str }}</button>
+        <button type="button" class="btn btn-outline-secondary btn-sm googlemeet-chapters-toggle d-print-none" aria-expanded="true" aria-controls="googlemeet-chapters-body" data-label-show="{{# str }} chapters_show, mod_googlemeet {{/ str }}" data-label-hide="{{# str }} chapters_hide, mod_googlemeet {{/ str }}">{{# str }} chapters_hide, mod_googlemeet {{/ str }}</button>
       </div>
       <div id="googlemeet-chapters-body" class="googlemeet-chapters-body">
-      <p class="googlemeet-chapters-help">
+      <p class="googlemeet-chapters-help d-print-none">
         {{#canembed}}{{# str }} hub_chapters_hint_seek, mod_googlemeet {{/ str }}{{/canembed}}
         {{^canembed}}
           {{#caneditrecording}}{{# str }} chapters_teacher_hint, mod_googlemeet {{/ str }}{{/caneditrecording}}
@@ -92,7 +214,7 @@
             <span class="googlemeet-chapter-title" title="{{title}}">{{title}}</span>
           </button>
           {{#canembed}}
-          <button type="button" class="googlemeet-chapter-copylink googlemeet-button-reset" data-start-seconds="{{startseconds}}" data-chapter-timestamp="{{start}}" aria-label="{{# str }} chapter_copy_link_aria, mod_googlemeet, {{start}} {{/ str }}" title="{{# str }} chapter_copy_link, mod_googlemeet {{/ str }}">
+          <button type="button" class="googlemeet-chapter-copylink googlemeet-button-reset d-print-none" data-start-seconds="{{startseconds}}" data-chapter-timestamp="{{start}}" aria-label="{{# str }} chapter_copy_link_aria, mod_googlemeet, {{start}} {{/ str }}" title="{{# str }} chapter_copy_link, mod_googlemeet {{/ str }}">
             {{# pix }} t/copy, core {{/ pix }}
           </button>
           {{/canembed}}
@@ -100,13 +222,13 @@
         {{/chapters}}
       </ol>
       </div>
-      <div class="googlemeet-chapter-feedback" data-region="chapter-feedback" aria-live="polite"></div>
+      <div class="googlemeet-chapter-feedback d-print-none" data-region="chapter-feedback" aria-live="polite"></div>
     </aside>
     {{/haschapters}}
   </div>
 
   <div class="googlemeet-hub-header">
-    <div class="googlemeet-hub-statusbar">
+    <div class="googlemeet-hub-statusbar d-print-none">
       <div class="googlemeet-hub-progress" data-region="recording-progress" data-completed="{{#progresscompleted}}1{{/progresscompleted}}{{^progresscompleted}}0{{/progresscompleted}}" data-watchedseconds="{{progresswatchedseconds}}">
         <span class="googlemeet-progress-badge {{#progresscompleted}}googlemeet-progress-badge-completed{{/progresscompleted}}{{#progresspartial}}googlemeet-progress-badge-partial{{/progresspartial}}{{#progressunseen}}googlemeet-progress-badge-unseen{{/progressunseen}}" aria-live="polite" aria-label="{{progressarialabel}}">
           {{#progresscompleted}}<span aria-hidden="true">&#10003;</span>{{/progresscompleted}}
@@ -136,7 +258,7 @@
     </div>
   </div>
 
-  <div class="googlemeet-hub-tabs-wrap">
+  <div class="googlemeet-hub-tabs-wrap d-print-none">
   <ul class="nav nav-tabs googlemeet-hub-tabs" role="tablist" aria-label="{{# str }} hub_tabs_aria, mod_googlemeet {{/ str }}">
     <li class="nav-item" role="presentation">
       <button class="nav-link {{#summaryactive}}active{{/summaryactive}}" id="googlemeet-summary-tab" data-hub-tab="summary" data-bs-toggle="tab" data-bs-target="#googlemeet-summary-panel" type="button" role="tab" aria-controls="googlemeet-summary-panel" aria-selected="{{#summaryactive}}true{{/summaryactive}}{{^summaryactive}}false{{/summaryactive}}">
@@ -183,26 +305,26 @@
       {{#hasanalysis}}
         <div class="googlemeet-study-toolbar">
           <span class="googlemeet-ai-origin">{{# str }} hub_ai_generated_note, mod_googlemeet {{/ str }}</span>
-          <button type="button" class="btn btn-outline-secondary btn-sm googlemeet-print-summary d-none">{{# str }} hub_print_summary, mod_googlemeet {{/ str }}</button>
+          <button type="button" class="btn btn-outline-secondary btn-sm googlemeet-print-summary d-none d-print-none">{{# str }} hub_print_summary, mod_googlemeet {{/ str }}</button>
         </div>
         <div class="googlemeet-study-layout">
           <div class="googlemeet-study-main">
         <section class="googlemeet-ai-section googlemeet-ai-summary" aria-labelledby="googlemeet-hub-summary-title">
           <h4 id="googlemeet-hub-summary-title" class="googlemeet-hub-section-title">{{# str }} ai_summary, mod_googlemeet {{/ str }}</h4>
           <div class="googlemeet-ai-summary-body" id="googlemeet-ai-summary-body">{{{summary}}}</div>
-          <button type="button" class="btn btn-link btn-sm px-0 googlemeet-readmore d-none" aria-expanded="false" aria-controls="googlemeet-ai-summary-body" data-label-more="{{# str }} hub_read_more, mod_googlemeet {{/ str }}" data-label-less="{{# str }} hub_read_less, mod_googlemeet {{/ str }}">{{# str }} hub_read_more, mod_googlemeet {{/ str }}</button>
+          <button type="button" class="btn btn-link btn-sm px-0 googlemeet-readmore d-none d-print-none" aria-expanded="false" aria-controls="googlemeet-ai-summary-body" data-label-more="{{# str }} hub_read_more, mod_googlemeet {{/ str }}" data-label-less="{{# str }} hub_read_less, mod_googlemeet {{/ str }}">{{# str }} hub_read_more, mod_googlemeet {{/ str }}</button>
         </section>
         {{#keypoints.0}}
         <section class="googlemeet-ai-section googlemeet-ai-keypoints" data-kp-hash="{{keypointshash}}" data-kp-state="{{keypointsstate}}" aria-labelledby="googlemeet-hub-keypoints-title">
           <div class="googlemeet-hub-section-head">
             <h4 id="googlemeet-hub-keypoints-title" class="googlemeet-hub-section-title">{{# str }} ai_keypoints, mod_googlemeet {{/ str }} <span class="googlemeet-hub-section-count">{{keypointcount}}</span></h4>
-            <span class="googlemeet-keypoints-progress d-none" aria-live="polite" data-template="{{# str }} hub_keypoints_reviewed, mod_googlemeet {{/ str }}"></span>
+            <span class="googlemeet-keypoints-progress d-none d-print-none" aria-live="polite" data-template="{{# str }} hub_keypoints_reviewed, mod_googlemeet {{/ str }}"></span>
           </div>
-          <p class="googlemeet-keypoints-hint d-none">{{# str }} hub_keypoints_hint, mod_googlemeet {{/ str }}</p>
+          <p class="googlemeet-keypoints-hint d-none d-print-none">{{# str }} hub_keypoints_hint, mod_googlemeet {{/ str }}</p>
           <ol class="googlemeet-keypoints-checklist">
             {{#keypoints}}
             <li class="googlemeet-keypoint">
-              <input type="checkbox" class="form-check-input googlemeet-keypoint-check d-none" id="googlemeet-keypoint-{{number}}" aria-label="{{# str }} hub_keypoint_check_aria, mod_googlemeet, {{number}} {{/ str }}">
+              <input type="checkbox" class="form-check-input googlemeet-keypoint-check d-none d-print-none" id="googlemeet-keypoint-{{number}}" aria-label="{{# str }} hub_keypoint_check_aria, mod_googlemeet, {{number}} {{/ str }}">
               <span class="googlemeet-keypoint-number" aria-hidden="true">{{number}}</span>
               <span class="googlemeet-keypoint-text">{{text}}</span>
             </li>
@@ -215,21 +337,21 @@
         {{#topics.0}}
         <section class="googlemeet-ai-section googlemeet-ai-topics" aria-labelledby="googlemeet-hub-topics-title">
           <h4 id="googlemeet-hub-topics-title" class="googlemeet-hub-section-title">{{# str }} ai_topics, mod_googlemeet {{/ str }}</h4>
-          <p class="googlemeet-topics-hint">{{# str }} hub_topics_hint, mod_googlemeet {{/ str }}</p>
+          <p class="googlemeet-topics-hint d-print-none">{{# str }} hub_topics_hint, mod_googlemeet {{/ str }}</p>
           <ul class="googlemeet-hub-topics" role="list">
             {{#topics}}<li><a class="googlemeet-hub-topic" href="{{url}}" title="{{# str }} hub_topic_link_aria, mod_googlemeet, {{text}} {{/ str }}">{{text}}</a></li>{{/topics}}
           </ul>
         </section>
         {{/topics.0}}
           {{^canmanagequestions}}{{#hasquestions}}
-          <section class="googlemeet-ai-section googlemeet-study-cta">
+          <section class="googlemeet-ai-section googlemeet-study-cta d-print-none">
             <h4 class="googlemeet-hub-section-title">{{# str }} hub_cta_practice_title, mod_googlemeet {{/ str }}</h4>
             <p>{{# str }} hub_cta_practice_text, mod_googlemeet, {{questioncount}} {{/ str }}</p>
             <button type="button" class="btn btn-primary btn-sm" data-hub-goto="questions">{{# str }} hub_cta_practice_button, mod_googlemeet {{/ str }}</button>
           </section>
           {{/hasquestions}}{{/canmanagequestions}}
           {{#hasmaterials}}
-          <section class="googlemeet-ai-section googlemeet-study-cta googlemeet-study-cta-materials">
+          <section class="googlemeet-ai-section googlemeet-study-cta googlemeet-study-cta-materials d-print-none">
             <h4 class="googlemeet-hub-section-title">{{# str }} hub_tab_materials, mod_googlemeet {{/ str }} <span class="googlemeet-hub-section-count">{{materialcount}}</span></h4>
             <button type="button" class="btn btn-outline-primary btn-sm" data-hub-goto="materials">{{# str }} hub_cta_materials_button, mod_googlemeet {{/ str }}</button>
           </section>
@@ -255,7 +377,7 @@
           <div>
             <strong>{{questioncount}}</strong> {{# str }} hub_tab_questions, mod_googlemeet {{/ str }}
             {{#draftcount}}<span class="badge bg-warning text-dark ms-1">{{draftcount}} {{# str }} question_status_draft, mod_googlemeet {{/ str }}</span>{{/draftcount}}
-            {{#publishedcount}}<span class="badge bg-success ms-1">{{publishedcount}} {{# str }} question_status_published, mod_googlemeet {{/ str }}</span>{{/publishedcount}}
+            {{#publishedcount}}<span class="badge bg-success text-white ms-1">{{publishedcount}} {{# str }} question_status_published, mod_googlemeet {{/ str }}</span>{{/publishedcount}}
           </div>
           <div class="d-flex gap-2 flex-wrap">
           {{#activitydraftcount}}
@@ -298,7 +420,7 @@
                       <input class="form-check-input mt-1 flex-shrink-0 googlemeet-question-select" type="checkbox" value="{{id}}" id="googlemeet-question-select-{{id}}" data-isdraft="{{#isdraft}}1{{/isdraft}}{{^isdraft}}0{{/isdraft}}">
                       <label class="fw-bold mb-0 text-break" for="googlemeet-question-select-{{id}}">{{{stem}}}</label>
                     </div>
-                    <span class="badge flex-shrink-0 {{#isready}}bg-success{{/isready}}{{#isdraft}}bg-warning text-dark{{/isdraft}}">{{statuslabel}}</span>
+                    <span class="badge flex-shrink-0 {{#isready}}bg-success text-white{{/isready}}{{#isdraft}}bg-warning text-dark{{/isdraft}}">{{statuslabel}}</span>
                   </div>
                   <ol class="mt-2">
                     {{#answers}}
@@ -438,7 +560,7 @@
   </div>
 
   {{#hasrecordingnav}}
-    <nav class="googlemeet-hub-pager mt-4" aria-label="{{# str }} hub_lesson_nav_aria, mod_googlemeet {{/ str }}">
+    <nav class="googlemeet-hub-pager mt-4 d-print-none" aria-label="{{# str }} hub_lesson_nav_aria, mod_googlemeet {{/ str }}">
       {{#haspreviousrecording}}
         <a href="{{previousrecordingurl}}" class="googlemeet-hub-pager-link googlemeet-hub-pager-prev">
           <span class="googlemeet-hub-pager-label"><span aria-hidden="true">&lsaquo;</span> {{# str }} hub_previous_lesson, mod_googlemeet {{/ str }}</span>

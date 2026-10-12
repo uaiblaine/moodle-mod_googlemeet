@@ -26,8 +26,8 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * New-recording notice with lesson content (NOT-05, QA-03) and the teacher alert when
- * auto-sync gives up without a recording (NOT-05).
+ * New-recording notice with lesson content, and the teacher alert when auto-sync gives up
+ * without a recording.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -37,7 +37,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 #[CoversClass(notify_new_recordings::class)]
 #[CoversClass(process_autosync::class)]
 final class notify_new_recordings_test extends \advanced_testcase {
-
     /**
      * Course, activity, subscribed student, unsubscribed student and teacher.
      *
@@ -98,7 +97,7 @@ final class notify_new_recordings_test extends \advanced_testcase {
      *
      * @param int $recordingid Recording id.
      * @param string $status Status.
-     * @param int $reviewed IA-04 review flag (1 = published to students).
+     * @param int $reviewed Review flag (1 = published to students).
      * @return int Analysis id.
      */
     private function create_analysis(int $recordingid, string $status = 'completed', int $reviewed = 1): int {
@@ -172,8 +171,7 @@ final class notify_new_recordings_test extends \advanced_testcase {
     }
 
     /**
-     * With review required by the site, unreviewed AI content is not quoted (tolerates the
-     * review field not existing).
+     * With review required by the site, unreviewed AI content is not quoted.
      */
     public function test_unreviewed_ai_content_is_not_quoted(): void {
         $this->resetAfterTest();
@@ -243,7 +241,7 @@ final class notify_new_recordings_test extends \advanced_testcase {
         $enrol = $DB->get_record('enrol', ['courseid' => $course->id, 'enrol' => 'manual']);
         enrol_get_plugin('manual')->unenrol_user($enrol, $teacher->id);
         process_autosync::notify_no_recording($googlemeet, $event, 3);
-        $recipients = array_map(static function($m) {
+        $recipients = array_map(static function ($m) {
             return (int)$m->useridto;
         }, $sink->get_messages());
         $this->assertSame(array_map('intval', array_keys(get_admins())), $recipients);

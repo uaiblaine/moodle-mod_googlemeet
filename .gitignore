@@ -1,7 +1,22 @@
+# OS files
+.DS_Store
+
+# IDE / Editor
+.vscode/
+.idea/
+.claude/
+
+# Node.js / Composer (build tooling only — not part of the plugin)
+node_modules/
+vendor/
+package.json
+package-lock.json
+
+# PHPUnit cache from a local run with the bundled phpunit.xml
+.phpunit.cache/
+
+# Editor and script leftovers
 *.bak-*
 *.archived
 *.wip.bak
 .superpowers/
-CLAUDE.md
-# Internal working notes are kept outside the repository.
-docs/

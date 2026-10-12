@@ -25,13 +25,12 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->dirroot.'/mod/googlemeet/backup/moodle2/backup_googlemeet_stepslib.php');
+require_once($CFG->dirroot . '/mod/googlemeet/backup/moodle2/backup_googlemeet_stepslib.php');
 
 /**
  * The class provides all the settings and steps to perform one complete backup of mod_googlemeet.
  */
 class backup_googlemeet_activity_task extends backup_activity_task {
-
     /**
      * Defines particular settings for the plugin.
      */
@@ -46,9 +45,9 @@ class backup_googlemeet_activity_task extends backup_activity_task {
         $this->add_step(new backup_googlemeet_activity_structure_step('googlemeet_structure', 'googlemeet.xml'));
 
         // The AI practice questions live in this activity's private question bank (module context).
-        // Like mod_quiz, annotate every question category of the module context so the final task
-        // writes them (with their questions, versions/status and tags) to questions.xml. Without
-        // these two steps the questions are silently dropped on backup and duplication.
+        // As in mod_quiz, annotate every question category of the module context so the final task
+        // writes them (with their questions, versions/status and tags) to questions.xml; without
+        // this the questions are dropped on backup and duplication.
         $this->add_step(new backup_calculate_question_categories('activity_question_categories'));
         $this->add_step(new backup_delete_temp_questions('clean_temp_questions'));
     }
@@ -65,11 +64,11 @@ class backup_googlemeet_activity_task extends backup_activity_task {
         $base = preg_quote($CFG->wwwroot, "/");
 
         // Link to the list of googlemeets.
-        $search = "/(".$base."\/mod\/googlemeet\/index.php\?id\=)([0-9]+)/";
+        $search = "/(" . $base . "\/mod\/googlemeet\/index.php\?id\=)([0-9]+)/";
         $content = preg_replace($search, '$@GOOGLEMEETINDEX*$2@$', $content);
 
         // Link to googlemeet view by moduleid.
-        $search = "/(".$base."\/mod\/googlemeet\/view.php\?id\=)([0-9]+)/";
+        $search = "/(" . $base . "\/mod\/googlemeet\/view.php\?id\=)([0-9]+)/";
         $content = preg_replace($search, '$@GOOGLEMEETVIEWBYID*$2@$', $content);
 
         return $content;

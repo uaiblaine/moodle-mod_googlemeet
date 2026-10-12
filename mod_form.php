@@ -37,8 +37,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mod_googlemeet_mod_form extends moodleform_mod {
-    /** @var array options to be used with date_time_selector fields in the quiz. */
-    public static $datefieldoptions = array('optional' => true);
+    /** @var array Options for date_time_selector fields (not referenced by this form). */
+    public static $datefieldoptions = ['optional' => true];
 
     /**
      * Defines forms elements
@@ -55,31 +55,29 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             $client->logout();
         }
 
-        // Check the Google login once and reuse the result (PERF-01).
+        // Check the Google login once and reuse the result.
         $isgooglelogged = $client->enabled && $client->check_login();
 
         if (empty($this->current->instance)) {
             $clientislogged = optional_param('client_islogged', false, PARAM_BOOL);
 
-            // Was logged in before submitting the form and the google session expired after submitting the form.
+            // The Google session expired between loading and submitting the form.
             if ($clientislogged && !$isgooglelogged) {
                 $mform->addElement('html', html_writer::div(get_string('sessionexpired', 'googlemeet') .
-                    $client->print_login_popup(), 'mdl-align alert alert-danger googlemeet_loginbutton'
-                ));
+                    $client->print_login_popup(), 'mdl-align alert alert-danger googlemeet_loginbutton'));
 
-                // Whether the customer is enabled and if not logged in to the Google account.
+                // The Google client is enabled but the user has not logged in to a Google account.
             } else if ($client->enabled && !$isgooglelogged) {
                 $mform->addElement('html', html_writer::div(get_string('logintoyourgoogleaccount', 'googlemeet') .
-                    $client->print_login_popup(), 'mdl-align alert alert-info googlemeet_loginbutton'
-                ));
+                    $client->print_login_popup(), 'mdl-align alert alert-info googlemeet_loginbutton'));
             }
 
-            // If is logged in, shows Google account information.
+            // Show the linked Google account; client_islogged lets validation() detect a session that
+            // expires before the form is submitted.
             if ($isgooglelogged) {
                 $mform->addElement('html', $client->print_user_info('calendar'));
                 $mform->addElement('hidden', 'client_islogged', true);
             }
-
         } else {
             $mform->addElement('hidden', 'client_islogged', false);
         }
@@ -90,7 +88,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $mform->setExpanded('general', true);
 
         // Adding the standard "name" field.
-        $mform->addElement('text', 'name', get_string('roomname', 'googlemeet'), array('size' => '50'));
+        $mform->addElement('text', 'name', get_string('roomname', 'googlemeet'), ['size' => '50']);
 
         if (!empty($CFG->formatstringstriptags)) {
             $mform->setType('name', PARAM_TEXT);
@@ -125,7 +123,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             $mform->createElement('html', '<div class="items-center">' . get_string('to', 'googlemeet') . '</div>'),
             $mform->createElement('select', 'endhour', get_string('hour', 'form'), $hours, false, true),
             $mform->createElement('select', 'endminute', get_string('minute', 'form'), $minutes, false, true),
-            $mform->createElement('html',
+            $mform->createElement(
+                'html',
                 '<div id="id_googlemeet_eventtime_error" class="form-control-feedback invalid-feedback"></div>'
             ),
         ];
@@ -162,13 +161,17 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $mform->setDefault('recordingsorder', 'DESC');
         $mform->addHelpButton('recordingsorder', 'recordingsorder', 'googlemeet');
 
-        // Recording filter - custom name pattern to filter recordings from Google Drive.
-        $mform->addElement('text', 'recordingfilter', get_string('recordingfilter', 'googlemeet'),
-            ['size' => '50', 'placeholder' => get_string('recordingfilter_placeholder', 'googlemeet')]);
+        // Recording filter: an extra file-name substring searched in Drive besides the meeting code and room name.
+        $mform->addElement(
+            'text',
+            'recordingfilter',
+            get_string('recordingfilter', 'googlemeet'),
+            ['size' => '50', 'placeholder' => get_string('recordingfilter_placeholder', 'googlemeet')]
+        );
         $mform->setType('recordingfilter', PARAM_TEXT);
         $mform->addHelpButton('recordingfilter', 'recordingfilter', 'googlemeet');
 
-        // Auto-sync hours (0 = disabled).
+        // Auto-sync: hours after a session ends before Drive is synced (0 = disabled).
         $mform->addElement('text', 'autosynchours', get_string('autosynchours', 'googlemeet'), ['size' => '4']);
         $mform->setType('autosynchours', PARAM_INT);
         $mform->setDefault('autosynchours', (int) ($config->autosynchours_default ?? 4));
@@ -196,8 +199,10 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             array_push($days, $mform->createElement('checkbox', 'days[Sun]', '', get_string('sunday', 'calendar')));
         }
 
-        array_push($days,
-            $mform->createElement('html',
+        array_push(
+            $days,
+            $mform->createElement(
+                'html',
                 '<div id="id_googlemeet_days_error" class="form-control-feedback invalid-feedback"></div>'
             )
         );
@@ -205,14 +210,15 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $mform->addGroup($days, 'days', get_string('repeaton', 'googlemeet'), ['&nbsp;&nbsp;&nbsp;'], false);
         $mform->disabledIf('days', 'addmultiply', 'notchecked');
 
-        $period = array(
+        $period = [
             1 => 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20,
-            21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36
-        );
+            21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
+        ];
         $periodgroup = [
             $mform->createElement('select', 'period', '', $period, false, true),
             $mform->createElement('html', '<div class="items-center">' . get_string('week', 'googlemeet') . '</div>'),
-            $mform->createElement('html',
+            $mform->createElement(
+                'html',
                 '<div id="id_googlemeet_periodgroup_error" class="form-control-feedback invalid-feedback"></div>'
             ),
         ];
@@ -221,7 +227,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
 
         $eventenddategroup = [
             $mform->createElement('date_selector', 'eventenddate', ''),
-            $mform->createElement('html',
+            $mform->createElement(
+                'html',
                 '<div id="id_googlemeet_eventenddategroup_error" class="form-control-feedback invalid-feedback"></div>'
             ),
         ];
@@ -235,12 +242,22 @@ class mod_googlemeet_mod_form extends moodleform_mod {
 
         // Define the elements for a single holiday period.
         $holidayelements = [];
-        $holidayelements[] = $mform->createElement('text', 'holidayname', get_string('holidayname', 'googlemeet'),
-            ['size' => '30', 'placeholder' => get_string('holidayname_placeholder', 'googlemeet')]);
-        $holidayelements[] = $mform->createElement('date_selector', 'holidaystartdate',
-            get_string('holidaystartdate', 'googlemeet'));
-        $holidayelements[] = $mform->createElement('date_selector', 'holidayenddate',
-            get_string('holidayenddate', 'googlemeet'));
+        $holidayelements[] = $mform->createElement(
+            'text',
+            'holidayname',
+            get_string('holidayname', 'googlemeet'),
+            ['size' => '30', 'placeholder' => get_string('holidayname_placeholder', 'googlemeet')]
+        );
+        $holidayelements[] = $mform->createElement(
+            'date_selector',
+            'holidaystartdate',
+            get_string('holidaystartdate', 'googlemeet')
+        );
+        $holidayelements[] = $mform->createElement(
+            'date_selector',
+            'holidayenddate',
+            get_string('holidayenddate', 'googlemeet')
+        );
 
         // Determine the number of existing holiday periods.
         $repeatno = 0;
@@ -285,10 +302,17 @@ class mod_googlemeet_mod_form extends moodleform_mod {
 
         // Define the elements for a single cancelled date.
         $cancelledelements = [];
-        $cancelledelements[] = $mform->createElement('date_selector', 'cancelleddate',
-            get_string('cancelleddate', 'googlemeet'));
-        $cancelledelements[] = $mform->createElement('text', 'cancelledreason', get_string('cancelledreason', 'googlemeet'),
-            ['size' => '30', 'placeholder' => get_string('cancelledreason_placeholder', 'googlemeet')]);
+        $cancelledelements[] = $mform->createElement(
+            'date_selector',
+            'cancelleddate',
+            get_string('cancelleddate', 'googlemeet')
+        );
+        $cancelledelements[] = $mform->createElement(
+            'text',
+            'cancelledreason',
+            get_string('cancelledreason', 'googlemeet'),
+            ['size' => '30', 'placeholder' => get_string('cancelledreason_placeholder', 'googlemeet')]
+        );
 
         // Use repeat_elements for dynamic cancelled dates.
         $this->repeat_elements(
@@ -309,7 +333,10 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $mform->setExpanded('headerroomurl', true);
 
         if (!empty($this->current->instance) && $client->enabled) {
-            $mform->addElement('static', 'url_caution', '',
+            $mform->addElement(
+                'static',
+                'url_caution',
+                '',
                 $OUTPUT->notification(get_string('roomurl_caution', 'googlemeet'), 'warning')
             );
         }
@@ -320,7 +347,10 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             $mform->setType('url', PARAM_RAW);
             $mform->addHelpButton('url', 'url', 'googlemeet');
 
-            $mform->addElement('text', 'creatoremail', get_string('creatoremail', 'googlemeet'),
+            $mform->addElement(
+                'text',
+                'creatoremail',
+                get_string('creatoremail', 'googlemeet'),
                 ['size' => '50', 'readonly' => true]
             );
             $mform->setType('creatoremail', PARAM_EMAIL);
@@ -346,15 +376,24 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         for ($i = 0; $i <= 120; $i = $i + 5) {
             $minutes[$i] = $i;
         }
-        $minutesbefore = $mform->addElement('select',
-            'minutesbefore', get_string('minutesbefore', 'googlemeet'), $minutes, false, true
+        $minutesbefore = $mform->addElement(
+            'select',
+            'minutesbefore',
+            get_string('minutesbefore', 'googlemeet'),
+            $minutes,
+            false,
+            true
         );
         $minutesbefore->setSelected($config->minutesbefore);
         $mform->addHelpButton('minutesbefore', 'minutesbefore', 'googlemeet');
 
-        // NOT-04: optional second, earlier reminder (0 = off). Default comes from the site setting.
-        $mform->addElement('select', 'notifyhoursbefore', get_string('notifyhoursbefore', 'googlemeet'),
-            \mod_googlemeet\local\reminders::hours_options());
+        // Optional second, earlier reminder (0 = off). Default comes from the site setting.
+        $mform->addElement(
+            'select',
+            'notifyhoursbefore',
+            get_string('notifyhoursbefore', 'googlemeet'),
+            \mod_googlemeet\local\reminders::hours_options()
+        );
         $mform->setType('notifyhoursbefore', PARAM_INT);
         $notifyhoursdefault = get_config('googlemeet', 'notifyhoursbefore');
         $mform->setDefault('notifyhoursbefore', $notifyhoursdefault === false ? 24 : (int)$notifyhoursdefault);
@@ -373,7 +412,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         ]);
         $mform->addHelpButton('attachments', 'attachments', 'googlemeet');
 
-        // ANA-03 (track: w2-completion): per-activity opt-in to real attendance from Google Meet.
+        // Per-activity opt-in to attendance read from Google Meet (only when the site enables it).
         \mod_googlemeet\local\attendance\settings_form::add_activity_fields($mform);
 
         // Add standard elements.
@@ -381,11 +420,10 @@ class mod_googlemeet_mod_form extends moodleform_mod {
 
         // Add standard buttons.
         $this->add_action_buttons();
-
     }
 
     /**
-     * Decode json format from the database
+     * Load the form defaults: attachments draft area, weekdays JSON, holiday periods and cancelled dates.
      *
      * @param array $defaultvalues Form defaults
      * @return void
@@ -393,8 +431,14 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     public function data_preprocessing(&$defaultvalues) {
         // Prepare the draft file area for the teacher attachments (works for new and existing instances).
         $draftitemid = file_get_submitted_draft_itemid('attachments');
-        file_prepare_draft_area($draftitemid, $this->context->id, 'mod_googlemeet', 'attachment', 0,
-            ['subdirs' => 0]);
+        file_prepare_draft_area(
+            $draftitemid,
+            $this->context->id,
+            'mod_googlemeet',
+            'attachment',
+            0,
+            ['subdirs' => 0]
+        );
         $defaultvalues['attachments'] = $draftitemid;
 
         if ($this->current->instance) {
@@ -402,8 +446,11 @@ class mod_googlemeet_mod_form extends moodleform_mod {
 
             // Load holiday periods from database.
             global $DB;
-            $holidays = $DB->get_records('googlemeet_holidays',
-                ['googlemeetid' => $this->current->instance], 'id ASC');
+            $holidays = $DB->get_records(
+                'googlemeet_holidays',
+                ['googlemeetid' => $this->current->instance],
+                'id ASC'
+            );
 
             $i = 0;
             foreach ($holidays as $holiday) {
@@ -414,11 +461,15 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             }
 
             // Load cancelled dates from database.
-            $cancelleddates = $DB->get_records('googlemeet_cancelled',
-                ['googlemeetid' => $this->current->instance], 'cancelleddate ASC, id ASC');
+            $cancelleddates = $DB->get_records(
+                'googlemeet_cancelled',
+                ['googlemeetid' => $this->current->instance],
+                'cancelleddate ASC, id ASC'
+            );
             $cancelleddates = array_values($cancelleddates);
             $today = usergetmidnight(time());
-            usort($cancelleddates, static function($a, $b) use ($today) {
+            // Today and upcoming dates first (soonest first), then past dates (most recent first).
+            usort($cancelleddates, static function ($a, $b) use ($today) {
                 $aday = usergetmidnight((int)$a->cancelleddate);
                 $bday = usergetmidnight((int)$b->cancelleddate);
                 $agroup = $aday >= $today ? 0 : 1;
@@ -462,7 +513,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             $errors['eventtime'] = get_string('invalideventendtime', 'googlemeet');
         }
 
-        if (!empty($data['addmultiply']) &&
+        if (
+            !empty($data['addmultiply']) &&
             $data['eventdate'] !== 0 &&
             $data['eventenddate'] !== 0 &&
             $data['eventenddate'] < $data['eventdate']
@@ -484,7 +536,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             $errors['eventenddate'] = get_string('timeahead', 'googlemeet');
         }
 
-        // NOT-04: the early reminder must come before the "minutes before" one, or it is never sent.
+        // The early reminder must come before the "minutes before" one, or it is never sent
+        // (see \mod_googlemeet\local\reminders::get_due_events()).
         $hoursbefore = (int)($data['notifyhoursbefore'] ?? 0);
         if (!empty($data['notify']) && $hoursbefore > 0 && $hoursbefore * 60 <= (int)($data['minutesbefore'] ?? 0)) {
             $errors['notifyhoursbefore'] = get_string('notifyhoursbefore_tooclose', 'googlemeet');
@@ -508,7 +561,9 @@ class mod_googlemeet_mod_form extends moodleform_mod {
 
         $startdate = $data['eventdate'] + $starttime;
         if ($startdate < $COURSE->startdate) {
-            $errors['eventtime'] = get_string('earlierto', 'googlemeet',
+            $errors['eventtime'] = get_string(
+                'earlierto',
+                'googlemeet',
                 userdate($COURSE->startdate, get_string('strftimedmyhm', 'googlemeet'))
             );
         }
@@ -544,7 +599,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     }
 
     /**
-     * Whether the current user may set the organizer email of an existing instance (PRIV-05 mitigation).
+     * Whether the current user may set the organizer email of an existing instance.
      *
      * Background tasks act on the organizer's Google Drive by looking up the Moodle user with that
      * email, so an editor must not be able to point an activity at someone else's linked account.
@@ -560,7 +615,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         global $DB;
 
         $current = (string)$DB->get_field('googlemeet', 'creatoremail', ['id' => $this->current->instance]);
-        $normalise = static function(string $email): string {
+        $normalise = static function (string $email): string {
             return \core_text::strtolower(trim($email));
         };
         if ($normalise($newemail) === $normalise($current)) {
@@ -570,7 +625,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             return true;
         }
         if ($isgooglelogged) {
-            // Served from the session userinfo cache (PERF-01), normally no HTTP request.
+            // Served from the session userinfo cache, normally no HTTP request.
             $linked = $client->get_email();
             return $linked !== '' && $normalise($linked) === $normalise($newemail);
         }
@@ -578,14 +633,10 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     }
 
     /**
-     * Simulate the same event-generation loop used by
-     * googlemeet_construct_events_data_for_add() and return true if at least
-     * one event would be produced with the submitted configuration (respecting
-     * period, selected weekdays, and holiday exclusions built from the form data).
+     * Whether the submitted recurrence would produce at least one session.
      *
-     * This replaces the old checkweekdays() helper which iterated every day in
-     * the range without honouring the "repeat every N weeks" period, causing
-     * false positives when period > (enddate - startdate) / WEEKSECS.
+     * Runs the event-generation loop of {@see googlemeet_construct_events_data_for_add()} (keep in
+     * step) over the form data: period, selected weekdays and the holiday periods being submitted.
      *
      * @param array $data Validated form data.
      * @return bool True if at least one event would be created.
@@ -597,17 +648,17 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             return false;
         }
 
-        $starthour   = (int)($data['starthour']   ?? 0);
+        $starthour   = (int)($data['starthour'] ?? 0);
         $startminute = (int)($data['startminute'] ?? 0);
-        $endhour     = (int)($data['endhour']     ?? 0);
-        $endminute   = (int)($data['endminute']   ?? 0);
-        $period      = (int)($data['period']      ?? 1);
+        $endhour     = (int)($data['endhour'] ?? 0);
+        $endminute   = (int)($data['endminute'] ?? 0);
+        $period      = (int)($data['period'] ?? 1);
         if ($period < 1) {
             $period = 1;
         }
 
         $eventstarttime = $starthour * HOURSECS + $startminute * MINSECS;
-        $eventendtime   = $endhour   * HOURSECS + $endminute   * MINSECS;
+        $eventendtime   = $endhour * HOURSECS + $endminute * MINSECS;
         $eventdate      = $data['eventdate'] + $eventstarttime;
         $enddate        = $data['eventenddate'] + $eventendtime;
 
@@ -617,7 +668,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         if (!empty($data['holiday_repeats'])) {
             for ($i = 0; $i < $data['holiday_repeats']; $i++) {
                 $hstart = $data["holidaystartdate[$i]"] ?? 0;
-                $hend   = $data["holidayenddate[$i]"]   ?? 0;
+                $hend   = $data["holidayenddate[$i]"] ?? 0;
                 if ($hstart && $hend && $hend >= $hstart) {
                     $h            = new stdClass();
                     $h->startdate = (int)$hstart;
@@ -627,12 +678,12 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             }
         }
 
-        // --- Check the first event (eventdate itself) ---
+        // Check the first event (eventdate itself).
         if (!googlemeet_is_holiday($eventdate, $holidays)) {
             return true;
         }
 
-        // --- Mirror the recurrence loop from googlemeet_construct_events_data_for_add() ---
+        // Mirror the recurrence loop from googlemeet_construct_events_data_for_add().
         $wdaydesc = [0 => 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
         $sdate   = $eventdate + DAYSECS;
@@ -673,7 +724,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         return false;
     }
 
-    // ANA-01 (track: w2-completion): custom completion rules.
+    // Custom completion rules.
 
     /**
      * Rule definitions: rule => [checkbox lang string, max value].
@@ -789,7 +840,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     }
 
     /**
-     * Validate the provided url
+     * Add an error when the URL holds no Google Meet code (see googlemeet_clear_url()).
+     *
      * @param string $url Url to validate.
      * @param array $errors Form errors.
      *

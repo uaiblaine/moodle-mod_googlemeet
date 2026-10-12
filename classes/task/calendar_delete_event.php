@@ -19,17 +19,17 @@ namespace mod_googlemeet\task;
 use mod_googlemeet\local\calendar_sync;
 
 /**
- * Adhoc task: delete the Google Calendar event of a deleted activity (DAT-04).
+ * Adhoc task: delete the Google Calendar event of a deleted activity.
  *
- * Custom data (captured before the record was deleted): googlemeetid, eventid, creatoremail,
- * name, course, editorid. Never throws: failures are logged and the editor is notified.
+ * Queued by {@see calendar_sync::queue_delete()}, with the custom data captured before the record
+ * was deleted: googlemeetid, eventid, url, creatoremail, name, course, editorid. Never throws:
+ * failures are logged and the editor is notified.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class calendar_delete_event extends \core\task\adhoc_task {
-
     /**
      * Task name.
      *

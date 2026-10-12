@@ -16,9 +16,9 @@
 
 namespace mod_googlemeet;
 
-// curl class lives in lib/filelib.php and is not autoloaded — load it eagerly
-// so adhoc/scheduled task contexts (which don't go through code that pulls
-// filelib.php) can still instantiate \curl.
+defined('MOODLE_INTERNAL') || die();
+
+// The curl class lives in lib/filelib.php, which is not autoloaded and is not always loaded in task runs.
 global $CFG;
 require_once($CFG->libdir . '/filelib.php');
 
@@ -36,7 +36,6 @@ require_once($CFG->libdir . '/filelib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class subtitle_extractor {
-
     /** @var string|null Path to the yt-dlp binary */
     private ?string $ytdlppath = null;
 
@@ -165,11 +164,11 @@ class subtitle_extractor {
     /**
      * Use yt-dlp to extract the timedtext URL from a Google Drive video page.
      *
-     * yt-dlp parses the Drive page HTML and extracts the timedtext URL
-     * with the authpayload parameter needed for authentication.
+     * The yt-dlp verbose log of a subtitle-only run contains the timedtext URL, with the
+     * authpayload parameter needed for authentication.
      *
-     * Exposed as public so that CLI scripts can call individual pipeline
-     * steps while emitting progress output between them.
+     * Public, like download_subtitle() and parse_xml(), so cli/process_transcripts.php can run
+     * the pipeline steps one by one with progress output between them.
      *
      * @param string $driveurl The Google Drive video URL
      * @return string|null The timedtext URL or null on failure
@@ -200,10 +199,9 @@ class subtitle_extractor {
     /**
      * Download subtitle XML from the timedtext URL.
      *
-     * The Referer header is required - without it, Google returns empty responses.
+     * The Referer header is required: without it, Google returns empty responses.
      *
-     * Exposed as public so that CLI scripts can call individual pipeline
-     * steps while emitting progress output between them.
+     * Public for cli/process_transcripts.php ({@see self::get_timedtext_url()}).
      *
      * @param string $url The timedtext URL with track parameters
      * @return string The subtitle XML content, or empty string on failure
@@ -230,10 +228,9 @@ class subtitle_extractor {
      * Input format: <transcript><text start="148.92" dur="3">Hola</text>...</transcript>
      * Output format: "2:28\nHola\nbuen texto\n3:01\nmás texto..."
      *
-     * Timestamps are inserted at each new minute boundary.
+     * A timestamp line (the cue's own start time) precedes the first cue of each new minute.
      *
-     * Exposed as public so that CLI scripts can call individual pipeline
-     * steps while emitting progress output between them.
+     * Public for cli/process_transcripts.php ({@see self::get_timedtext_url()}).
      *
      * @param string $xml The subtitle XML content
      * @return string The parsed transcript with timestamps
@@ -258,7 +255,7 @@ class subtitle_extractor {
                 continue;
             }
 
-            // Convert seconds to MM:SS or H:MM:SS.
+            // Convert seconds to M:SS or H:MM:SS.
             $hours = floor($start / 3600);
             $minutes = floor(($start % 3600) / 60);
             $seconds = floor($start % 60);

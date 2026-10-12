@@ -26,7 +26,7 @@ use mod_googlemeet\privacy\provider;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * Privacy API coverage of googlemeet_practice_attempts (ANA-05).
+ * Privacy API coverage of googlemeet_practice_attempts.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -35,11 +35,10 @@ use PHPUnit\Framework\Attributes\CoversClass;
  */
 #[CoversClass(\mod_googlemeet\privacy\provider::class)]
 final class privacy_practice_attempts_test extends \core_privacy\tests\provider_testcase {
-
     /**
      * Two activities, two students with attempts.
      *
-     * @return array
+     * @return array [context1, context2, user1, user2, googlemeet1, googlemeet2, recording id by activity id]
      */
     private function fixture(): array {
         global $DB;
@@ -101,8 +100,10 @@ final class privacy_practice_attempts_test extends \core_privacy\tests\provider_
 
         // Export.
         provider::export_user_data(new approved_contextlist($u1, 'mod_googlemeet', [$ctx1->id]));
-        $data = writer::with_context($ctx1)->get_related_data([get_string('privacy:practiceattempts', 'googlemeet')],
-            'recording_' . $recs[$gm1->id]);
+        $data = writer::with_context($ctx1)->get_related_data(
+            [get_string('privacy:practiceattempts', 'googlemeet')],
+            'recording_' . $recs[$gm1->id]
+        );
         $this->assertCount(2, $data->attempts);
         $this->assertEquals(11, $data->attempts[0]['questionid']);
 

@@ -23,7 +23,7 @@ use core_external\external_value;
 use mod_googlemeet\local\room_entry;
 
 /**
- * Log that the user is entering the live room (ANA-02) and return the Meet URL to open.
+ * Log that the user is entering the live room and return the Meet URL to open.
  *
  * Used by the mobile app (and any client that cannot go through enter.php) right before
  * opening Google Meet.
@@ -33,7 +33,6 @@ use mod_googlemeet\local\room_entry;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class log_room_entered extends external_api {
-
     /**
      * Parameters.
      *

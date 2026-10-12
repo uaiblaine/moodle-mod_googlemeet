@@ -25,13 +25,12 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-require_once($CFG->dirroot.'//mod/googlemeet/backup/moodle2/restore_googlemeet_stepslib.php');
+require_once($CFG->dirroot . '//mod/googlemeet/backup/moodle2/restore_googlemeet_stepslib.php');
 
 /**
  * Restore task for mod_googlemeet.
  */
 class restore_googlemeet_activity_task extends restore_activity_task {
-
     /**
      * Defines particular settings that this activity can have.
      */
@@ -42,7 +41,7 @@ class restore_googlemeet_activity_task extends restore_activity_task {
     /**
      * Defines particular steps that this activity can have.
      *
-     * @return base_step.
+     * @return void
      */
     protected function define_my_steps() {
         $this->add_step(new restore_googlemeet_activity_structure_step('googlemeet_structure', 'googlemeet.xml'));
@@ -54,9 +53,9 @@ class restore_googlemeet_activity_task extends restore_activity_task {
      * @return array.
      */
     public static function define_decode_contents() {
-        $contents = array();
+        $contents = [];
 
-        $contents[] = new restore_decode_content('googlemeet', array('intro'), 'googlemeet');
+        $contents[] = new restore_decode_content('googlemeet', ['intro'], 'googlemeet');
 
         return $contents;
     }
@@ -67,7 +66,7 @@ class restore_googlemeet_activity_task extends restore_activity_task {
      * @return array.
      */
     public static function define_decode_rules() {
-        $rules = array();
+        $rules = [];
 
         $rules[] = new restore_decode_rule('GOOGLEMEETINDEX', '/mod/googlemeet/index.php?id=$1', 'course');
         $rules[] = new restore_decode_rule('GOOGLEMEETVIEWBYID', '/mod/googlemeet/view.php?id=$1', 'course_module');
@@ -83,7 +82,7 @@ class restore_googlemeet_activity_task extends restore_activity_task {
      * @return array.
      */
     public static function define_restore_log_rules() {
-        $rules = array();
+        $rules = [];
 
         $rules[] = new restore_log_rule('googlemeet', 'add', 'view.php?id={course_module}', '{googlemeet}');
         $rules[] = new restore_log_rule('googlemeet', 'update', 'view.php?id={course_module}', '{googlemeet}');

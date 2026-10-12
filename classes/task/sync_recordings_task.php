@@ -19,7 +19,7 @@ namespace mod_googlemeet\task;
 use mod_googlemeet\local\sync_manager;
 
 /**
- * Adhoc task: teacher-requested "Sync with Google Drive" (PERF-02).
+ * Adhoc task: teacher-requested "Sync with Google Drive", queued by {@see sync_manager::request()}.
  *
  * Custom data: googlemeetid, userid (teacher whose Google token is used), logid (sync_log row the
  * page polls). When the per-activity lock is busy the task throws so the task API retries it.
@@ -29,7 +29,6 @@ use mod_googlemeet\local\sync_manager;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class sync_recordings_task extends \core\task\adhoc_task {
-
     /**
      * Task name.
      *

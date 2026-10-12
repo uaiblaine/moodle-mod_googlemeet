@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Definition of Google Meet task.
+ * Definition of Google Meet scheduled tasks.
  *
  * @package     mod_googlemeet
  * @copyright   2020 Rone Santos <ronefel@hotmail.com>
@@ -32,7 +32,7 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\process_ai_analysis',
@@ -41,7 +41,7 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\process_autosync',
@@ -50,7 +50,7 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
     [
         'classname' => 'mod_googlemeet\task\check_stale_recurrence',
@@ -59,19 +59,18 @@ $tasks = [
         'hour' => '4',
         'day' => '*',
         'dayofweek' => '1',
-        'month' => '*'
+        'month' => '*',
     ],
     [
-        // OPS-03: purge recordings that stayed in the trash longer than googlemeet/trashretentiondays.
         'classname' => 'mod_googlemeet\task\purge_trash',
         'blocking' => 0,
         'minute' => 'R',
         'hour' => '3',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
+        'month' => '*',
     ],
-    // track: w2-completion (ANA-03). No-op unless googlemeet/attendanceenabled is on.
+    // No-op unless googlemeet/attendanceenabled is on.
     [
         'classname' => 'mod_googlemeet\task\fetch_attendance',
         'blocking' => 0,
@@ -79,6 +78,6 @@ $tasks = [
         'hour' => '*',
         'day' => '*',
         'dayofweek' => '*',
-        'month' => '*'
-    ]
+        'month' => '*',
+    ],
 ];

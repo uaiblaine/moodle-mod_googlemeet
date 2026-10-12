@@ -26,9 +26,9 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * PERF-03: the recordings list and the hub run a constant number of DB queries.
+ * The recordings list and the hub run a constant number of DB queries.
  *
- * Measured with $DB->perf_get_queries() around the real render functions with an increasing
+ * Counted with $DB->perf_get_queries() around the real render functions with an increasing
  * number of recordings, each with attached materials and published questions.
  *
  * @package     mod_googlemeet
@@ -38,8 +38,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversClass(list_aggregates::class)]
 final class list_query_count_test extends \advanced_testcase {
-
-    /** @var int Allowed drift between small and large pages (spec: ± 3). */
+    /** @var int Queries the large activity may run above the small one. */
     private const TOLERANCE = 3;
 
     /**
@@ -62,11 +61,13 @@ final class list_query_count_test extends \advanced_testcase {
             'showonloginpage' => 0,
         ]);
         $issuer->create();
-        foreach ([
+        foreach (
+            [
             'authorization_endpoint' => 'https://accounts.google.com/o/oauth2/v2/auth',
             'token_endpoint' => 'https://oauth2.googleapis.com/token',
             'userinfo_endpoint' => 'https://openidconnect.googleapis.com/v1/userinfo',
-        ] as $name => $url) {
+            ] as $name => $url
+        ) {
             (new \core\oauth2\endpoint(0, (object)['issuerid' => $issuer->get('id'), 'name' => $name, 'url' => $url]))->create();
         }
         set_config('issuerid', $issuer->get('id'), 'googlemeet');
@@ -167,7 +168,7 @@ final class list_query_count_test extends \advanced_testcase {
     private function render_hub(\stdClass $googlemeet, \stdClass $cm, \context_module $context, int $recordingid): array {
         global $DB, $PAGE;
         $recording = $DB->get_record('googlemeet_recordings', ['id' => $recordingid]);
-        $render = function() use ($googlemeet, $cm, $context, $recording) {
+        $render = function () use ($googlemeet, $cm, $context, $recording) {
             global $PAGE;
             $PAGE = new \moodle_page();
             $PAGE->set_url('/mod/googlemeet/view.php', ['id' => $cm->id, 'recording' => $recording->id]);
@@ -201,8 +202,11 @@ final class list_query_count_test extends \advanced_testcase {
         [$smallhtml, $smallq] = $this->render_list($small, $smallcm, $smallctx);
         [$largehtml, $largeq] = $this->render_list($large, $largecm, $largectx);
         $this->assertStringContainsString('esquema.pdf', $largehtml);
-        $this->assertLessThanOrEqual($smallq + self::TOLERANCE, $largeq,
-            "Teacher list: {$smallq} queries with 2 recordings, {$largeq} with 12.");
+        $this->assertLessThanOrEqual(
+            $smallq + self::TOLERANCE,
+            $largeq,
+            "Teacher list: {$smallq} queries with 2 recordings, {$largeq} with 12."
+        );
 
         // Student.
         $student = $this->getDataGenerator()->create_and_enrol($smallcourse, 'student');
@@ -211,8 +215,11 @@ final class list_query_count_test extends \advanced_testcase {
         [, $smallq] = $this->render_list($small, $smallcm, $smallctx);
         [$largehtml, $largeq] = $this->render_list($large, $largecm, $largectx);
         $this->assertStringContainsString('esquema.pdf', $largehtml);
-        $this->assertLessThanOrEqual($smallq + self::TOLERANCE, $largeq,
-            "Student list: {$smallq} queries with 2 recordings, {$largeq} with 12.");
+        $this->assertLessThanOrEqual(
+            $smallq + self::TOLERANCE,
+            $largeq,
+            "Student list: {$smallq} queries with 2 recordings, {$largeq} with 12."
+        );
     }
 
     /**
@@ -231,8 +238,11 @@ final class list_query_count_test extends \advanced_testcase {
 
         [, $smallq] = $this->render_hub($small, $smallcm, $smallctx, $smallids[1]);
         [, $largeq] = $this->render_hub($large, $largecm, $largectx, $largeids[7]);
-        $this->assertLessThanOrEqual($smallq + self::TOLERANCE, $largeq,
-            "Hub: {$smallq} queries with 3 recordings, {$largeq} with 15.");
+        $this->assertLessThanOrEqual(
+            $smallq + self::TOLERANCE,
+            $largeq,
+            "Hub: {$smallq} queries with 3 recordings, {$largeq} with 15."
+        );
     }
 
     /**
@@ -288,7 +298,7 @@ final class list_query_count_test extends \advanced_testcase {
         global $DB;
         $this->resetAfterTest();
 
-        $insert = function(int $created, int $visible = 1, int $deleted = 0) {
+        $insert = function (int $created, int $visible = 1, int $deleted = 0) {
             global $DB;
             return (int)$DB->insert_record('googlemeet_recordings', (object)[
                 'googlemeetid' => 77, 'recordingid' => random_string(8), 'name' => 'R' . $created,

@@ -36,11 +36,11 @@ $recordingid = optional_param('recording', 0, PARAM_INT);
 
 if ($id) {
     $cm = get_coursemodule_from_id('googlemeet', $id, 0, false, MUST_EXIST);
-    $course = $DB->get_record('course', array('id' => $cm->course), '*', MUST_EXIST);
-    $googlemeet = $DB->get_record('googlemeet', array('id' => $cm->instance), '*', MUST_EXIST);
+    $course = $DB->get_record('course', ['id' => $cm->course], '*', MUST_EXIST);
+    $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
 } else if ($g) {
-    $googlemeet = $DB->get_record('googlemeet', array('id' => $g), '*', MUST_EXIST);
-    $course = $DB->get_record('course', array('id' => $googlemeet->course), '*', MUST_EXIST);
+    $googlemeet = $DB->get_record('googlemeet', ['id' => $g], '*', MUST_EXIST);
+    $course = $DB->get_record('course', ['id' => $googlemeet->course], '*', MUST_EXIST);
     $cm = get_coursemodule_from_instance('googlemeet', $googlemeet->id, $course->id, false, MUST_EXIST);
 } else {
     throw new moodle_exception('missingidandcmid', 'mod_googlemeet');
@@ -62,11 +62,8 @@ $PAGE->set_context($context);
 googlemeet_handle_view_actions($googlemeet, $cm, $course);
 googlemeet_handle_subscription_action($googlemeet, $cm);
 
-// Recordings view preference (cards|list). Setting it via the optional `rview`
-// GET param only updates the per-user preference, then redirects to a clean URL
-// (rview removed) preserving the content state params. No sesskey is required:
-// it only changes the user's own view preference and is idempotent. This must run
-// before any output is produced so redirect() is legal.
+// The `rview` param (cards|list) saves the recordings view preference, then redirects to the same
+// list state without it. No sesskey: it only sets the viewer's own preference and is idempotent.
 $rview = optional_param('rview', '', PARAM_ALPHA);
 if ($rview === 'cards' || $rview === 'list') {
     set_user_preference('mod_googlemeet_recordings_view', $rview);
@@ -94,10 +91,8 @@ if ($rview === 'cards' || $rview === 'list') {
     redirect(new moodle_url('/mod/googlemeet/view.php', $redirectparams));
 }
 
-// Make sure URL exists before generating output - some older sites may contain empty urls
-// Do not use PARAM_URL here, it is too strict and does not support general URIs!
-// An invalid stored URL must not make the whole activity (recordings included) unusable:
-// hide the join CTA and tell only the people who can fix it.
+// An empty or invalid stored Meet URL must not make the activity (recordings included) unusable:
+// it only hides the join CTA, and an invalid one is reported to the users who can fix it.
 $url = trim((string)$googlemeet->url);
 $pattern = "/^https:\/\/meet.google.com\/[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/";
 $hasinvalidmeeturl = ($url !== '' && !preg_match($pattern, $url));
@@ -110,8 +105,12 @@ $recording = null;
 if ($recordingid > 0) {
     $recording = googlemeet_get_accessible_recording($googlemeet, $context, $recordingid);
     if (!$recording) {
-        redirect(new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
-            get_string('recordingnotfound', 'googlemeet'), null, \core\output\notification::NOTIFY_WARNING);
+        redirect(
+            new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
+            get_string('recordingnotfound', 'googlemeet'),
+            null,
+            \core\output\notification::NOTIFY_WARNING
+        );
     }
 }
 
@@ -128,15 +127,20 @@ if ($recording) {
 googlemeet_print_header($googlemeet, $cm, $course);
 
 if ($hasinvalidmeeturl && has_capability('moodle/course:manageactivities', $context)) {
-    echo $OUTPUT->notification(get_string('invalidstoredurl_editor', 'googlemeet',
-        (new moodle_url('/course/modedit.php', ['update' => $cm->id, 'return' => 1]))->out()),
-        \core\output\notification::NOTIFY_WARNING);
+    echo $OUTPUT->notification(
+        get_string(
+            'invalidstoredurl_editor',
+            'googlemeet',
+            (new moodle_url('/course/modedit.php', ['update' => $cm->id, 'return' => 1]))->out()
+        ),
+        \core\output\notification::NOTIFY_WARNING
+    );
 }
-// ANA-03: the organiser must link Google again to grant the Meet attendance scope.
+// Asks the organiser to link Google again when the Meet attendance scope is missing (other
+// teachers only get an informative note).
 echo \mod_googlemeet\local\attendance\scope::relink_notice($googlemeet, $context);
-// Note: In Moodle 4.0+, the activity header automatically displays
-// the title and description, so we don't call googlemeet_print_heading
-// or googlemeet_print_intro to avoid duplication.
+// The activity header already shows the title and description: no googlemeet_print_heading()
+// or googlemeet_print_intro() here.
 
 if ($recording) {
     googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording);
@@ -155,16 +159,20 @@ $herocontext = googlemeet_get_classroom_hero_context(
     $hasvalidmeeturl,
     $scheduleeventscontext
 );
-// NOT-04: "Add to my calendar" (.ics export + Google Calendar link) in the live-class block.
-$herocontext = array_merge($herocontext,
-    \mod_googlemeet\local\calendar_export::hero_context($googlemeet, (int)$cm->id, time()));
+// The "Add to my calendar" links (.ics export and Google Calendar) for the live-class block.
+$herocontext = array_merge(
+    $herocontext,
+    \mod_googlemeet\local\calendar_export::hero_context($googlemeet, (int)$cm->id, time())
+);
 echo $OUTPUT->render_from_template('mod_googlemeet/hero', $herocontext);
 
 if (has_capability('mod/googlemeet:editrecording', $context)) {
     if ($googlemeet->eventid != null) {
-        echo html_writer::link('https://calendar.google.com/calendar/u/0/r/eventedit/'.$googlemeet->eventid,
+        echo html_writer::link(
+            'https://calendar.google.com/calendar/u/0/r/eventedit/' . $googlemeet->eventid,
             get_string('eventdetails', 'googlemeet'),
-            ['class' => 'btn btn-outline-primary ms-2', 'target' => '_blank', 'title' => get_string('eventdetails', 'googlemeet')]);
+            ['class' => 'btn btn-outline-primary ms-2', 'target' => '_blank', 'title' => get_string('eventdetails', 'googlemeet')]
+        );
     }
 }
 
@@ -178,7 +186,15 @@ $recordingquery = optional_param('rq', '', PARAM_TEXT);
 $recordingtopic = optional_param('topic', '', PARAM_TEXT);
 $recordingpending = optional_param('rpending', 0, PARAM_BOOL);
 
-googlemeet_print_recordings($googlemeet, $cm, $context, $recordingspage, $recordingsorder, $recordingquery, $recordingtopic,
-    (bool)$recordingpending);
+googlemeet_print_recordings(
+    $googlemeet,
+    $cm,
+    $context,
+    $recordingspage,
+    $recordingsorder,
+    $recordingquery,
+    $recordingtopic,
+    (bool)$recordingpending
+);
 
 echo $OUTPUT->footer();

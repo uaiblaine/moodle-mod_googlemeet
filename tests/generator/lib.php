@@ -23,18 +23,16 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-defined('MOODLE_INTERNAL') || die();
-
 /**
  * mod_googlemeet test data generator class.
  */
 class mod_googlemeet_generator extends testing_module_generator {
-
     /**
      * Create a new googlemeet activity instance.
      *
      * Supplies the fields googlemeet_add_instance() needs when no Google account is linked:
-     * a valid Meet URL and the (zeroed) event-time fields read by the event constructor.
+     * a valid Meet URL, the zeroed event-time fields read by
+     * {@see googlemeet_construct_events_data_for_add()} and notifications off.
      *
      * @param array|stdClass|null $record
      * @param array|null $options

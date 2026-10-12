@@ -19,10 +19,10 @@ namespace mod_googlemeet\local;
 use stdClass;
 
 /**
- * Pre-session reminders (NOT-02, NOT-03, NOT-04).
+ * Pre-session reminders.
  *
  * Two independent reminders per session, each deduplicated in googlemeet_notify_done by its kind:
- *  - KIND_MINUTES: "minutesbefore" minutes before the start (the historical reminder);
+ *  - KIND_MINUTES: "minutesbefore" minutes before the start (0 = off);
  *  - KIND_HOURS: "notifyhoursbefore" hours before the start (0 = off).
  *
  * The send window is tolerant to cron gaps: a reminder is due from its lead time until the
@@ -35,7 +35,6 @@ use stdClass;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class reminders {
-
     /** @var int Reminder "minutesbefore" minutes before the session. */
     const KIND_MINUTES = 0;
 
@@ -172,12 +171,18 @@ class reminders {
             $kind = (int)($event->kind ?? self::KIND_MINUTES);
             $a = (object)[
                 // Plain-text subject: no HTML escaping (would show "Q&amp;A").
-                'name' => format_string($event->googlemeetname, true,
-                    ['context' => \context_module::instance($event->cmid), 'escape' => false]),
+                'name' => format_string(
+                    $event->googlemeetname,
+                    true,
+                    ['context' => \context_module::instance($event->cmid), 'escape' => false]
+                ),
                 'date' => userdate($event->eventdate, get_string('strftimedmy', 'googlemeet'), $user->timezone),
                 'start' => userdate($event->eventdate, get_string('strftimehm', 'googlemeet'), $user->timezone),
-                'end' => userdate($event->eventdate + $event->duration, get_string('strftimehm', 'googlemeet'),
-                    $user->timezone),
+                'end' => userdate(
+                    $event->eventdate + $event->duration,
+                    get_string('strftimehm', 'googlemeet'),
+                    $user->timezone
+                ),
                 'timezone' => usertimezone($user->timezone),
             ];
             $subjectkey = $kind === self::KIND_HOURS ? 'reminder_subject_hours' : 'reminder_subject_minutes';
@@ -199,7 +204,7 @@ class reminders {
             $message->contexturl = $url->out(false);
             $message->contexturlname = $a->name;
             $message->courseid = $event->courseid;
-            // NOT-03: lets the Moodle app open the activity from the push notification.
+            // Lets the Moodle app open the activity from the push notification.
             $message->customdata = self::app_customdata((int)$event->cmid, (int)$event->courseid, $url);
             return $message;
         } finally {

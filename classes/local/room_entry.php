@@ -17,19 +17,19 @@
 namespace mod_googlemeet\local;
 
 /**
- * "Join the live class" entry point (ANA-02): logs the intention to join and resolves the Meet URL.
+ * "Join the live class" entry point: logs the intention to join and resolves the Meet URL.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class room_entry {
-
     /** @var int Seconds before the start in which a session already counts as the one being joined. */
     public const EARLY_WINDOW = 30 * MINSECS;
 
     /** @var string Valid Google Meet room URL. */
-    public const MEET_URL_PATTERN = '/^https:\/\/meet\.google\.com\/[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/';
+    public const MEET_URL_PATTERN = '/^https:\/\/meet\.google\.com\/'
+        . '[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/';
 
     /**
      * The session (googlemeet_events row) being joined at $now: live, or starting within the early window.
@@ -42,10 +42,15 @@ class room_entry {
         global $DB;
 
         $now = $now ?? time();
-        $records = $DB->get_records_select('googlemeet_events',
+        $records = $DB->get_records_select(
+            'googlemeet_events',
             'googlemeetid = :googlemeetid AND eventdate <= :earliest AND eventdate + duration >= :now',
             ['googlemeetid' => $googlemeetid, 'earliest' => $now + self::EARLY_WINDOW, 'now' => $now],
-            'eventdate ASC', '*', 0, 1);
+            'eventdate ASC',
+            '*',
+            0,
+            1
+        );
         return $records ? reset($records) : null;
     }
 
@@ -67,7 +72,7 @@ class room_entry {
      * @param \stdClass|\cm_info $cm Course module.
      * @param \context_module $context Module context.
      * @param string $via "web" or "mobile".
-     * @return int Session id logged (0 when no session is live).
+     * @return int Session id logged (0 when no session is live and none starts within EARLY_WINDOW).
      */
     public static function log(\stdClass $googlemeet, $cm, \context_module $context, string $via = 'web'): int {
         $session = self::current_session((int)$googlemeet->id);

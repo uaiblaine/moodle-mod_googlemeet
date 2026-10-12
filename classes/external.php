@@ -25,7 +25,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// Support both Moodle 4.2+ (namespaced) and older versions.
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
@@ -43,7 +42,6 @@ require_once("$CFG->dirroot/mod/googlemeet/lib.php");
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mod_googlemeet_external extends external_api {
-
     /**
      * Describes the parameters for recording_edit_name.
      *
@@ -71,13 +69,12 @@ class mod_googlemeet_external extends external_api {
         global $DB;
 
         // Parameter validation.
-        // REQUIRED.
         $params = self::validate_parameters(
             self::recording_edit_name_parameters(),
             [
                 'recordingid' => $recordingid,
                 'name' => $name,
-                'coursemoduleid' => $coursemoduleid
+                'coursemoduleid' => $coursemoduleid,
             ]
         );
 
@@ -87,8 +84,12 @@ class mod_googlemeet_external extends external_api {
         require_capability('mod/googlemeet:editrecording', $context);
 
         // Verify the recording belongs to this googlemeet instance (prevent IDOR).
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0], '*', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            '*',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -143,12 +144,11 @@ class mod_googlemeet_external extends external_api {
         global $DB;
 
         // Parameter validation.
-        // REQUIRED.
         $params = self::validate_parameters(
             self::showhide_recording_parameters(),
             [
                 'recordingid' => $recordingid,
-                'coursemoduleid' => $coursemoduleid
+                'coursemoduleid' => $coursemoduleid,
             ]
         );
 
@@ -158,8 +158,12 @@ class mod_googlemeet_external extends external_api {
         require_capability('mod/googlemeet:editrecording', $context);
 
         // Verify the recording belongs to this googlemeet instance (prevent IDOR).
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0], '*', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            '*',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -175,7 +179,7 @@ class mod_googlemeet_external extends external_api {
         $DB->update_record('googlemeet_recordings', $recording);
 
         return (object)[
-            'visible' => $recording->visible
+            'visible' => $recording->visible,
         ];
     }
 
@@ -209,7 +213,7 @@ class mod_googlemeet_external extends external_api {
     /**
      * Moves every active recording of the activity to the teacher trash (manual).
      *
-     * @param int $googlemeetid the googlemeet ID
+     * @param int $googlemeetid Ignored: the instance of the validated course module is used
      * @param int $coursemoduleid the course module ID
      * @return array empty
      */
@@ -217,12 +221,11 @@ class mod_googlemeet_external extends external_api {
         global $DB;
 
         // Parameter validation.
-        // REQUIRED.
         $params = self::validate_parameters(
             self::delete_all_recordings_parameters(),
             [
                 'googlemeetid' => $googlemeetid,
-                'coursemoduleid' => $coursemoduleid
+                'coursemoduleid' => $coursemoduleid,
             ]
         );
 
@@ -239,13 +242,14 @@ class mod_googlemeet_external extends external_api {
         // their AI analysis and questions), and the retention task purges the rest. Practice
         // questions are never deleted here.
         $now = time();
-        $DB->execute("UPDATE {googlemeet_recordings}
+        $DB->execute(
+            "UPDATE {googlemeet_recordings}
                          SET deleted = 1, timedeleted = :now, trashreason = :reason, timemodified = :now2
                        WHERE googlemeetid = :googlemeetid AND deleted = 0",
             ['now' => $now, 'now2' => $now, 'reason' => \mod_googlemeet\local\recording_cleanup::TRASH_MANUAL,
-                'googlemeetid' => $googlemeetid]);
+            'googlemeetid' => $googlemeetid]
+        );
 
-        // Use set_field instead of get_record + update_record.
         $DB->set_field('googlemeet', 'lastsync', time(), ['id' => $googlemeetid]);
 
         return [];
@@ -297,8 +301,10 @@ class mod_googlemeet_external extends external_api {
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
 
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance]);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance]
+        );
         if (!$recording || empty($recording->deleted)) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -362,8 +368,10 @@ class mod_googlemeet_external extends external_api {
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
 
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance]);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance]
+        );
         if (!$recording || !empty($recording->deleted)) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -428,13 +436,15 @@ class mod_googlemeet_external extends external_api {
         self::validate_context($context);
         require_capability('mod/googlemeet:removerecording', $context);
 
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance]);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance]
+        );
         if (!$recording || empty($recording->deleted)) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
-        // DAT-01: one cascade for every dependent (AI, progress, attempts, files, preferences, questions).
+        // One cascade for every dependent (AI, progress, attempts, files, preferences, questions).
         \mod_googlemeet\local\recording_cleanup::purge_recordings([(int)$recording->id], $context);
 
         return ['success' => true];
@@ -462,7 +472,12 @@ class mod_googlemeet_external extends external_api {
                 'recordingid' => new external_value(PARAM_INT, 'The recording ID'),
                 'coursemoduleid' => new external_value(PARAM_INT, 'The course module ID'),
                 'regenerate' => new external_value(PARAM_BOOL, 'Whether to regenerate existing analysis', VALUE_DEFAULT, false),
-                'forcedownload' => new external_value(PARAM_BOOL, 'Allow tier 3: download full video for transcription', VALUE_DEFAULT, false),
+                'forcedownload' => new external_value(
+                    PARAM_BOOL,
+                    'Allow tier 3: download full video for transcription',
+                    VALUE_DEFAULT,
+                    false
+                ),
             ]
         );
     }
@@ -496,8 +511,12 @@ class mod_googlemeet_external extends external_api {
         require_capability('mod/googlemeet:generateai', $context);
 
         // Verify the recording belongs to this googlemeet instance before delegating (prevent IDOR).
-        if (!$DB->record_exists('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0])) {
+        if (
+            !$DB->record_exists(
+                'googlemeet_recordings',
+                ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0]
+            )
+        ) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
@@ -606,19 +625,24 @@ class mod_googlemeet_external extends external_api {
         $cantranscript = has_capability('mod/googlemeet:editrecording', $context);
 
         // Verify the recording belongs to this googlemeet instance before delegating (prevent IDOR).
-        // Also pull the recording's own transcript so we can fall back to it when the analysis row
-        // has no transcript stored (tier-1 analyses generated from an existing recording transcript
-        // never copied it into the analysis row, leaving the UI stuck on "loading transcript").
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0], 'id, transcripttext', MUST_EXIST);
+        // Its own transcript is the fallback when the analysis row stores none, as happens for an
+        // analysis built from the recording's existing transcript.
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            'id, transcripttext',
+            MUST_EXIST
+        );
 
         $aiservice = new \mod_googlemeet\ai_service();
         $analysis = $aiservice->get_analysis($recordingid);
 
-        // IA-04: unreviewed content is not served to students (it looks as if there was no analysis yet).
+        // Unreviewed content is not served to students (it looks as if there was no analysis yet).
         $canreview = has_capability(\mod_googlemeet\local\ai_review::CAPABILITY, $context);
-        if ($analysis && $analysis->status === 'completed'
-                && !\mod_googlemeet\local\ai_review::is_visible_to_user($analysis, $context)) {
+        if (
+            $analysis && $analysis->status === 'completed'
+                && !\mod_googlemeet\local\ai_review::is_visible_to_user($analysis, $context)
+        ) {
             $analysis = null;
         }
         // A row that is processing, pending or failed (regeneration, safety block, stale cleanup) still
@@ -674,7 +698,7 @@ class mod_googlemeet_external extends external_api {
             'timemodified' => $analysis->timemodified,
             'reviewed' => !empty($analysis->reviewed),
             'pendingreview' => \mod_googlemeet\local\ai_review::is_pending_review($analysis),
-            // F-8: only teachers act on a stuck analysis.
+            // Only users who can (re)generate analyses act on a stuck one.
             'stuck' => has_capability('mod/googlemeet:generateai', $context)
                 && \mod_googlemeet\ai_service::is_stuck($analysis),
         ];
@@ -708,8 +732,11 @@ class mod_googlemeet_external extends external_api {
                 'timecreated' => new external_value(PARAM_INT, 'Time created'),
                 'timemodified' => new external_value(PARAM_INT, 'Time modified'),
                 'reviewed' => new external_value(PARAM_BOOL, 'Whether a teacher approved the current content', VALUE_OPTIONAL),
-                'pendingreview' => new external_value(PARAM_BOOL, 'Completed but hidden from students until reviewed',
-                    VALUE_OPTIONAL),
+                'pendingreview' => new external_value(
+                    PARAM_BOOL,
+                    'Completed but hidden from students until reviewed',
+                    VALUE_OPTIONAL
+                ),
                 'stuck' => new external_value(PARAM_BOOL, 'Processing for longer than the stuck threshold', VALUE_OPTIONAL),
             ]
         );
@@ -744,7 +771,14 @@ class mod_googlemeet_external extends external_api {
      * @param string $transcript Transcript text
      * @return array The saved analysis data
      */
-    public static function save_ai_analysis($recordingid, $coursemoduleid, $summary = '', $keypoints = '', $topics = '', $transcript = '') {
+    public static function save_ai_analysis(
+        $recordingid,
+        $coursemoduleid,
+        $summary = '',
+        $keypoints = '',
+        $topics = '',
+        $transcript = ''
+    ) {
         global $DB, $USER;
 
         // Parameter validation.
@@ -766,8 +800,12 @@ class mod_googlemeet_external extends external_api {
         require_capability('mod/googlemeet:editrecording', $context);
 
         // Verify the recording exists and belongs to this googlemeet instance (prevent IDOR).
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0], '*', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            '*',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -816,7 +854,7 @@ class mod_googlemeet_external extends external_api {
             $analysis->error = null;
             $analysis->aimodel = 'manual';
             $analysis->timemodified = $now;
-            // IA-04: content written by the teacher counts as reviewed.
+            // Content written by the teacher counts as reviewed.
             foreach (\mod_googlemeet\local\ai_review::reviewed_fields((int)$USER->id) as $key => $value) {
                 $analysis->$key = $value;
             }
@@ -926,8 +964,10 @@ class mod_googlemeet_external extends external_api {
         }
 
         // Get recording info for context, scoped to this googlemeet instance (prevent IDOR).
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0]);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0]
+        );
         if (!$recording) {
             throw new \moodle_exception('ai_error', 'googlemeet', '', 'Recording not found (ID: ' . $params['recordingid'] . ')');
         }
@@ -957,7 +997,7 @@ class mod_googlemeet_external extends external_api {
             $analysis->error = null;
             $analysis->aimodel = $client->get_last_used_model() ?? $client->get_model();
             $analysis->timemodified = $now;
-            // IA-04: new AI text waits for a teacher review before students see it.
+            // New AI text waits for a teacher review before students see it.
             foreach (\mod_googlemeet\local\ai_review::unreviewed_fields() as $key => $value) {
                 $analysis->$key = $value;
             }
@@ -976,11 +1016,9 @@ class mod_googlemeet_external extends external_api {
                 'keypoints' => $result->keypoints ?? [],
                 'topics' => $result->topics ?? [],
             ];
-
         } catch (\Exception $e) {
             // Log the real error server-side; return a generic message so internal API
-            // details are never leaked to the client. IA-03: a safety block has its own, clear,
-            // non-technical message.
+            // details are never leaked to the client. A safety block has its own non-technical message.
             debugging('mod_googlemeet analyze_transcript failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
             return [
                 'success' => false,
@@ -1289,8 +1327,17 @@ class mod_googlemeet_external extends external_api {
      * @param string $sesskey Session key.
      * @return array
      */
-    public static function update_question($recordingid, $coursemoduleid, $questionid, $stem, $options,
-            $correctindex, $explanation, $citation, $sesskey) {
+    public static function update_question(
+        $recordingid,
+        $coursemoduleid,
+        $questionid,
+        $stem,
+        $options,
+        $correctindex,
+        $explanation,
+        $citation,
+        $sesskey
+    ) {
         $params = self::validate_parameters(self::update_question_parameters(), [
             'recordingid' => $recordingid,
             'coursemoduleid' => $coursemoduleid,
@@ -1309,8 +1356,14 @@ class mod_googlemeet_external extends external_api {
             'sesskey' => $params['sesskey'],
         ];
         [, , , $rows, $service] = self::validate_question_action($actionparams);
-        $service->update_question($rows, $params['stem'], $params['options'], $params['correctindex'],
-            $params['explanation'], $params['citation']);
+        $service->update_question(
+            $rows,
+            $params['stem'],
+            $params['options'],
+            $params['correctindex'],
+            $params['explanation'],
+            $params['citation']
+        );
         return ['success' => true, 'count' => 1];
     }
 
@@ -1363,8 +1416,12 @@ class mod_googlemeet_external extends external_api {
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:managequestions', $context);
-        if (!$DB->record_exists('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0])) {
+        if (
+            !$DB->record_exists(
+                'googlemeet_recordings',
+                ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0]
+            )
+        ) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
@@ -1417,8 +1474,12 @@ class mod_googlemeet_external extends external_api {
         self::validate_context($context);
         require_capability('mod/googlemeet:managequestions', $context);
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
-        if (!$DB->record_exists('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0])) {
+        if (
+            !$DB->record_exists(
+                'googlemeet_recordings',
+                ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0]
+            )
+        ) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
@@ -1498,10 +1559,12 @@ class mod_googlemeet_external extends external_api {
         self::validate_context($context);
         require_capability('mod/googlemeet:view', $context);
 
-        $recording = $DB->get_record('googlemeet_recordings',
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
             ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0],
             'id,visible,duration',
-            IGNORE_MISSING);
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -1563,7 +1626,7 @@ class mod_googlemeet_external extends external_api {
         ];
         $DB->update_record('googlemeet_recording_progress', $update);
 
-        // ANA-01: a newly watched class may complete the activity without a page reload.
+        // A newly watched class may complete the activity without a page reload.
         if ($iscompleted && empty($progress->completed)) {
             \mod_googlemeet\local\completion_updater::progress_changed($cm, (int)$USER->id);
         }
@@ -1619,8 +1682,12 @@ class mod_googlemeet_external extends external_api {
         require_capability('mod/googlemeet:view', $context);
 
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $googlemeet->id, 'deleted' => 0], 'id,visible', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $googlemeet->id, 'deleted' => 0],
+            'id,visible',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -1691,8 +1758,12 @@ class mod_googlemeet_external extends external_api {
         require_capability('mod/googlemeet:view', $context);
 
         $googlemeet = $DB->get_record('googlemeet', ['id' => $cm->instance], '*', MUST_EXIST);
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $googlemeet->id, 'deleted' => 0], 'id,visible', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $googlemeet->id, 'deleted' => 0],
+            'id,visible',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -1710,11 +1781,16 @@ class mod_googlemeet_external extends external_api {
             $params['answerid']
         );
 
-        // ANA-05: persist the attempt (only reached for a valid, published question of this recording).
+        // Persist the attempt (only reached for a valid, published question of this recording).
         global $USER;
-        \mod_googlemeet\local\practice_attempts::record((int)$googlemeet->id, (int)$params['recordingid'],
-            (int)$params['questionid'], (int)$USER->id, !empty($result['correct']));
-        // ANA-01: answered-questions completion rule.
+        \mod_googlemeet\local\practice_attempts::record(
+            (int)$googlemeet->id,
+            (int)$params['recordingid'],
+            (int)$params['questionid'],
+            (int)$USER->id,
+            !empty($result['correct'])
+        );
+        // The answered-questions completion rule may now be met.
         \mod_googlemeet\local\completion_updater::practice_changed($cm, (int)$USER->id);
 
         return $result;

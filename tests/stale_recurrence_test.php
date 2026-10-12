@@ -16,6 +16,10 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\task\check_stale_recurrence;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversFunction;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -30,9 +34,16 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class stale_recurrence_test extends \advanced_testcase {
-
-    /** Insert a googlemeet_events row. */
+#[CoversFunction('googlemeet_get_stale_recurrences')]
+#[CoversFunction('googlemeet_send_stale_alert')]
+#[CoversClass(check_stale_recurrence::class)]
+final class stale_recurrence_test extends \advanced_testcase {
+    /**
+     * Insert a two-hour googlemeet_events row.
+     *
+     * @param int $gmid Activity instance id.
+     * @param int $eventdate Session start timestamp.
+     */
     private function add_event(int $gmid, int $eventdate): void {
         global $DB;
         $DB->insert_record('googlemeet_events', (object) [
@@ -45,7 +56,13 @@ class stale_recurrence_test extends \advanced_testcase {
         ]);
     }
 
-    /** Insert a googlemeet_recordings row. */
+    /**
+     * Insert a googlemeet_recordings row.
+     *
+     * @param int $gmid Activity instance id.
+     * @param int $createdtime Recording creation timestamp.
+     * @param int $deleted 1 for a trashed recording.
+     */
     private function add_recording(int $gmid, int $createdtime, int $deleted = 0): void {
         global $DB;
         $DB->insert_record('googlemeet_recordings', (object) [
@@ -66,21 +83,26 @@ class stale_recurrence_test extends \advanced_testcase {
         ]);
     }
 
-    /** Create a googlemeet module and return its instance record (has ->id and ->cmid). */
+    /**
+     * Create a googlemeet activity in a new course.
+     *
+     * @return \stdClass Instance record, with ->id and ->cmid.
+     */
     private function make_module(): \stdClass {
-        // add_instance() mirrors the session into the core calendar (calendar_event::create),
-        // which requires a user with calendar-manage capability; run as admin in tests.
         $this->setAdminUser();
         $course = $this->getDataGenerator()->create_course();
         return $this->getDataGenerator()->create_module('googlemeet', ['course' => $course->id]);
     }
 
+    /**
+     * A future session with the last recording older than the threshold is reported, with its cmid and session count.
+     */
     public function test_detects_abandoned_recurrence(): void {
         $this->resetAfterTest();
         $now = 1800000000;
         $gm = $this->make_module();
-        $this->add_event($gm->id, $now + DAYSECS);          // future session
-        $this->add_recording($gm->id, $now - 30 * DAYSECS); // last recording 30d ago
+        $this->add_event($gm->id, $now + DAYSECS);
+        $this->add_recording($gm->id, $now - 30 * DAYSECS);
 
         $stale = googlemeet_get_stale_recurrences(3, $now);
 
@@ -90,42 +112,56 @@ class stale_recurrence_test extends \advanced_testcase {
         $this->assertEquals(1, (int) $stale[0]->futurecount);
     }
 
+    /**
+     * A recording within the threshold keeps the activity off the list.
+     */
     public function test_ignores_recent_recording(): void {
         $this->resetAfterTest();
         $now = 1800000000;
         $gm = $this->make_module();
         $this->add_event($gm->id, $now + DAYSECS);
-        $this->add_recording($gm->id, $now - 5 * DAYSECS); // recent
+        $this->add_recording($gm->id, $now - 5 * DAYSECS);
         $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
     }
 
+    /**
+     * An activity with only past sessions is not an abandoned recurrence.
+     */
     public function test_ignores_when_no_future_sessions(): void {
         $this->resetAfterTest();
         $now = 1800000000;
         $gm = $this->make_module();
-        $this->add_event($gm->id, $now - 10 * DAYSECS); // only past
+        $this->add_event($gm->id, $now - 10 * DAYSECS);
         $this->add_recording($gm->id, $now - 60 * DAYSECS);
         $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
     }
 
+    /**
+     * An activity that never had a recording is not reported.
+     */
     public function test_ignores_when_never_recorded(): void {
         $this->resetAfterTest();
         $now = 1800000000;
         $gm = $this->make_module();
         $this->add_event($gm->id, $now + DAYSECS);
-        // no recordings at all
         $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
     }
 
+    /**
+     * Trashed recordings do not count: with only those, the activity counts as never recorded.
+     */
     public function test_ignores_when_only_deleted_recordings(): void {
         $this->resetAfterTest();
         $now = 1800000000;
         $gm = $this->make_module();
         $this->add_event($gm->id, $now + DAYSECS);
-        $this->add_recording($gm->id, $now - 60 * DAYSECS, 1); // deleted
+        $this->add_recording($gm->id, $now - 60 * DAYSECS, 1);
         $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
     }
 
+    /**
+     * Every site admin gets one stalerecurrence notification linking to the activity settings.
+     */
     public function test_send_stale_alert_notifies_admins(): void {
         $this->resetAfterTest();
         $this->preventResetByRollback();
@@ -151,7 +187,9 @@ class stale_recurrence_test extends \advanced_testcase {
         $this->assertStringContainsString('update=456', $messages[0]->fullmessagehtml);
     }
 
-    /** Run the scheduled task, swallowing its mtrace output. */
+    /**
+     * Run the scheduled task, swallowing its mtrace output.
+     */
     private function run_task(): void {
         $task = new \mod_googlemeet\task\check_stale_recurrence();
         ob_start();
@@ -159,6 +197,9 @@ class stale_recurrence_test extends \advanced_testcase {
         ob_end_clean();
     }
 
+    /**
+     * The task alerts once, stays quiet within the re-notify window and alerts again after it.
+     */
     public function test_task_notifies_once_then_respects_renotify(): void {
         global $DB;
         $this->resetAfterTest();
@@ -193,6 +234,9 @@ class stale_recurrence_test extends \advanced_testcase {
         $sink->close();
     }
 
+    /**
+     * The stored alert time is reset once the activity is no longer stale, so a later relapse alerts at once.
+     */
     public function test_task_clears_state_when_no_longer_stale(): void {
         global $DB;
         $this->resetAfterTest();
@@ -218,6 +262,9 @@ class stale_recurrence_test extends \advanced_testcase {
         $this->assertEquals(0, (int)$DB->get_field('googlemeet', 'stalealerttime', ['id' => $gm->id]));
     }
 
+    /**
+     * An explicit stalerecurrence_enabled = 0 turns the task off.
+     */
     public function test_task_noop_when_disabled(): void {
         $this->resetAfterTest();
         $this->preventResetByRollback();
@@ -232,11 +279,13 @@ class stale_recurrence_test extends \advanced_testcase {
         $this->assertCount(0, $sink->get_messages());
     }
 
+    /**
+     * A never-saved stalerecurrence_enabled setting counts as enabled.
+     */
     public function test_task_enabled_by_default_when_unset(): void {
         $this->resetAfterTest();
         $this->preventResetByRollback();
-        // Do NOT set stalerecurrence_enabled: get_config() returns false (unpersisted default),
-        // which must behave as ON.
+        // Leave stalerecurrence_enabled unset: get_config() then returns false, which the task reads as on.
         set_config('stalerecurrence_weeks', 3, 'googlemeet');
         set_config('stalerecurrence_renotifydays', 28, 'googlemeet');
 

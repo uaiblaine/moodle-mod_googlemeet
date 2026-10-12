@@ -21,13 +21,13 @@ namespace mod_googlemeet\completion;
 use core_completion\activity_custom_completion;
 
 /**
- * Custom completion rules of mod_googlemeet (ANA-01).
+ * Custom completion rules of mod_googlemeet.
  *
  * - completionrecordings: the student has watched at least N classes.
  * - completionwatchpercent: the student has watched at least X % of the visible classes.
  * - completionpractice: the student has answered at least N distinct practice questions.
  *
- * "Watched" is the existing per-recording progress flag (googlemeet_recording_progress.completed),
+ * "Watched" is the per-recording progress flag (googlemeet_recording_progress.completed),
  * which with the Google Drive player is an approximation (visible-page heartbeats or "mark as
  * watched"), not real playback time. Only visible recordings that are not in the trash count.
  *
@@ -36,7 +36,6 @@ use core_completion\activity_custom_completion;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class custom_completion extends activity_custom_completion {
-
     /**
      * Fetches the completion state for a given completion rule.
      *
@@ -160,12 +159,21 @@ class custom_completion extends activity_custom_completion {
     public function get_custom_rule_descriptions(): array {
         $rules = $this->cm->customdata['customcompletionrules'] ?? [];
         return [
-            'completionrecordings' => get_string('completiondetail:recordings', 'googlemeet',
-                (int)($rules['completionrecordings'] ?? 0)),
-            'completionwatchpercent' => get_string('completiondetail:watchpercent', 'googlemeet',
-                (int)($rules['completionwatchpercent'] ?? 0)),
-            'completionpractice' => get_string('completiondetail:practice', 'googlemeet',
-                (int)($rules['completionpractice'] ?? 0)),
+            'completionrecordings' => get_string(
+                'completiondetail:recordings',
+                'googlemeet',
+                (int)($rules['completionrecordings'] ?? 0)
+            ),
+            'completionwatchpercent' => get_string(
+                'completiondetail:watchpercent',
+                'googlemeet',
+                (int)($rules['completionwatchpercent'] ?? 0)
+            ),
+            'completionpractice' => get_string(
+                'completiondetail:practice',
+                'googlemeet',
+                (int)($rules['completionpractice'] ?? 0)
+            ),
         ];
     }
 

@@ -15,10 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin page: Google Meet sync status (OPS-04).
+ * Admin page: Google Meet sync status.
  *
  * Failed/exhausted autosync in the last week, stuck AI analyses, failed Calendar updates and
- * the last sync of every activity, so admins do not need to read cron logs.
+ * the last sync of each activity (up to ops_status::LAST_SYNC_LIMIT rows), so admins do not
+ * need to read cron logs.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -85,7 +86,9 @@ if (!$rows) {
     $table = new html_table();
     $table->attributes['class'] = 'generaltable googlemeet-admin-status';
     $table->head = [
-        get_string('course'), get_string('adminstatus_col_activity', 'googlemeet'), get_string('adminstatus_col_creator', 'googlemeet'),
+        get_string('course'),
+        get_string('adminstatus_col_activity', 'googlemeet'),
+        get_string('adminstatus_col_creator', 'googlemeet'),
         get_string('adminstatus_failedruns', 'googlemeet'), get_string('adminstatus_exhausted', 'googlemeet'),
         get_string('adminstatus_retrying', 'googlemeet'), get_string('adminstatus_lastfailure', 'googlemeet'),
         get_string('adminstatus_col_lastsync', 'googlemeet'),
@@ -111,7 +114,9 @@ if (!$rows) {
     $table = new html_table();
     $table->attributes['class'] = 'generaltable googlemeet-admin-status';
     $table->head = [
-        get_string('course'), get_string('adminstatus_col_activity', 'googlemeet'), get_string('adminstatus_recording', 'googlemeet'),
+        get_string('course'),
+        get_string('adminstatus_col_activity', 'googlemeet'),
+        get_string('adminstatus_recording', 'googlemeet'),
         get_string('status'), get_string('adminstatus_since', 'googlemeet'), get_string('adminstatus_retries', 'googlemeet'),
         get_string('error'),
     ];
@@ -151,7 +156,9 @@ $rows = ops_status::last_syncs();
 $table = new html_table();
 $table->attributes['class'] = 'generaltable googlemeet-admin-status';
 $table->head = [
-    get_string('course'), get_string('adminstatus_col_activity', 'googlemeet'), get_string('adminstatus_col_lastsync', 'googlemeet'),
+    get_string('course'),
+    get_string('adminstatus_col_activity', 'googlemeet'),
+    get_string('adminstatus_col_lastsync', 'googlemeet'),
     get_string('adminstatus_autosynchours', 'googlemeet'), get_string('adminstatus_lastmanual', 'googlemeet'),
     get_string('adminstatus_lastauto', 'googlemeet'),
 ];
@@ -168,7 +175,11 @@ foreach ($rows as $row) {
 }
 echo html_writer::div(html_writer::table($table), 'table-responsive');
 if (count($rows) >= ops_status::LAST_SYNC_LIMIT) {
-    echo html_writer::tag('p', get_string('adminstatus_truncated', 'googlemeet', ops_status::LAST_SYNC_LIMIT), ['class' => 'small']);
+    echo html_writer::tag(
+        'p',
+        get_string('adminstatus_truncated', 'googlemeet', ops_status::LAST_SYNC_LIMIT),
+        ['class' => 'small']
+    );
 }
 
 echo $OUTPUT->footer();

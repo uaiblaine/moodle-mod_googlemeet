@@ -16,8 +16,6 @@
 
 namespace mod_googlemeet\task;
 
-defined('MOODLE_INTERNAL') || die();
-
 use mod_googlemeet\ai_service;
 use mod_googlemeet\client;
 
@@ -33,7 +31,6 @@ use mod_googlemeet\client;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class process_recording_enrichment extends \core\task\adhoc_task {
-
     /**
      * Get the task name.
      *
@@ -52,10 +49,8 @@ class process_recording_enrichment extends \core\task\adhoc_task {
         $data = $this->get_custom_data();
         $googlemeetid = (int)($data->googlemeetid ?? 0);
         $recordingids = array_values(array_unique(array_filter(array_map('intval', $data->recordingids ?? []))));
-        // AI analysis and "new recording" notifications only apply to inserts;
-        // restored recordings are enriched but stay silent (parity with the
-        // inline/cron path). Tasks queued before this field existed fall back
-        // to treating every id as new.
+        // Only inserts trigger AI analysis and "new recording" notifications; see
+        // googlemeet_sync_recordings(). Tasks queued without newrecordingids treat every id as new.
         $newrecordingids = property_exists($data, 'newrecordingids')
             ? array_values(array_unique(array_filter(array_map('intval', $data->newrecordingids ?? []))))
             : $recordingids;
@@ -189,8 +184,10 @@ class process_recording_enrichment extends \core\task\adhoc_task {
         global $DB;
 
         $recordingids = array_values(array_unique(array_filter(array_map('intval', $recordingids))));
-        if (empty($recordingids)
-                || !$DB->record_exists('googlemeet_recording_subs', ['googlemeetid' => $googlemeetid])) {
+        if (
+            empty($recordingids)
+                || !$DB->record_exists('googlemeet_recording_subs', ['googlemeetid' => $googlemeetid])
+        ) {
             return;
         }
 

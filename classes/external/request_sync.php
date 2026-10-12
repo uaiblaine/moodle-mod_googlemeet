@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 namespace mod_googlemeet\external;
 
 use core_external\external_api;
@@ -22,16 +23,16 @@ use core_external\external_value;
 use mod_googlemeet\local\sync_manager;
 
 /**
- * Queue a background "Sync with Google Drive" for an activity (PERF-02).
+ * Queue a background "Sync with Google Drive" for an activity.
  *
- * Returns immediately; a second request while one is queued/running does not queue another.
+ * Returns immediately; a second request while one is queued/running does not queue another
+ * ({@see \mod_googlemeet\local\sync_manager::request()}).
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class request_sync extends external_api {
-
     /**
      * Parameters.
      *

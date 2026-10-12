@@ -19,7 +19,7 @@ namespace mod_googlemeet;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * IA-03: Gemini safety settings and the SAFETY finish reason.
+ * Gemini safety settings and the SAFETY finish reason.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -29,7 +29,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(gemini_client::class)]
 #[CoversClass(gemini_safety_exception::class)]
 final class gemini_safety_test extends \advanced_testcase {
-
     /**
      * Call a private parser of the client with a simulated raw API response.
      *
@@ -76,12 +75,16 @@ final class gemini_safety_test extends \advanced_testcase {
         $this->assertEqualsCanonicalizing(gemini_client::SAFETY_CATEGORIES, array_column($settings, 'category'));
 
         set_config('aisafetythreshold', 'BLOCK_MEDIUM_AND_ABOVE', 'googlemeet');
-        $this->assertSame(['BLOCK_MEDIUM_AND_ABOVE'], array_unique(array_column(gemini_client::build_safety_settings(),
-            'threshold')));
+        $this->assertSame(['BLOCK_MEDIUM_AND_ABOVE'], array_unique(array_column(
+            gemini_client::build_safety_settings(),
+            'threshold'
+        )));
 
         set_config('aisafetythreshold', 'BLOCK_EVERYTHING', 'googlemeet');
-        $this->assertSame(['BLOCK_ONLY_HIGH'], array_unique(array_column(gemini_client::build_safety_settings(),
-            'threshold')));
+        $this->assertSame(['BLOCK_ONLY_HIGH'], array_unique(array_column(
+            gemini_client::build_safety_settings(),
+            'threshold'
+        )));
     }
 
     /**
@@ -94,7 +97,7 @@ final class gemini_safety_test extends \advanced_testcase {
             $this->fail('A SAFETY response must throw');
         } catch (gemini_safety_exception $e) {
             $this->assertSame('ai_error_safety', $e->errorcode);
-            // getMessage() appends the debug info under PHPUnit / developer debugging.
+            // The getMessage() call appends the debug info under PHPUnit / developer debugging.
             $this->assertStringStartsWith(get_string('ai_error_safety', 'googlemeet'), $e->getMessage());
             $this->assertSame(get_string('ai_error_safety', 'googlemeet'), $e->get_user_message());
             $this->assertStringContainsString('HARM_CATEGORY_DANGEROUS_CONTENT', (string)$e->debuginfo);
@@ -115,7 +118,7 @@ final class gemini_safety_test extends \advanced_testcase {
                 $this->parse($method, $this->safety_response());
                 $this->fail("{$method} must throw on SAFETY");
             } catch (gemini_safety_exception $e) {
-                // getMessage() appends the debug info under PHPUnit / developer debugging.
+                // The getMessage() call appends the debug info under PHPUnit / developer debugging.
                 $this->assertStringStartsWith(get_string('ai_error_safety', 'googlemeet'), $e->getMessage());
                 $this->assertSame(get_string('ai_error_safety', 'googlemeet'), $e->get_user_message());
             }
@@ -132,7 +135,7 @@ final class gemini_safety_test extends \advanced_testcase {
     }
 
     /**
-     * A normal response is not affected; other non-text failures keep their old error.
+     * A normal response is not affected; other responses without text keep the generic parse error.
      */
     public function test_normal_and_other_responses(): void {
         $this->resetAfterTest();

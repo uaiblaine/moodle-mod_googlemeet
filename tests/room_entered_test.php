@@ -22,7 +22,7 @@ use mod_googlemeet\local\room_entry;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * Tests for the room_entered event and its entry points (ANA-02).
+ * Tests for the room_entered event and its entry points.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -33,7 +33,6 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(room_entry::class)]
 #[CoversClass(log_room_entered::class)]
 final class room_entered_test extends \advanced_testcase {
-
     /**
      * Activity + student.
      *
@@ -70,6 +69,9 @@ final class room_entered_test extends \advanced_testcase {
         ]);
     }
 
+    /**
+     * A session is current while live or within EARLY_WINDOW of its start; one two hours away is not.
+     */
     public function test_current_session_window(): void {
         [$googlemeet] = $this->setup_activity();
         $now = time();
@@ -83,6 +85,9 @@ final class room_entered_test extends \advanced_testcase {
         $this->assertSame($live, (int)room_entry::current_session($googlemeet->id, $now)->id);
     }
 
+    /**
+     * Logging an entry triggers one room_entered event carrying the live session id and the channel.
+     */
     public function test_log_triggers_event_with_session(): void {
         [$googlemeet, $cm, $student] = $this->setup_activity();
         $sessionid = $this->create_session($googlemeet->id, time() - 5 * MINSECS);
@@ -106,6 +111,9 @@ final class room_entered_test extends \advanced_testcase {
         $this->assertEquals(new \moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]), $event->get_url());
     }
 
+    /**
+     * The web service logs the entry (sessionid 0 when no session is current) and returns the room URL.
+     */
     public function test_ws_logs_and_returns_url(): void {
         [$googlemeet, $cm, $student] = $this->setup_activity();
         $this->setUser($student);
@@ -123,6 +131,9 @@ final class room_entered_test extends \advanced_testcase {
         $this->assertSame('mobile', reset($events)->other['via']);
     }
 
+    /**
+     * A stored URL that is not a Meet room is neither logged nor returned.
+     */
     public function test_ws_does_not_log_invalid_room(): void {
         [, $cm, $student] = $this->setup_activity('https://example.com/not-a-room');
         $this->setUser($student);
@@ -137,6 +148,9 @@ final class room_entered_test extends \advanced_testcase {
         $this->assertCount(0, $events);
     }
 
+    /**
+     * The hero room button links to enter.php with a sesskey, not straight to Meet, so the entry is logged.
+     */
     public function test_hero_room_cta_goes_through_entry_endpoint(): void {
         global $CFG;
         require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');

@@ -30,7 +30,6 @@ namespace mod_googlemeet;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class rest extends \core\oauth2\rest {
-
     /**
      * Define the functions of the rest API.
      *
@@ -42,9 +41,9 @@ class rest extends \core\oauth2\rest {
                 'endpoint' => 'https://www.googleapis.com/calendar/v3/calendars/{calendarid}/events',
                 'method' => 'post',
                 'args' => [
-                    'calendarid' => PARAM_RAW
+                    'calendarid' => PARAM_RAW,
                 ],
-                'response' => 'json'
+                'response' => 'json',
             ],
             'createconference' => [
                 'endpoint' => 'https://www.googleapis.com/calendar/v3/calendars/{calendarid}/events/{eventid}',
@@ -52,11 +51,12 @@ class rest extends \core\oauth2\rest {
                 'args' => [
                     'calendarid' => PARAM_RAW,
                     'eventid' => PARAM_RAW,
-                    'conferenceDataVersion' => PARAM_RAW
+                    'conferenceDataVersion' => PARAM_RAW,
                 ],
-                'response' => 'json'
+                'response' => 'json',
             ],
-            // DAT-04: keep the Calendar event in step with the activity (adhoc tasks).
+            // Used by the calendar_update_event / calendar_delete_event adhoc tasks to keep the Calendar
+            // event in step with the activity.
             'updateevent' => [
                 'endpoint' => 'https://www.googleapis.com/calendar/v3/calendars/{calendarid}/events/{eventid}',
                 'method' => 'patch',
@@ -65,7 +65,7 @@ class rest extends \core\oauth2\rest {
                     'eventid' => PARAM_RAW,
                     'sendUpdates' => PARAM_ALPHA,
                 ],
-                'response' => 'json'
+                'response' => 'json',
             ],
             'deleteevent' => [
                 'endpoint' => 'https://www.googleapis.com/calendar/v3/calendars/{calendarid}/events/{eventid}',
@@ -76,7 +76,7 @@ class rest extends \core\oauth2\rest {
                     'sendUpdates' => PARAM_ALPHA,
                 ],
                 // JSON so that a 404/410 error body raises a rest_exception; a 204 decodes to null.
-                'response' => 'json'
+                'response' => 'json',
             ],
             'list' => [
                 'endpoint' => 'https://www.googleapis.com/drive/v3/files',
@@ -86,37 +86,37 @@ class rest extends \core\oauth2\rest {
                     'pageSize' => PARAM_INT,
                     'pageToken' => PARAM_RAW,
                     'orderBy' => PARAM_RAW,
-                    'q' => PARAM_RAW
+                    'q' => PARAM_RAW,
                 ],
-                'response' => 'json'
+                'response' => 'json',
             ],
             'create_permission' => [
                 'endpoint' => 'https://www.googleapis.com/drive/v3/files/{fileid}/permissions',
                 'method' => 'post',
                 'args' => [
                     'fileid' => PARAM_RAW,
-                    'fields' => PARAM_RAW
+                    'fields' => PARAM_RAW,
                 ],
-                'response' => 'json'
+                'response' => 'json',
             ],
             'get' => [
                 'endpoint' => 'https://www.googleapis.com/drive/v3/files/{fileid}',
                 'method' => 'get',
                 'args' => [
                     'fileid' => PARAM_RAW,
-                    'alt' => PARAM_RAW
+                    'alt' => PARAM_RAW,
                 ],
-                'response' => 'raw'
+                'response' => 'raw',
             ],
             'export' => [
                 'endpoint' => 'https://www.googleapis.com/drive/v3/files/{fileid}/export',
                 'method' => 'get',
                 'args' => [
                     'fileid' => PARAM_RAW,
-                    'mimeType' => PARAM_RAW
+                    'mimeType' => PARAM_RAW,
                 ],
-                'response' => 'raw'
-            ]
+                'response' => 'raw',
+            ],
         ];
     }
 }

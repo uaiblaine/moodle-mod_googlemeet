@@ -34,7 +34,7 @@ require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 
 /**
- * Tests for real attendance from the Google Meet REST API (ANA-03), with a test double source.
+ * Tests for real attendance from the Google Meet REST API, with a test double source.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -48,7 +48,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversClass(\mod_googlemeet\local\attendance\privacy::class)]
 #[CoversClass(\mod_googlemeet\task\fetch_attendance::class)]
 final class attendance_test extends \advanced_testcase {
-
     /** @var \stdClass */
     private $course;
     /** @var \stdClass */
@@ -64,6 +63,10 @@ final class attendance_test extends \advanced_testcase {
     /** @var int Session id. */
     private $eventid;
 
+    /**
+     * Activity with attendance on, the organiser as teacher, four students (two with the same name)
+     * and one session that started three hours ago.
+     */
     protected function setUp(): void {
         global $DB;
         parent::setUp();
@@ -74,14 +77,26 @@ final class attendance_test extends \advanced_testcase {
         $gen = $this->getDataGenerator();
         $this->course = $gen->create_course();
         $this->teacher = $gen->create_and_enrol($this->course, 'editingteacher', ['email' => 'organiser@example.com']);
-        $this->students['ana'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Ana', 'lastname' => 'García López']);
-        $this->students['luis'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Luis', 'lastname' => 'Pérez']);
-        $this->students['juan1'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Juan', 'lastname' => 'Martín']);
-        $this->students['juan2'] = $gen->create_and_enrol($this->course, 'student',
-            ['firstname' => 'Juan', 'lastname' => 'Martín']);
+        $this->students['ana'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Ana', 'lastname' => 'García López']
+        );
+        $this->students['luis'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Luis', 'lastname' => 'Pérez']
+        );
+        $this->students['juan1'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Juan', 'lastname' => 'Martín']
+        );
+        $this->students['juan2'] = $gen->create_and_enrol(
+            $this->course,
+            'student',
+            ['firstname' => 'Juan', 'lastname' => 'Martín']
+        );
 
         $this->googlemeet = $gen->create_module('googlemeet', ['course' => $this->course->id,
             'url' => 'https://meet.google.com/abc-defg-hij']);
@@ -139,8 +154,9 @@ final class attendance_test extends \advanced_testcase {
     }
 
     /**
-     * Queue + return the sync row of the main session.
+     * Queue a fetch for a session and return its sync row joined with the event date and duration.
      *
+     * @param int $eventid Session id; 0 for the session created in setUp().
      * @return \stdClass
      */
     private function sync_row(int $eventid = 0): \stdClass {
@@ -151,6 +167,9 @@ final class attendance_test extends \advanced_testcase {
             JOIN {googlemeet_events} ge ON ge.id = s.eventid WHERE s.eventid = ?', [$eventid], MUST_EXIST);
     }
 
+    /**
+     * Interval union, RFC 3339 parsing, scope-error detection, name normalisation and name matching.
+     */
     public function test_helpers(): void {
         $this->assertSame(0, service::union_seconds([]));
         $this->assertSame(150, service::union_seconds([[0, 100], [50, 120], [200, 230]]));
@@ -159,7 +178,8 @@ final class attendance_test extends \advanced_testcase {
         $this->assertSame(0, meet_api_source::parse_time(''));
         $this->assertTrue(meet_api_source::is_scope_error('403: Request had insufficient authentication scopes.'));
         $this->assertFalse(meet_api_source::is_scope_error(
-            '403: Google Meet REST API has not been used in project 123 before or it is disabled.'));
+            '403: Google Meet REST API has not been used in project 123 before or it is disabled.'
+        ));
         $this->assertFalse(meet_api_source::is_scope_error('500: Internal error'));
         $this->assertSame('jose maria nunez', service::normalise_name('  José-María  Núñez '));
 
@@ -177,6 +197,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertSame(0, service::match_name('García Ana', $names));
     }
 
+    /**
+     * Processing stores one row per participant, matched by name only when unambiguous, and the sync counters.
+     */
     public function test_process_stores_matched_and_unmatched_participants(): void {
         global $DB;
 
@@ -185,8 +208,10 @@ final class attendance_test extends \advanced_testcase {
         $this->assertSame(service::STATUS_DONE, $status);
 
         // The query is scoped to the meeting code with a margin around the session.
-        $this->assertSame(['conferences', 'abc-defg-hij', $this->start - HOURSECS, $this->start + 2 * HOURSECS],
-            $source->calls[0]);
+        $this->assertSame(
+            ['conferences', 'abc-defg-hij', $this->start - HOURSECS, $this->start + 2 * HOURSECS],
+            $source->calls[0]
+        );
 
         $rows = $DB->get_records('googlemeet_attendance', ['eventid' => $this->eventid]);
         $this->assertCount(5, $rows);
@@ -218,6 +243,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertEquals(2, $sync->matched);
     }
 
+    /**
+     * A manual link survives a re-fetch and matches the same Google id in later sessions.
+     */
     public function test_manual_link_is_remembered_for_next_sessions(): void {
         global $DB;
 
@@ -318,6 +346,10 @@ final class attendance_test extends \advanced_testcase {
         $this->assertNotEmpty(service::get_sessions((int)$this->googlemeet->id, time()));
     }
 
+    /**
+     * A missing Meet scope shows the organiser the relink notice and schedules a retry; unlinking
+     * removes the stored tokens and the grant.
+     */
     public function test_scope_error_and_relink_notice(): void {
         global $DB;
 
@@ -347,6 +379,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertFalse(scope::granted((int)$this->teacher->id));
     }
 
+    /**
+     * After a Google login only the most recently modified refresh token of the issuer is kept.
+     */
     public function test_after_login_keeps_only_newest_refresh_token(): void {
         global $DB;
         set_config('issuerid', 7, 'googlemeet');
@@ -360,6 +395,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertSame('new', reset($tokens)->token);
     }
 
+    /**
+     * No conference counts as one attempt; a room URL without a Meet code fails for good.
+     */
     public function test_nodata_and_invalid_room(): void {
         global $DB;
 
@@ -370,10 +408,15 @@ final class attendance_test extends \advanced_testcase {
         $broken = clone $this->googlemeet;
         $broken->url = 'https://example.com/room';
         $this->assertSame(service::STATUS_ERROR, service::process($broken, $this->sync_row(), $source, time()));
-        $this->assertEquals(service::MAX_ATTEMPTS,
-            $DB->get_field('googlemeet_attendance_sync', 'attempts', ['eventid' => $this->eventid]));
+        $this->assertEquals(
+            service::MAX_ATTEMPTS,
+            $DB->get_field('googlemeet_attendance_sync', 'attempts', ['eventid' => $this->eventid])
+        );
     }
 
+    /**
+     * Sessions are queued once, only while both the site and the activity switches are on.
+     */
     public function test_queue_respects_site_and_activity_switches(): void {
         global $DB;
         $now = time();
@@ -395,11 +438,14 @@ final class attendance_test extends \advanced_testcase {
         $this->assertCount(1, service::get_due($now)[$this->googlemeet->id]);
     }
 
+    /**
+     * The task fetches as the activity's organiser and restores the calling user afterwards.
+     */
     public function test_task_runs_as_organiser(): void {
         global $DB, $USER;
 
         $source = $this->double($this->start);
-        $task = new class($source) extends \mod_googlemeet\task\fetch_attendance {
+        $task = new class ($source) extends \mod_googlemeet\task\fetch_attendance {
             /** @var attendance_source_double */
             public $source;
             /** @var int */
@@ -411,6 +457,11 @@ final class attendance_test extends \advanced_testcase {
             public function __construct($source) {
                 $this->source = $source;
             }
+            /**
+             * Record which user the task runs as and return the double.
+             *
+             * @return \mod_googlemeet\local\attendance\source|null
+             */
             protected function get_source(): ?\mod_googlemeet\local\attendance\source {
                 global $USER;
                 $this->runas = (int)$USER->id;
@@ -424,10 +475,15 @@ final class attendance_test extends \advanced_testcase {
 
         $this->assertEquals($this->teacher->id, $task->runas);
         $this->assertEquals($before, $USER->id);
-        $this->assertSame(service::STATUS_DONE,
-            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => $this->eventid]));
+        $this->assertSame(
+            service::STATUS_DONE,
+            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => $this->eventid])
+        );
     }
 
+    /**
+     * Report rows list present, unmatched and absent students (staff excluded) and export as a table.
+     */
     public function test_report_rows_and_export(): void {
         service::process($this->googlemeet, $this->sync_row(), $this->double($this->start), time());
         $rows = report::session_rows($this->googlemeet, $this->eventid);
@@ -448,6 +504,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertCount(count($table['columns']), $table['rows'][0]);
     }
 
+    /**
+     * Privacy: attendance is exported per user and deleted per user and per context.
+     */
     public function test_privacy_export_and_delete(): void {
         global $DB;
 
@@ -472,6 +531,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('googlemeet_attendance', ['googlemeetid' => $this->googlemeet->id]));
     }
 
+    /**
+     * The Meet scope is requested only while attendance is enabled on the site; Drive always is.
+     */
     public function test_scopes_follow_site_setting(): void {
         set_config('attendanceenabled', 0, 'googlemeet');
         $this->assertStringNotContainsString(scope::MEET_SCOPE, client::get_scopes());
@@ -480,6 +542,9 @@ final class attendance_test extends \advanced_testcase {
         $this->assertStringContainsString('https://www.googleapis.com/auth/drive', client::get_scopes());
     }
 
+    /**
+     * Deleting the activity removes its attendance and sync rows.
+     */
     public function test_instance_deletion_removes_attendance(): void {
         global $DB;
         service::process($this->googlemeet, $this->sync_row(), $this->double($this->start), time());
@@ -488,14 +553,23 @@ final class attendance_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('googlemeet_attendance_sync', ['googlemeetid' => $this->googlemeet->id]));
     }
 
+    /**
+     * Backup and restore with users keeps attendance, its session and sync state, and maps the users.
+     */
     public function test_backup_restore_with_users_keeps_attendance(): void {
         global $DB, $USER;
 
         service::process($this->googlemeet, $this->sync_row(), $this->double($this->start), time());
         set_config('backup_general_users', 1, 'backup');
 
-        $bc = new \backup_controller(\backup::TYPE_1COURSE, $this->course->id, \backup::FORMAT_MOODLE,
-            \backup::INTERACTIVE_NO, \backup::MODE_GENERAL, $USER->id);
+        $bc = new \backup_controller(
+            \backup::TYPE_1COURSE,
+            $this->course->id,
+            \backup::FORMAT_MOODLE,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id
+        );
         $bc->get_plan()->get_setting('users')->set_value(true);
         $bc->execute_plan();
         $file = $bc->get_results()['backup_destination'];
@@ -504,8 +578,14 @@ final class attendance_test extends \advanced_testcase {
         $backupdir = 'googlemeet-ana03-' . random_string(6);
         $file->extract_to_pathname(get_file_packer('application/vnd.moodle.backup'), make_backup_temp_directory($backupdir));
         $newcourseid = \restore_dbops::create_new_course('Copy', 'ana03copy', $this->course->category);
-        $rc = new \restore_controller($backupdir, $newcourseid, \backup::INTERACTIVE_NO, \backup::MODE_GENERAL,
-            $USER->id, \backup::TARGET_NEW_COURSE);
+        $rc = new \restore_controller(
+            $backupdir,
+            $newcourseid,
+            \backup::INTERACTIVE_NO,
+            \backup::MODE_GENERAL,
+            $USER->id,
+            \backup::TARGET_NEW_COURSE
+        );
         $rc->get_plan()->get_setting('users')->set_value(true);
         $this->assertTrue($rc->execute_precheck());
         $rc->execute_plan();
@@ -518,8 +598,10 @@ final class attendance_test extends \advanced_testcase {
         $eventids = array_unique(array_column($rows, 'eventid'));
         $this->assertCount(1, $eventids);
         $this->assertTrue($DB->record_exists('googlemeet_events', ['id' => reset($eventids), 'googlemeetid' => $new->id]));
-        $this->assertSame(service::STATUS_DONE,
-            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => reset($eventids)]));
+        $this->assertSame(
+            service::STATUS_DONE,
+            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => reset($eventids)])
+        );
         $userids = array_filter(array_map('intval', array_column($rows, 'userid')));
         $this->assertEqualsCanonicalizing([(int)$this->students['ana']->id, (int)$this->students['luis']->id], $userids);
     }

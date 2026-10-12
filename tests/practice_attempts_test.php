@@ -29,7 +29,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 
 /**
- * Tests for practice attempts persistence (ANA-05) and the activity-wide practice modes.
+ * Tests for practice attempts persistence and the activity-wide practice modes.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -39,7 +39,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 #[CoversClass(\mod_googlemeet\local\practice_attempts::class)]
 #[CoversClass(\mod_googlemeet\external\get_practice_session::class)]
 final class practice_attempts_test extends \advanced_testcase {
-
     /** @var \stdClass */
     private $course;
     /** @var \stdClass */
@@ -99,7 +98,7 @@ final class practice_attempts_test extends \advanced_testcase {
                 'keypoints' => json_encode(['k']),
                 'topics' => json_encode($topics),
                 'status' => 'completed',
-                'reviewed' => 1, // IA-04: published, so students see its topics.
+                'reviewed' => 1, // Published, so students see its topics.
                 'timecreated' => time(),
                 'timemodified' => time(),
             ]);
@@ -126,8 +125,12 @@ final class practice_attempts_test extends \advanced_testcase {
             'citation' => '00:01:00',
         ]);
         if ($ready) {
-            $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_READY,
-                ['questionid' => $questionid]);
+            $DB->set_field(
+                'question_versions',
+                'status',
+                question_version_status::QUESTION_STATUS_READY,
+                ['questionid' => $questionid]
+            );
         }
         return $questionid;
     }
@@ -154,11 +157,15 @@ final class practice_attempts_test extends \advanced_testcase {
         $answers = $this->answer_ids($qid);
 
         $this->setUser($this->student);
-        $result = external_api::clean_returnvalue(\mod_googlemeet_external::check_practice_answer_returns(),
-            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $qid, $answers[0]));
+        $result = external_api::clean_returnvalue(
+            \mod_googlemeet_external::check_practice_answer_returns(),
+            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $qid, $answers[0])
+        );
         $this->assertFalse($result['correct']);
-        external_api::clean_returnvalue(\mod_googlemeet_external::check_practice_answer_returns(),
-            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $qid, $answers[1]));
+        external_api::clean_returnvalue(
+            \mod_googlemeet_external::check_practice_answer_returns(),
+            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $qid, $answers[1])
+        );
 
         $attempts = array_values($DB->get_records(practice_attempts::TABLE, ['userid' => $this->student->id], 'id ASC'));
         $this->assertCount(2, $attempts);
@@ -190,7 +197,7 @@ final class practice_attempts_test extends \advanced_testcase {
     }
 
     /**
-     * Failed selection uses the LATEST attempt per question and only serves published, visible questions.
+     * Failed selection uses the latest attempt per question and only serves published, visible questions.
      */
     public function test_failed_selection_uses_latest_attempt(): void {
         global $DB;
@@ -225,8 +232,13 @@ final class practice_attempts_test extends \advanced_testcase {
         $DB->set_field('question_versions', 'status', question_version_status::QUESTION_STATUS_DRAFT, ['questionid' => $q4]);
 
         $this->setUser($this->student);
-        $questions = practice_attempts::get_session_questions($this->googlemeet, $this->cm, $this->context, $uid,
-            practice_attempts::MODE_FAILED);
+        $questions = practice_attempts::get_session_questions(
+            $this->googlemeet,
+            $this->cm,
+            $this->context,
+            $uid,
+            practice_attempts::MODE_FAILED
+        );
         $ids = array_column($questions, 'questionid');
         // Most recently failed first: q3 (attempt id later than q2's).
         $this->assertEquals([$q3, $q2], $ids);
@@ -254,8 +266,14 @@ final class practice_attempts_test extends \advanced_testcase {
         $qc = $this->create_question($recc);
 
         $this->setUser($this->student);
-        $questions = practice_attempts::get_session_questions($this->googlemeet, $this->cm, $this->context,
-            (int)$this->student->id, practice_attempts::MODE_TOPIC, 'CONSTITUCIÓN');
+        $questions = practice_attempts::get_session_questions(
+            $this->googlemeet,
+            $this->cm,
+            $this->context,
+            (int)$this->student->id,
+            practice_attempts::MODE_TOPIC,
+            'CONSTITUCIÓN'
+        );
         $this->assertEqualsCanonicalizing([$qa, $qb1, $qb2], array_column($questions, 'questionid'));
         $this->assertNotContains($qc, array_column($questions, 'questionid'));
 
@@ -269,8 +287,10 @@ final class practice_attempts_test extends \advanced_testcase {
         $this->assertEquals(3, $bykey[googlemeet_fold('Constitución')]['questions']);
         $this->assertEquals(1, $bykey[googlemeet_fold('Derechos')]['questions']);
         $this->assertEquals(1, $bykey[googlemeet_fold('Otro tema')]['questions']);
-        $this->assertEquals([$reca => 1, $recb => 2, $recc => 1],
-            practice_attempts::count_ready_questions_by_recording($this->googlemeet, $this->cm, $this->context));
+        $this->assertEquals(
+            [$reca => 1, $recb => 2, $recc => 1],
+            practice_attempts::count_ready_questions_by_recording($this->googlemeet, $this->cm, $this->context)
+        );
         unset($recd);
     }
 
@@ -283,13 +303,17 @@ final class practice_attempts_test extends \advanced_testcase {
         practice_attempts::record((int)$this->googlemeet->id, $rec, $qid, (int)$this->student->id, false);
 
         $this->setUser($this->student);
-        $result = external_api::clean_returnvalue(external\get_practice_session::execute_returns(),
-            external\get_practice_session::execute($this->cm->id, 'failed', ''));
+        $result = external_api::clean_returnvalue(
+            external\get_practice_session::execute_returns(),
+            external\get_practice_session::execute($this->cm->id, 'failed', '')
+        );
         $this->assertCount(1, $result['questions']);
         $this->assertEquals($rec, $result['questions'][0]['recordingid']);
 
-        $result = external_api::clean_returnvalue(external\get_practice_session::execute_returns(),
-            external\get_practice_session::execute($this->cm->id, 'topic', 'tema'));
+        $result = external_api::clean_returnvalue(
+            external\get_practice_session::execute_returns(),
+            external\get_practice_session::execute($this->cm->id, 'topic', 'tema')
+        );
         $this->assertCount(1, $result['questions']);
 
         $this->expectException(\invalid_parameter_exception::class);

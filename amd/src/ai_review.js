@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * IA-04 / F-8 teacher actions: publish reviewed AI summaries and retry a stuck analysis.
+ * Teacher actions: publish reviewed AI summaries and retry a stuck analysis.
  *
  * @module     mod_googlemeet/ai_review
  * @copyright  2026 PreparaOposiciones
@@ -44,28 +44,35 @@ const setBusy = (button, busy) => {
  * @param {HTMLButtonElement} button Trigger.
  * @param {number} cmid Course module id.
  * @param {number} recordingid Recording id or 0.
- * @param {number} seen Version of the content on screen (see the web service), 0 = no check.
+ * @param {number} seen One recording: timemodified of the content on screen; all: time the page was loaded;
+ *     0 = no check. See mod_googlemeet\external\review_ai_analysis.
  * @returns {Promise}
  */
 const publish = (button, cmid, recordingid, seen) => {
     setBusy(button, true);
+    // Set when the server reports a newer rewrite: the alert is followed by a reload.
+    let changed = false;
     return Ajax.call([{
         methodname: 'mod_googlemeet_review_ai_analysis',
         args: {coursemoduleid: cmid, recordingid: recordingid, seen: seen || 0},
     }])[0].then(result => {
         if (result.changed) {
             // A retry or regeneration rewrote the summary after this page was loaded: show the new text.
-            return getString('aireview_publish_changed', 'mod_googlemeet')
-                .then(Notification.alert)
-                .then(() => window.location.reload());
+            changed = true;
+            return getString('aireview_publish_changed', 'mod_googlemeet');
         }
         if (!result.success) {
             setBusy(button, false);
-            return getString('aireview_publish_failed', 'mod_googlemeet').then(Notification.alert);
+            return getString('aireview_publish_failed', 'mod_googlemeet');
         }
         // The page shows (or hides) content according to the review state: reload to reflect it.
         window.location.reload();
-        return result;
+        return null;
+    }).then(message => (message === null ? null : Notification.alert(message))).then(() => {
+        if (changed) {
+            window.location.reload();
+        }
+        return null;
     }).catch(error => {
         setBusy(button, false);
         Notification.exception(error);
@@ -73,7 +80,7 @@ const publish = (button, cmid, recordingid, seen) => {
 };
 
 /**
- * F-8: re-queue a stuck analysis (the server accepts regeneration of a row stuck in "processing").
+ * Re-queue a stuck analysis (the server accepts regeneration of a row stuck in "processing").
  *
  * @param {HTMLButtonElement} button Trigger.
  * @param {number} cmid Course module id.

@@ -27,7 +27,7 @@ global $CFG;
 require_once($CFG->libdir . '/adminlib.php');
 
 /**
- * OPS-04: structured autosync log and the admin status page data.
+ * Structured autosync log and the admin status page data.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -37,7 +37,6 @@ require_once($CFG->libdir . '/adminlib.php');
 #[CoversClass(ops_status::class)]
 #[CoversClass(process_autosync::class)]
 final class ops_status_test extends \advanced_testcase {
-
     /**
      * Activity record.
      *
@@ -85,7 +84,8 @@ final class ops_status_test extends \advanced_testcase {
 
         $this->assertMatchesRegularExpression(
             '/mod_googlemeet autosync: activity=' . $gm->id . ' result=error .*permanent=[0-9]+.*detail="creator account missing"/',
-            $output);
+            $output
+        );
         $row = sync_log::latest((int)$gm->id, sync_log::KIND_AUTO);
         $this->assertSame(sync_log::STATUS_ERROR, $row->status);
 
@@ -139,8 +139,10 @@ final class ops_status_test extends \advanced_testcase {
         $gm = $this->make_activity();
         $now = time();
         $ids = [];
-        foreach ([['processing', $now - 2 * HOURSECS, 0], ['processing', $now - 60, 0], ['pending', $now - 7 * HOURSECS, 0],
-                ['pending', $now - 7 * HOURSECS, 99], ['completed', $now - 30 * DAYSECS, 0]] as $i => [$status, $time, $retry]) {
+        foreach (
+            [['processing', $now - 2 * HOURSECS, 0], ['processing', $now - 60, 0], ['pending', $now - 7 * HOURSECS, 0],
+                ['pending', $now - 7 * HOURSECS, 99], ['completed', $now - 30 * DAYSECS, 0]] as $i => [$status, $time, $retry]
+        ) {
             $rid = $DB->insert_record('googlemeet_recordings', (object)[
                 'googlemeetid' => $gm->id, 'recordingid' => 'r' . $i, 'name' => 'Clase ' . $i, 'createdtime' => $now,
                 'duration' => '1:00', 'webviewlink' => '', 'visible' => 1, 'deleted' => 0, 'timemodified' => $now,

@@ -35,7 +35,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 #[CoversFunction('googlemeet_print_recording_hub')]
 #[CoversFunction('googlemeet_hub_resume_label')]
 final class hub_ui_test extends \advanced_testcase {
-
     /**
      * Render the hub for the current user.
      *
@@ -69,7 +68,7 @@ final class hub_ui_test extends \advanced_testcase {
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $now = time();
-        $insert = function(string $notes) use ($DB, $googlemeet, $now) {
+        $insert = function (string $notes) use ($DB, $googlemeet, $now) {
             $id = $DB->insert_record('googlemeet_recordings', (object)[
                 'googlemeetid' => $googlemeet->id, 'recordingid' => uniqid('drive-', true), 'name' => 'Clase',
                 'createdtime' => $now, 'duration' => '01:00:00', 'webviewlink' => 'https://drive.google.com/file/d/x/view',
@@ -105,9 +104,13 @@ final class hub_ui_test extends \advanced_testcase {
         $this->assertSame(get_string('hub_resume_chapter', 'googlemeet', (object)[
             'title' => 'Derechos de los ciudadanos', 'time' => googlemeet_format_seconds_timestamp(842),
         ]), googlemeet_hub_resume_label(842, $chapters));
-        $this->assertSame(get_string('hub_resume_time', 'googlemeet', googlemeet_format_seconds_timestamp(900)),
-            googlemeet_hub_resume_label(900, $chapters));
-        $this->assertSame(get_string('hub_resume_time', 'googlemeet', googlemeet_format_seconds_timestamp(842)),
-            googlemeet_hub_resume_label(842, []));
+        $this->assertSame(
+            get_string('hub_resume_time', 'googlemeet', googlemeet_format_seconds_timestamp(900)),
+            googlemeet_hub_resume_label(900, $chapters)
+        );
+        $this->assertSame(
+            get_string('hub_resume_time', 'googlemeet', googlemeet_format_seconds_timestamp(842)),
+            googlemeet_hub_resume_label(842, [])
+        );
     }
 }

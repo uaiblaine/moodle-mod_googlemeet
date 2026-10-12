@@ -22,14 +22,13 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Fetches, matches and stores real attendance of the live sessions (ANA-03).
+ * Fetches, matches and stores real attendance of the live sessions.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class service {
-
     /** @var string Waiting for the first fetch. */
     public const STATUS_PENDING = 'pending';
     /** @var string Participants stored. */
@@ -122,8 +121,8 @@ class service {
                    AND s.nextattempt <= :now
               ORDER BY s.googlemeetid, ge.eventdate";
         $grouped = [];
-        foreach ($DB->get_records_sql($sql, ['done' => self::STATUS_DONE, 'max' => self::MAX_ATTEMPTS, 'now' => $now])
-                as $row) {
+        $params = ['done' => self::STATUS_DONE, 'max' => self::MAX_ATTEMPTS, 'now' => $now];
+        foreach ($DB->get_records_sql($sql, $params) as $row) {
             $grouped[(int)$row->googlemeetid][] = $row;
         }
         return $grouped;
@@ -189,8 +188,14 @@ class service {
      * @param bool $final Do not retry.
      * @return void
      */
-    public static function record_outcome(\stdClass $sync, string $status, array $counts, ?string $message, int $now,
-            bool $final = false): void {
+    public static function record_outcome(
+        \stdClass $sync,
+        string $status,
+        array $counts,
+        ?string $message,
+        int $now,
+        bool $final = false
+    ): void {
         global $DB;
 
         $attempts = (int)$sync->attempts + 1;
@@ -322,7 +327,8 @@ class service {
     }
 
     /**
-     * Normalise a person name for matching: lower case, accents folded, punctuation removed.
+     * Normalise a person name for matching: lower case, accents folded (those of {@see googlemeet_fold()}
+     * plus grave accents, ç and ï; others are kept), punctuation removed.
      *
      * @param string $name Name.
      * @return string
@@ -343,16 +349,18 @@ class service {
     public static function get_candidates(\stdClass $googlemeet): array {
         $cm = get_coursemodule_from_instance('googlemeet', $googlemeet->id, 0, false, MUST_EXIST);
         $context = \context_module::instance($cm->id);
-        $fields = 'u.id, u.email, ' . implode(', ', array_map(static fn($f) => 'u.' . $f,
-            \core_user\fields::get_name_fields()));
+        $fields = 'u.id, u.email, ' . implode(', ', array_map(
+            static fn($f) => 'u.' . $f,
+            \core_user\fields::get_name_fields()
+        ));
         return get_enrolled_users($context, 'mod/googlemeet:view', 0, $fields, null, 0, 0, true);
     }
 
     /**
      * Assign a Moodle user to each participant: e-mail, then a remembered Google id, then the name.
      *
-     * A name only matches when exactly one candidate fits. Google never returns e-mails through the
-     * Meet API today, but sources that provide them are matched first.
+     * A name only matches when exactly one candidate fits. {@see meet_api_source} returns no e-mail
+     * addresses; e-mail is matched first for sources that provide it.
      *
      * @param \stdClass $googlemeet Activity record.
      * @param array[] $participants Aggregated participants.
@@ -387,13 +395,15 @@ class service {
             [$gsql, $gparams] = $DB->get_in_or_equal($googleids, SQL_PARAMS_NAMED, 'g');
             [$usql, $uparams] = $DB->get_in_or_equal(array_keys($candidates), SQL_PARAMS_NAMED, 'u');
             [$msql, $mparams] = $DB->get_in_or_equal([self::MATCH_MANUAL, 'email'], SQL_PARAMS_NAMED, 'm');
-            $rows = $DB->get_records_sql("SELECT a.id, a.googleuserid, a.userid
-                                             FROM {googlemeet_attendance} a
-                                             JOIN {googlemeet} g ON g.id = a.googlemeetid
-                                            WHERE a.googleuserid $gsql AND a.userid $usql AND a.matchedby $msql
-                                                  AND g.course = :courseid
-                                         ORDER BY a.timemodified DESC, a.id DESC",
-                $gparams + $uparams + $mparams + ['courseid' => (int)$googlemeet->course]);
+            $rows = $DB->get_records_sql(
+                "SELECT a.id, a.googleuserid, a.userid
+                   FROM {googlemeet_attendance} a
+                   JOIN {googlemeet} g ON g.id = a.googlemeetid
+                  WHERE a.googleuserid $gsql AND a.userid $usql AND a.matchedby $msql
+                        AND g.course = :courseid
+               ORDER BY a.timemodified DESC, a.id DESC",
+                $gparams + $uparams + $mparams + ['courseid' => (int)$googlemeet->course]
+            );
             foreach ($rows as $row) {
                 if (!isset($byid[$row->googleuserid])) {
                     $byid[$row->googleuserid] = (int)$row->userid;
@@ -459,8 +469,10 @@ class service {
             }
             $firstwords = count(explode(' ', $first));
             $firstlast = reset($variants);
-            if ($words > $firstwords && str_starts_with($needle . ' ', $first . ' ')
-                    && str_starts_with($firstlast . ' ', $needle . ' ')) {
+            if (
+                $words > $firstwords && str_starts_with($needle . ' ', $first . ' ')
+                && str_starts_with($firstlast . ' ', $needle . ' ')
+            ) {
                 $prefix[$userid] = true;
             }
         }
@@ -476,7 +488,8 @@ class service {
     /**
      * Replace the stored attendance of a session, merging participants matched to the same user.
      *
-     * Manual links made by the teacher on a previous fetch are kept for the same Google id/name.
+     * Teacher decisions from a previous fetch (manual link or unlink) win over automatic matching
+     * for the same person ({@see person_key()}).
      *
      * @param \stdClass $googlemeet Activity record.
      * @param int $eventid Session id.
@@ -487,11 +500,14 @@ class service {
     public static function store(\stdClass $googlemeet, int $eventid, array $participants, int $now): void {
         global $DB;
 
-        // Teacher decisions (manual link or unlink) win over automatic matching on every re-fetch.
         $manual = [];
         [$msql, $mparams] = $DB->get_in_or_equal([self::MATCH_MANUAL, self::MATCH_UNLINKED], SQL_PARAMS_NAMED);
-        foreach ($DB->get_records_select('googlemeet_attendance', "eventid = :eventid AND matchedby $msql",
-                ['eventid' => $eventid] + $mparams) as $old) {
+        $oldrows = $DB->get_records_select(
+            'googlemeet_attendance',
+            "eventid = :eventid AND matchedby $msql",
+            ['eventid' => $eventid] + $mparams
+        );
+        foreach ($oldrows as $old) {
             $manual[self::person_key((array)$old)] = (int)$old->userid;
         }
 
@@ -508,8 +524,10 @@ class service {
                 $row = $rows[$rowkey];
                 $row->timejoined = min($row->timejoined, (int)$p['timejoined']);
                 $row->timeleft = max($row->timeleft, (int)$p['timeleft']);
-                $row->durationseconds = min($row->timeleft - $row->timejoined,
-                    $row->durationseconds + (int)$p['durationseconds']);
+                $row->durationseconds = min(
+                    $row->timeleft - $row->timejoined,
+                    $row->durationseconds + (int)$p['durationseconds']
+                );
                 $row->sessions += (int)$p['sessions'];
                 continue;
             }
@@ -565,17 +583,26 @@ class service {
     public static function link_manually(\stdClass $googlemeet, int $attendanceid, int $userid): void {
         global $DB;
 
-        $row = $DB->get_record('googlemeet_attendance', ['id' => $attendanceid, 'googlemeetid' => $googlemeet->id],
-            '*', MUST_EXIST);
+        $row = $DB->get_record(
+            'googlemeet_attendance',
+            ['id' => $attendanceid, 'googlemeetid' => $googlemeet->id],
+            '*',
+            MUST_EXIST
+        );
         if ($userid && !isset(self::get_candidates($googlemeet)[$userid])) {
             throw new \moodle_exception('invaliduser');
         }
-        if ($userid && $DB->record_exists_select('googlemeet_attendance', 'eventid = ? AND userid = ? AND id <> ?',
-                [$row->eventid, $userid, $row->id])) {
+        if (
+            $userid && $DB->record_exists_select(
+                'googlemeet_attendance',
+                'eventid = ? AND userid = ? AND id <> ?',
+                [$row->eventid, $userid, $row->id]
+            )
+        ) {
             throw new \moodle_exception('attendance_link_duplicate', 'googlemeet');
         }
         $row->userid = $userid;
-        // 'unlinked' remembers the teacher's decision: later fetches keep it unmatched.
+        // The 'unlinked' value remembers the teacher's decision: later fetches keep it unmatched.
         $row->matchedby = $userid ? self::MATCH_MANUAL : self::MATCH_UNLINKED;
         $row->timemodified = time();
         $DB->update_record('googlemeet_attendance', $row);
@@ -591,12 +618,15 @@ class service {
     public static function get_sessions(int $googlemeetid, int $now): array {
         global $DB;
 
-        return $DB->get_records_sql("SELECT ge.id, ge.eventdate, ge.duration, s.status, s.attempts, s.participants,
-                                            s.matched, s.message, s.timemodified AS fetched
-                                       FROM {googlemeet_events} ge
-                                  LEFT JOIN {googlemeet_attendance_sync} s ON s.eventid = ge.id
-                                      WHERE ge.googlemeetid = :googlemeetid AND ge.eventdate <= :now
-                                   ORDER BY ge.eventdate DESC", ['googlemeetid' => $googlemeetid, 'now' => $now]);
+        return $DB->get_records_sql(
+            "SELECT ge.id, ge.eventdate, ge.duration, s.status, s.attempts, s.participants,
+                    s.matched, s.message, s.timemodified AS fetched
+               FROM {googlemeet_events} ge
+          LEFT JOIN {googlemeet_attendance_sync} s ON s.eventid = ge.id
+              WHERE ge.googlemeetid = :googlemeetid AND ge.eventdate <= :now
+           ORDER BY ge.eventdate DESC",
+            ['googlemeetid' => $googlemeetid, 'now' => $now]
+        );
     }
 
     /**
@@ -610,12 +640,14 @@ class service {
         global $DB;
 
         $fields = implode(', ', array_map(static fn($f) => 'u.' . $f, \core_user\fields::get_name_fields()));
-        return $DB->get_records_sql("SELECT a.*, u.email AS useremail, $fields
-                                       FROM {googlemeet_attendance} a
-                                  LEFT JOIN {user} u ON u.id = a.userid
-                                      WHERE a.googlemeetid = :googlemeetid AND a.eventid = :eventid
-                                   ORDER BY CASE WHEN a.userid = 0 THEN 1 ELSE 0 END, u.lastname, u.firstname, a.displayname",
-            ['googlemeetid' => $googlemeetid, 'eventid' => $eventid]);
+        return $DB->get_records_sql(
+            "SELECT a.*, u.email AS useremail, $fields
+               FROM {googlemeet_attendance} a
+          LEFT JOIN {user} u ON u.id = a.userid
+              WHERE a.googlemeetid = :googlemeetid AND a.eventid = :eventid
+           ORDER BY CASE WHEN a.userid = 0 THEN 1 ELSE 0 END, u.lastname, u.firstname, a.displayname",
+            ['googlemeetid' => $googlemeetid, 'eventid' => $eventid]
+        );
     }
 
     /**

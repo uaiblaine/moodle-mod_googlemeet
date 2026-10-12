@@ -24,17 +24,17 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Data builder for the teacher viewing report (ANA-04): students x recordings.
+ * Data builder for the teacher viewing report: students x recordings.
  *
- * Percentages use exactly the same rule as the student UI (googlemeet_recording_progress_state()):
- * 100 when completed, otherwise watchedseconds / completion threshold capped at 99.
+ * Percentages mirror the student UI, {@see googlemeet_recording_progress_state()}; keep in step:
+ * 100 when completed, 0 when nothing was watched, otherwise watchedseconds / completion threshold
+ * clamped to 1-99.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class report_builder {
-
     /** @var int Days without activity for the "inactive" filter. */
     public const INACTIVE_DAYS = 14;
 
@@ -68,9 +68,12 @@ class report_builder {
     public function get_recordings(): array {
         global $DB;
 
-        return $DB->get_records('googlemeet_recordings',
-            ['googlemeetid' => $this->googlemeet->id, 'deleted' => 0], 'createdtime ASC, id ASC',
-            'id, name, duration, visible, createdtime');
+        return $DB->get_records(
+            'googlemeet_recordings',
+            ['googlemeetid' => $this->googlemeet->id, 'deleted' => 0],
+            'createdtime ASC, id ASC',
+            'id, name, duration, visible, createdtime'
+        );
     }
 
     /**
@@ -93,11 +96,19 @@ class report_builder {
      */
     public function get_students(int $groupid = 0): array {
         $names = array_unique(array_merge(['id'], \core_user\fields::get_name_fields(), $this->get_identity_fields()));
-        $fields = implode(', ', array_map(static function($f) {
+        $fields = implode(', ', array_map(static function ($f) {
             return 'u.' . $f;
         }, $names));
-        $users = get_enrolled_users($this->context, 'mod/googlemeet:view', $groupid, $fields,
-            'u.lastname ASC, u.firstname ASC, u.id ASC', 0, 0, true);
+        $users = get_enrolled_users(
+            $this->context,
+            'mod/googlemeet:view',
+            $groupid,
+            $fields,
+            'u.lastname ASC, u.firstname ASC, u.id ASC',
+            0,
+            0,
+            true
+        );
         $staff = get_users_by_capability($this->context, 'mod/googlemeet:viewreports', 'u.id');
         return array_diff_key($users, $staff);
     }
@@ -122,9 +133,13 @@ class report_builder {
         if ($recordings && $students) {
             [$rinsql, $rparams] = $DB->get_in_or_equal(array_keys($recordings), SQL_PARAMS_NAMED, 'rec');
             [$uinsql, $uparams] = $DB->get_in_or_equal(array_keys($students), SQL_PARAMS_NAMED, 'usr');
-            $rs = $DB->get_recordset_select('googlemeet_recording_progress',
-                "recordingid {$rinsql} AND userid {$uinsql}", $rparams + $uparams, '',
-                'id, recordingid, userid, watchedseconds, completed, timemodified');
+            $rs = $DB->get_recordset_select(
+                'googlemeet_recording_progress',
+                "recordingid {$rinsql} AND userid {$uinsql}",
+                $rparams + $uparams,
+                '',
+                'id, recordingid, userid, watchedseconds, completed, timemodified'
+            );
             foreach ($rs as $row) {
                 $progress[(int)$row->userid][(int)$row->recordingid] = $row;
                 $lastaccess[(int)$row->userid] = max($lastaccess[(int)$row->userid] ?? 0, (int)$row->timemodified);
@@ -253,8 +268,10 @@ class report_builder {
                 $out[$field] = (string)($row['user']->$field ?? '');
             }
             $out['completed'] = $row['completed'] . '/' . $total;
-            $out['lastaccess'] = $row['lastaccess'] ? userdate($row['lastaccess'], get_string('strftimedatetimeshort',
-                'langconfig')) : get_string('never');
+            $out['lastaccess'] = $row['lastaccess'] ? userdate($row['lastaccess'], get_string(
+                'strftimedatetimeshort',
+                'langconfig'
+            )) : get_string('never');
             foreach ($row['cells'] as $recordingid => $cell) {
                 $out['rec' . $recordingid] = $cell['pct'];
             }

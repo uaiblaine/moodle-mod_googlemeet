@@ -38,8 +38,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 #[CoversClass(\mod_googlemeet\question_service::class)]
 #[CoversClass(\mod_googlemeet_external::class)]
 final class question_publish_test extends \advanced_testcase {
-
-    /** @var string Stem the local_questions leak gate rejects (pattern "pendiente_tarea"). */
+    /** @var string Stem the local_questions leak gate rejects (its "pendiente_tarea" pattern). */
     private const LEAKY_STEM = '<p>Queda pendiente de verificar esta cifra con el temario.</p>';
 
     /**
@@ -91,8 +90,12 @@ final class question_publish_test extends \advanced_testcase {
      * @param string $stem Stem.
      * @return int
      */
-    private function create_draft(question_service $service, array $activity, int $recordingid,
-            string $stem = 'Which law regulates the national health system?'): int {
+    private function create_draft(
+        question_service $service,
+        array $activity,
+        int $recordingid,
+        string $stem = 'Which law regulates the national health system?'
+    ): int {
         [, $googlemeet, $cm, $context] = $activity;
         return $service->create_draft_multichoice($googlemeet, $cm, $context, $recordingid, [
             'stem' => $stem,
@@ -148,8 +151,10 @@ final class question_publish_test extends \advanced_testcase {
         $a2 = $this->create_draft($service, $activity, $reca);
         $b1 = $this->create_draft($service, $activity, $recb);
         $ready = $this->create_draft($service, $activity, $recb);
-        $service->set_status($service->require_questions_for_recording($googlemeet, $cm, $context, $recb, [$ready]),
-            question_version_status::QUESTION_STATUS_READY);
+        $service->set_status(
+            $service->require_questions_for_recording($googlemeet, $cm, $context, $recb, [$ready]),
+            question_version_status::QUESTION_STATUS_READY
+        );
         $trashed = $this->create_draft($service, $activity, $recdeleted);
         $DB->set_field('googlemeet_recordings', 'deleted', 1, ['id' => $recdeleted]);
 
@@ -197,7 +202,7 @@ final class question_publish_test extends \advanced_testcase {
         $b1 = $this->create_draft($plain, $activity, $recb);
 
         // Substitute the gate: reject the batch that contains $aleak, as fugas_exigir_limpia() would.
-        $service = new class($aleak) extends question_service {
+        $service = new class ($aleak) extends question_service {
             /** @var int Question the fake gate rejects. */
             private int $leakid;
 
@@ -330,8 +335,8 @@ final class question_publish_test extends \advanced_testcase {
     }
 
     /**
-     * The per-recording publish WS (used by "Publicar seleccionadas" / "Publicar todas las de
-     * esta clase") rejects students and questions of another recording.
+     * The per-recording publish WS (behind "Publish selected" and "Publish all for this class")
+     * rejects students and questions of another recording.
      */
     public function test_ws_publish_questions_scope_and_capability(): void {
         $this->resetAfterTest();

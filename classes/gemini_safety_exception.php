@@ -17,18 +17,17 @@
 namespace mod_googlemeet;
 
 /**
- * IA-03: Gemini refused to answer because of its content-safety filters.
+ * Gemini refused to answer because of its content-safety filters.
  *
- * Raised when the response has finishReason = SAFETY (or a blocked prompt). Its message is a clear,
- * non-technical explanation for the teacher; it is stored as the analysis error as is. It is not
- * transient: retrying the same content produces the same block.
+ * Raised by {@see gemini_client::assert_not_blocked()} for a blocked prompt or a SAFETY-type
+ * finishReason. {@see self::get_user_message()} is the non-technical explanation stored as the
+ * analysis error and shown to teachers. Not transient: retrying the same content produces the same block.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class gemini_safety_exception extends \moodle_exception {
-
     /**
      * Constructor.
      *

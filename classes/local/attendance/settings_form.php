@@ -17,14 +17,13 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Activity form fields of real attendance (ANA-03).
+ * Activity form fields of real attendance.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class settings_form {
-
     /**
      * Add the per-activity opt-in (only while the site setting is on).
      *

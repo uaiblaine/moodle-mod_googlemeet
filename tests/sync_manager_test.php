@@ -27,7 +27,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * PERF-02: manual "Sync with Google Drive" runs in an adhoc task and is polled.
+ * Tests for the manual "Sync with Google Drive": queued as an adhoc task, then polled by the page.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -40,16 +40,21 @@ defined('MOODLE_INTERNAL') || die();
 #[CoversClass(request_sync::class)]
 #[CoversClass(get_sync_status::class)]
 final class sync_manager_test extends \advanced_testcase {
-
     /** @var array User ids the fake runner ran as. */
     private array $ranas = [];
 
+    /**
+     * Reset the database after each test and forget the users the fake runner ran as.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
         $this->ranas = [];
     }
 
+    /**
+     * Restore the real Drive sync: the runner is static and would leak into later tests.
+     */
     protected function tearDown(): void {
         sync_manager::set_runner(null);
         parent::tearDown();
@@ -71,13 +76,13 @@ final class sync_manager_test extends \advanced_testcase {
     }
 
     /**
-     * Fake Drive sync returning $stats (or throwing).
+     * Replace the Drive sync with a fake that records the user it runs as, sets lastsync and returns $result.
      *
-     * @param array|\Throwable $result
+     * @param array|\Throwable $result Stats array to return, or the exception to throw.
      * @return void
      */
     private function fake_runner($result): void {
-        sync_manager::set_runner(function(\stdClass $googlemeet, \stdClass $user) use ($result) {
+        sync_manager::set_runner(function (\stdClass $googlemeet, \stdClass $user) use ($result) {
             global $USER, $DB;
             $this->ranas[] = (int)$USER->id;
             if ($result instanceof \Throwable) {
@@ -157,7 +162,8 @@ final class sync_manager_test extends \advanced_testcase {
      */
     public function test_busy_lock_defers_task(): void {
         global $CFG;
-        // DB (GET_LOCK) locks are re-entrant within one connection; file locks conflict in-process.
+        // The database lock factories grant a lock again to the connection that holds it, so the held
+        // lock would not block run(); file locks conflict within one process.
         $CFG->lock_factory = '\\core\\lock\\file_lock_factory';
         [$gm, , $teacher] = $this->make_activity();
         $this->fake_runner(['inserted' => 0]);
@@ -202,7 +208,7 @@ final class sync_manager_test extends \advanced_testcase {
     }
 
     /**
-     * Web services: teachers queue and poll; students cannot.
+     * Web services: teachers queue and poll; students cannot queue.
      */
     public function test_web_services(): void {
         [$gm, $cm, $teacher, $course] = $this->make_activity();

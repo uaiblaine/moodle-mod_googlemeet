@@ -27,7 +27,6 @@
  * Behat data generator for mod_googlemeet entities.
  */
 class behat_mod_googlemeet_generator extends behat_generator_base {
-
     /**
      * Entities the "the following mod_googlemeet ... exist" step can create.
      *
@@ -51,10 +50,11 @@ class behat_mod_googlemeet_generator extends behat_generator_base {
     }
 
     /**
-     * Resolve an activity name or idnumber to googlemeet.id.
+     * Resolve an activity name to googlemeet.id (the first match when names repeat).
      *
-     * @param string $name
+     * @param string $name Activity name.
      * @return int
+     * @throws Exception When no activity has that name.
      */
     protected function get_googlemeet_id(string $name): int {
         global $DB;
@@ -65,10 +65,11 @@ class behat_mod_googlemeet_generator extends behat_generator_base {
     }
 
     /**
-     * Resolve a recording name to googlemeet_recordings.id.
+     * Resolve a recording name to googlemeet_recordings.id (the first match when names repeat).
      *
-     * @param string $name
+     * @param string $name Recording name.
      * @return int
+     * @throws Exception When no recording has that name.
      */
     protected function get_recording_id(string $name): int {
         global $DB;

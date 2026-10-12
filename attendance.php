@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Teacher view of the real attendance read from Google Meet (ANA-03), with CSV export.
+ * Teacher view of the real attendance read from Google Meet, with dataformat export.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -71,8 +71,12 @@ if ($action === 'relink') {
 if ($action === 'refetch' && $session) {
     require_sesskey();
     service::request_refetch((int)$googlemeet->id, (int)$session->id);
-    redirect(new moodle_url($baseurl, ['session' => $session->id]), get_string('attendance_refetch_queued', 'googlemeet'),
-        null, \core\output\notification::NOTIFY_SUCCESS);
+    redirect(
+        new moodle_url($baseurl, ['session' => $session->id]),
+        get_string('attendance_refetch_queued', 'googlemeet'),
+        null,
+        \core\output\notification::NOTIFY_SUCCESS
+    );
 }
 if ($action === 'link' && $session) {
     require_sesskey();
@@ -112,8 +116,10 @@ echo html_writer::tag('p', get_string('attendance_intro', 'googlemeet'), ['class
 
 if (empty($googlemeet->attendanceenabled)) {
     $editurl = new moodle_url('/course/modedit.php', ['update' => $cm->id, 'return' => 1]);
-    echo $OUTPUT->notification(get_string('attendance_activity_disabled', 'googlemeet', $editurl->out()),
-        \core\output\notification::NOTIFY_INFO);
+    echo $OUTPUT->notification(
+        get_string('attendance_activity_disabled', 'googlemeet', $editurl->out()),
+        \core\output\notification::NOTIFY_INFO
+    );
 }
 
 echo scope::relink_notice($googlemeet, $context);
@@ -123,8 +129,10 @@ $isorganiser = scope::is_organiser($googlemeet, $USER);
 if ($isorganiser) {
     $client = new \mod_googlemeet\client();
     if ($client->enabled && !$client->check_login()) {
-        echo html_writer::div(get_string('attendance_login_needed', 'googlemeet') . $client->print_login_popup(),
-            'alert alert-info');
+        echo html_writer::div(
+            get_string('attendance_login_needed', 'googlemeet') . $client->print_login_popup(),
+            'alert alert-info'
+        );
     }
 }
 
@@ -164,8 +172,11 @@ echo html_writer::table($table);
 
 if ($session) {
     $sync = $DB->get_record('googlemeet_attendance_sync', ['eventid' => $session->id]);
-    echo $OUTPUT->heading(get_string('attendance_session_heading', 'googlemeet',
-        userdate($session->eventdate, get_string('strftimedatetime', 'langconfig'))), 3);
+    echo $OUTPUT->heading(get_string(
+        'attendance_session_heading',
+        'googlemeet',
+        userdate($session->eventdate, get_string('strftimedatetime', 'langconfig'))
+    ), 3);
     echo html_writer::tag('p', report::status_label($sync->status ?? null)
         . ($sync && $sync->status === service::STATUS_ERROR && $sync->message !== null
             ? ' · ' . s(shorten_text($sync->message, 200)) : ''));
@@ -173,11 +184,16 @@ if ($session) {
     $refetchurl = new moodle_url($baseurl, ['session' => $session->id, 'action' => 'refetch', 'sesskey' => sesskey()]);
     echo html_writer::div(
         html_writer::link($refetchurl, get_string('attendance_refetch', 'googlemeet'), ['class' => 'btn btn-secondary me-2']),
-        'mb-3');
+        'mb-3'
+    );
 
     if ($rows) {
-        echo $OUTPUT->download_dataformat_selector(get_string('attendance_download', 'googlemeet'),
-            new moodle_url('/mod/googlemeet/attendance.php'), 'download', ['id' => $cm->id, 'session' => $session->id]);
+        echo $OUTPUT->download_dataformat_selector(
+            get_string('attendance_download', 'googlemeet'),
+            new moodle_url('/mod/googlemeet/attendance.php'),
+            'download',
+            ['id' => $cm->id, 'session' => $session->id]
+        );
 
         $candidates = service::get_candidates($googlemeet);
         $options = [0 => get_string('attendance_link_choose', 'googlemeet')];
@@ -201,17 +217,26 @@ if ($session) {
             if ($row['kind'] === report::ROW_UNMATCHED) {
                 $form = html_writer::start_tag('form', ['method' => 'post', 'action' => $baseurl->out(false),
                     'class' => 'd-flex flex-wrap gap-1 mt-1 googlemeet-attendance-link']);
-                foreach (['id' => $cm->id, 'session' => $session->id, 'action' => 'link', 'sesskey' => sesskey(),
-                        'attendanceid' => $row['attendanceid']] as $k => $v) {
+                foreach (
+                    ['id' => $cm->id, 'session' => $session->id, 'action' => 'link', 'sesskey' => sesskey(),
+                        'attendanceid' => $row['attendanceid']] as $k => $v
+                ) {
                     $form .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $k, 'value' => $v]);
                 }
                 $selectid = 'googlemeet-attendance-link-' . $row['attendanceid'];
-                $form .= html_writer::label(get_string('attendance_link_label', 'googlemeet', s($row['meetname'])), $selectid,
-                    false, ['class' => 'visually-hidden']);
+                $form .= html_writer::label(
+                    get_string('attendance_link_label', 'googlemeet', s($row['meetname'])),
+                    $selectid,
+                    false,
+                    ['class' => 'visually-hidden']
+                );
                 $form .= html_writer::select($options, 'userid', 0, false, ['id' => $selectid,
                     'class' => 'form-select form-select-sm w-auto']);
-                $form .= html_writer::tag('button', get_string('attendance_link', 'googlemeet'),
-                    ['type' => 'submit', 'class' => 'btn btn-sm btn-outline-primary']);
+                $form .= html_writer::tag(
+                    'button',
+                    get_string('attendance_link', 'googlemeet'),
+                    ['type' => 'submit', 'class' => 'btn btn-sm btn-outline-primary']
+                );
                 $form .= html_writer::end_tag('form');
                 $name .= $form;
             } else if ($row['kind'] === report::ROW_PRESENT && $row['attendanceid']) {
@@ -219,20 +244,31 @@ if ($session) {
                 // and stays so on later fetches.
                 $form = html_writer::start_tag('form', ['method' => 'post', 'action' => $baseurl->out(false),
                     'class' => 'd-inline googlemeet-attendance-unlink']);
-                foreach (['id' => $cm->id, 'session' => $session->id, 'action' => 'link', 'sesskey' => sesskey(),
-                        'attendanceid' => $row['attendanceid'], 'userid' => 0] as $k => $v) {
+                foreach (
+                    ['id' => $cm->id, 'session' => $session->id, 'action' => 'link', 'sesskey' => sesskey(),
+                        'attendanceid' => $row['attendanceid'], 'userid' => 0] as $k => $v
+                ) {
                     $form .= html_writer::empty_tag('input', ['type' => 'hidden', 'name' => $k, 'value' => $v]);
                 }
-                $form .= html_writer::tag('button', get_string('attendance_unlink', 'googlemeet'),
+                $form .= html_writer::tag(
+                    'button',
+                    get_string('attendance_unlink', 'googlemeet'),
                     ['type' => 'submit', 'class' => 'btn btn-link btn-sm p-0 ms-2',
-                        'title' => get_string('attendance_unlink_title', 'googlemeet', s($row['meetname']))]);
+                    'title' => get_string(
+                        'attendance_unlink_title',
+                        'googlemeet',
+                        s($row['meetname'])
+                    )]
+                );
                 $form .= html_writer::end_tag('form');
                 $name .= $form;
             }
             $status = get_string('attendance_kind_' . $row['kind'], 'googlemeet');
             if ($row['matchedby'] !== '') {
-                $status .= html_writer::tag('small', ' (' . get_string('attendance_matchedby_' . $row['matchedby'],
-                    'googlemeet') . ')', ['class' => 'text-muted']);
+                $status .= html_writer::tag('small', ' (' . get_string(
+                    'attendance_matchedby_' . $row['matchedby'],
+                    'googlemeet'
+                ) . ')', ['class' => 'text-muted']);
             }
             $table->data[] = [
                 $name,

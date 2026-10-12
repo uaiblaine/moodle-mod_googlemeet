@@ -17,9 +17,9 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Attendance read from the Google Meet REST API v2 (ANA-03).
+ * Attendance read from the Google Meet REST API v2.
  *
- * Findings that shape this class (Google docs, checked 2026-10):
+ * API constraints that shape this class:
  * - conferenceRecords.list only returns conferences where the authenticated user is the organizer,
  *   so it must run with the token of the Google account that owns the room (creatoremail).
  * - Participants expose a display name and, for signed-in users, an opaque id "users/{id}"; the
@@ -32,7 +32,6 @@ namespace mod_googlemeet\local\attendance;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class meet_api_source implements source {
-
     /** @var int Safety cap on paginated calls. */
     protected const MAX_PAGES = 20;
 
@@ -139,7 +138,13 @@ class meet_api_source implements source {
     }
 
     /**
-     * {@inheritDoc}
+     * Conferences held in the room with this meeting code that started in [$from, $to].
+     *
+     * @param string $meetingcode Meeting code (abc-defg-hij).
+     * @param int $from Earliest start time.
+     * @param int $to Latest start time.
+     * @return array[] Each: ['name' => 'conferenceRecords/...', 'start' => int, 'end' => int].
+     * @throws scope_exception When the token lacks the Meet scope.
      */
     public function list_conferences(string $meetingcode, int $from, int $to): array {
         $filter = 'space.meeting_code = "' . str_replace(['\\', '"'], ['\\\\', '\\"'], $meetingcode) . '"'
@@ -160,7 +165,13 @@ class meet_api_source implements source {
     }
 
     /**
-     * {@inheritDoc}
+     * Participants of one conference.
+     *
+     * @param string $conference Conference resource name (conferenceRecords/...).
+     * @return array[] Each: ['type' => signedin|anonymous|phone, 'displayname' => string,
+     *                 'googleuserid' => string ('' unless signed in), 'email' => string ('' when unknown),
+     *                 'sessions' => [[start, end], ...]].
+     * @throws scope_exception When the token lacks the Meet scope.
      */
     public function list_participants(string $conference): array {
         $participants = [];
@@ -178,8 +189,8 @@ class meet_api_source implements source {
             $sessions = [];
             if (!empty($item->name)) {
                 try {
-                    foreach ($this->list_all('participantsessions', ['parent' => $item->name], 'participantSessions')
-                            as $session) {
+                    $sessionitems = $this->list_all('participantsessions', ['parent' => $item->name], 'participantSessions');
+                    foreach ($sessionitems as $session) {
                         $sessions[] = [self::parse_time($session->startTime ?? ''), self::parse_time($session->endTime ?? '')];
                     }
                 } catch (scope_exception $e) {

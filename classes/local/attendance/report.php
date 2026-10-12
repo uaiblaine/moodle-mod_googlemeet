@@ -17,14 +17,13 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Rows of the teacher attendance view and its export (ANA-03).
+ * Rows of the teacher attendance view and its export.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class report {
-
     /** @var string Row of a matched participant. */
     public const ROW_PRESENT = 'present';
     /** @var string Participant not matched to a student. */

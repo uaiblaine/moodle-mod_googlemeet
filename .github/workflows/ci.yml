@@ -1,123 +1,44 @@
 name: ci
 
+# workflow_dispatch is the manual escape hatch: it lets a run be launched for
+# a push whose commits would otherwise skip CI, without pushing another commit.
+#
+# push is filtered to the branches that are merge targets. Without the filter
+# every push to a feature branch ran the whole pipeline AND the pull_request
+# event ran it again on the same commit - measured at 21 jobs and ~95 billable
+# minutes per run, so exactly double for no extra information. A branch with no
+# pull request open is covered by `mdl ci <repo> --matrix` locally.
 on:
   push:
-    branches: [master]
+    branches:
+      - main
+      - 'MOODLE_*_STABLE'
   pull_request:
+  workflow_dispatch:
+
+# Supersede a run when new commits arrive on the same pull request: pushing
+# three fixes in a row otherwise leaves three full pipelines running to the end.
+# Never on main - each merge there is the only run its commit will ever get, and
+# a second merge landing quickly must not cancel the first one's verdict.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 jobs:
-  test:
-    runs-on: ubuntu-latest
+  # One reusable-workflow call per supported Moodle branch (version.php
+  # $plugin->supported) — update these jobs when the supported range changes,
+  # in the same commit as the version.php change. The highest branch runs the
+  # full PHP x DB matrix; older branches run one DB only. PHPUnit and Behat
+  # run on every runtime leg.
+  ci-503:
+    name: Moodle 5.03
+    uses: moodle-an-hochschulen/moodle-workflows/.github/workflows/moodle-plugin-ci.yml@main
+    with:
+      moodle-core-branch: MOODLE_503_STABLE
 
-    services:
-      postgres:
-        image: postgres:16
-        env:
-          POSTGRES_USER: 'postgres'
-          POSTGRES_HOST_AUTH_METHOD: 'trust'
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-        ports:
-          - 5432:5432
-
-      mariadb:
-        image: mariadb:11
-        env:
-          MYSQL_USER: 'root'
-          MYSQL_ALLOW_EMPTY_PASSWORD: "true"
-          MYSQL_CHARACTER_SET_SERVER: "utf8mb4"
-          MYSQL_COLLATION_SERVER: "utf8mb4_unicode_ci"
-        ports:
-          - 3306:3306
-        options: >-
-          --health-cmd="healthcheck.sh --connect --innodb_initialized"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
-    strategy:
-      fail-fast: false
-      matrix:
-        # version.php: requires Moodle 5.0, supported [500, 501]. PHP 8.2 is the minimum of both.
-        php: ['8.2', '8.4']
-        moodle-branch: ['MOODLE_500_STABLE', 'MOODLE_501_STABLE']
-        database: ['pgsql', 'mariadb']
-
-    steps:
-      - name: Check out repository code
-        uses: actions/checkout@v4
-        with:
-          path: plugin
-
-      - name: Setup PHP ${{ matrix.php }}
-        uses: shivammathur/setup-php@v2
-        with:
-          php-version: ${{ matrix.php }}
-          ini-values: max_input_vars=5000
-          coverage: none
-
-      - name: Initialise moodle-plugin-ci
-        run: |
-          composer create-project -n --no-dev --prefer-dist moodlehq/moodle-plugin-ci ci ^4
-          echo $(cd ci/bin; pwd) >> $GITHUB_PATH
-          echo $(cd ci/vendor/bin; pwd) >> $GITHUB_PATH
-          sudo locale-gen en_AU.UTF-8
-          echo "NVM_DIR=$HOME/.nvm" >> $GITHUB_ENV
-
-      - name: Install moodle-plugin-ci
-        run: moodle-plugin-ci install --plugin ./plugin --db-host=127.0.0.1
-        env:
-          DB: ${{ matrix.database }}
-          MOODLE_BRANCH: ${{ matrix.moodle-branch }}
-
-      - name: PHP Lint
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phplint
-
-      - name: PHP Mess Detector
-        continue-on-error: true
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpmd
-
-      - name: Moodle Code Checker
-        # Style checks are informative until the legacy warnings are cleaned up.
-        continue-on-error: true
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpcs
-
-      - name: Moodle PHPDoc Checker
-        # Style checks are informative until the legacy warnings are cleaned up.
-        continue-on-error: true
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpdoc
-
-      - name: Validating
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci validate
-
-      - name: Check upgrade savepoints
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci savepoints
-
-      - name: Mustache Lint
-        # Style checks are informative until the legacy warnings are cleaned up.
-        continue-on-error: true
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci mustache
-
-      - name: Grunt
-        # Style checks are informative until the legacy warnings are cleaned up.
-        continue-on-error: true
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci grunt --max-lint-warnings 0
-
-      - name: PHPUnit tests
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci phpunit --fail-on-warning
-
-      - name: Behat features
-        if: ${{ !cancelled() }}
-        run: moodle-plugin-ci behat --profile chrome
+  ci-502:
+    name: Moodle 5.02
+    uses: moodle-an-hochschulen/moodle-workflows/.github/workflows/moodle-plugin-ci.yml@main
+    with:
+      moodle-core-branch: MOODLE_502_STABLE
+      one-db-only: true

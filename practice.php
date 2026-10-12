@@ -39,8 +39,10 @@ require_login($course, false, $cm);
 $context = context_module::instance($cm->id);
 require_capability('mod/googlemeet:view', $context);
 
-if (!in_array($mode, ['', practice_attempts::MODE_FAILED, practice_attempts::MODE_TOPIC], true)
-        || ($mode === practice_attempts::MODE_TOPIC && trim($topic) === '')) {
+if (
+    !in_array($mode, ['', practice_attempts::MODE_FAILED, practice_attempts::MODE_TOPIC], true)
+        || ($mode === practice_attempts::MODE_TOPIC && trim($topic) === '')
+) {
     $mode = '';
 }
 
@@ -65,10 +67,15 @@ if ($mode === '') {
     foreach (practice_attempts::get_practice_topics($googlemeet, $cm, $context) as $t) {
         $topics[] = [
             'topic' => format_string($t['topic'], true, ['context' => $context]),
-            'url' => (new moodle_url('/mod/googlemeet/practice.php',
-                ['id' => $cm->id, 'mode' => practice_attempts::MODE_TOPIC, 'topic' => $t['topic']]))->out(false),
-            'meta' => get_string('practice_topic_meta', 'googlemeet',
-                ['recordings' => $t['recordings'], 'questions' => $t['questions']]),
+            'url' => (new moodle_url(
+                '/mod/googlemeet/practice.php',
+                ['id' => $cm->id, 'mode' => practice_attempts::MODE_TOPIC, 'topic' => $t['topic']]
+            ))->out(false),
+            'meta' => get_string(
+                'practice_topic_meta',
+                'googlemeet',
+                ['recordings' => $t['recordings'], 'questions' => $t['questions']]
+            ),
         ];
     }
     echo $OUTPUT->header();
@@ -77,8 +84,10 @@ if ($mode === '') {
         'backurl' => (new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]))->out(false),
         'failedcount' => $failedcount,
         'hasfailed' => $failedcount > 0,
-        'failedurl' => (new moodle_url('/mod/googlemeet/practice.php',
-            ['id' => $cm->id, 'mode' => practice_attempts::MODE_FAILED]))->out(false),
+        'failedurl' => (new moodle_url(
+            '/mod/googlemeet/practice.php',
+            ['id' => $cm->id, 'mode' => practice_attempts::MODE_FAILED]
+        ))->out(false),
         'hastopics' => !empty($topics),
         'topics' => $topics,
     ]);

@@ -25,7 +25,7 @@
 defined('MOODLE_INTERNAL') || die();
 
 $definitions = [
-    // Linked Google account info (email, name, base64 avatar) per Moodle user + issuer (PERF-01).
+    // Linked Google account info (email, name, base64 avatar) per Moodle user + issuer.
     // Avoids userinfo/avatar HTTP requests on every teacher page load.
     'userinfo' => [
         'mode' => cache_store::MODE_SESSION,

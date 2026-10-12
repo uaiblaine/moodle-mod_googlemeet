@@ -16,6 +16,94 @@
 }}
 {{!
   @template mod_googlemeet/hero
+
+  Classroom hero of the activity page: next session with its countdown, the following classes,
+  the full schedule, "add to calendar" links, the student's progress, the Meet room button and
+  the "continue watching" card. Built by googlemeet_get_classroom_hero_context() (locallib.php)
+  plus \mod_googlemeet\local\calendar_export::hero_context().
+
+  Example context (json):
+  {
+    "activityname": "Clases de los martes",
+    "herocompact": false,
+    "courseid": 2,
+    "hasnextevent": true,
+    "nexteventislive": false,
+    "nexteventissoon": true,
+    "nexteventisscheduled": false,
+    "nexteventstatus": "soon",
+    "nexteventstatuslabel": "Starting soon",
+    "nexteventtoday": true,
+    "nexteventdate": "Tuesday, 17 November",
+    "nexteventstarttime": "09:00",
+    "nexteventendtime": "10:00",
+    "nexteventtimeinfo": "Starts in 25 minutes",
+    "nexteventtimestamp": 1795424400,
+    "nexteventduration": "1 hour",
+    "nexteventhascountdown": true,
+    "countdownprefix": "Starts in",
+    "countdownexpired": "Started",
+    "hasnextclassevents": true,
+    "nextclassevents": [
+      {"date": "Thu. 19 Nov.", "starttime": "09:00", "endtime": "10:00", "duration": "1 hour"},
+      {"date": "Tue. 24 Nov.", "starttime": "09:00", "endtime": "10:30", "duration": "1 hour 30 mins"}
+    ],
+    "hasscheduleevents": true,
+    "scheduleevents": [
+      {"isnext": true, "iscancelled": false, "cancelledreason": "", "date": "Tuesday, 17 November",
+       "starttime": "09:00", "endtime": "10:00", "duration": "1 hour"},
+      {"isnext": false, "iscancelled": true, "cancelledreason": "Public holiday", "date": "Thursday, 19 November",
+       "starttime": "09:00", "endtime": "10:00", "duration": "1 hour"}
+    ],
+    "hascalendarlinks": true,
+    "calendaricsurl": "https://example.com/mod/googlemeet/calendar.php?id=1",
+    "hascalendargoogle": true,
+    "calendargoogleurl": "https://calendar.google.com/calendar/render?action=TEMPLATE",
+    "hasrecordedcount": true,
+    "recordedcountlabel": "8 recorded classes",
+    "showheroprogress": true,
+    "progresssummarylabel": "3 of 8 classes watched",
+    "progresssummarypct": 37,
+    "progresssummarybarstyle": "width: 37%;",
+    "hasprogressstarted": true,
+    "progressstartedbarstyle": "width: 12%;",
+    "practicecta": {
+      "practiceurl": "https://example.com/mod/googlemeet/practice.php?id=1",
+      "failedurl": "https://example.com/mod/googlemeet/practice.php?id=1&mode=failed",
+      "hasfailed": true,
+      "failedlabel": "Review my wrong answers (3)"
+    },
+    "hasroomcta": true,
+    "roomactive": true,
+    "roomdisabled": false,
+    "roomclasses": "btn googlemeet-room-cta btn-primary googlemeet-room-cta-soon",
+    "roomurl": "https://example.com/mod/googlemeet/enter.php?id=1",
+    "roomlabel": "Join the class",
+    "roomnote": "",
+    "roomhascountdown": true,
+    "roomtargetts": 1795424400,
+    "roomcountdownprefix": "Starts in",
+    "roomcountdownexpired": "Started",
+    "hascontinue": true,
+    "continueurl": "https://example.com/mod/googlemeet/view.php?id=1&recording=7",
+    "continuetitle": "Tema 4: el acto administrativo",
+    "continueoriginaltitle": "Clases - 2026/11/10 09:00 CET - Recording",
+    "continuedate": "10/11/2026",
+    "continueduration": "1:02:00",
+    "continuesummary": "Elements, effects and validity of the administrative act.",
+    "continuelabel": "Continue watching",
+    "continuectalabel": "Resume",
+    "continueprogresslabel": "In progress",
+    "continueprogressarialabel": "Viewing progress: 40%",
+    "continueprogresspct": 40,
+    "continueprogresspcttext": "40%",
+    "continueprogressbarstyle": "width: 40%;",
+    "continueshowprogressbar": true,
+    "continueprogresscompleted": false,
+    "continueprogresspartial": true,
+    "continueprogressunseen": false,
+    "continueprogressbadgeclass": "googlemeet-progress-badge-partial"
+  }
 }}
 <section class="googlemeet-classroom-hero{{#herocompact}} googlemeet-classroom-hero-compact{{/herocompact}}" aria-labelledby="googlemeet-classroom-hero-title">
   <div class="googlemeet-hero-main">

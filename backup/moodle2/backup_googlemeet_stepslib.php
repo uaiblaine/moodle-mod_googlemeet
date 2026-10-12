@@ -27,7 +27,6 @@
  * Define the complete structure for backup, with file and id annotations.
  */
 class backup_googlemeet_activity_structure_step extends backup_activity_structure_step {
-
     /**
      * Defines the structure of the resulting xml file.
      *
@@ -36,7 +35,6 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
     protected function define_structure() {
         $userinfo = $this->get_setting_value('userinfo');
 
-        // Replace with the attributes and final elements that the element will handle.
         $googlemeet = new backup_nested_element('googlemeet', ['id'], [
             'name',
             'originalname',
@@ -67,7 +65,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'completionrecordings',
             'completionwatchpercent',
             'completionpractice',
-            'attendanceenabled'
+            'attendanceenabled',
         ]);
 
         $events = new backup_nested_element('events');
@@ -79,11 +77,11 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'timemodified',
             'autosynced',
             'syncattempts',
-            'nextsyncattempt'
+            'nextsyncattempt',
         ]);
 
-        // The recording transcript is participant-derived personal data, so it is only included
-        // when the backup carries user information. Non-personal fields are always included.
+        // The recording transcript and Gemini meeting notes are participant-derived personal data, so
+        // they are only included when the backup carries user information.
         $recordingfields = [
             'recordingid',
             'name',
@@ -91,7 +89,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'duration',
             'webviewlink',
             'visible',
-            'timemodified'
+            'timemodified',
         ];
         if ($userinfo) {
             $recordingfields[] = 'transcripttext';
@@ -106,7 +104,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
         $recordingsubs = new backup_nested_element('recordingsubs');
         $recordingsub = new backup_nested_element('recordingsub', ['id'], [
             'userid',
-            'timecreated'
+            'timecreated',
         ]);
 
         $recordingprogresses = new backup_nested_element('recordingprogresses');
@@ -115,17 +113,17 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'watchedseconds',
             'completed',
             'timecreated',
-            'timemodified'
+            'timemodified',
         ]);
 
-        // ANA-05: practice attempts (user data). Recording and question ids are remapped on restore.
+        // Practice attempts (user data). Recording and question ids are remapped on restore.
         $practiceattempts = new backup_nested_element('practiceattempts');
         $practiceattempt = new backup_nested_element('practiceattempt', ['id'], [
             'recordingid',
             'questionid',
             'userid',
             'correct',
-            'timecreated'
+            'timecreated',
         ]);
 
         // The AI summary, key points, topics and chapters are course content (they also feed the
@@ -144,11 +142,11 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'nextretry',
             'timecreated',
             'timemodified',
-            // IA-04 review state. It travels without user data too, so pending
+            // Teacher review state. It travels without user data too, so pending
             // content stays pending in the copy; reviewedby is only annotated with user data.
             'reviewed',
             'timereviewed',
-            'reviewedby'
+            'reviewedby',
         ];
         if ($userinfo) {
             $aifields[] = 'transcript';
@@ -158,7 +156,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
         }
         $aianalysis = new backup_nested_element('aianalysis', ['id'], $aifields);
 
-        // ANA-03: attendance read from Google Meet (user data), nested in its session.
+        // Attendance read from Google Meet (user data), nested in its session.
         $attendances = new backup_nested_element('attendances');
         $attendance = new backup_nested_element('attendance', ['id'], [
             'userid',
@@ -172,7 +170,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'durationseconds',
             'sessions',
             'timecreated',
-            'timemodified'
+            'timemodified',
         ]);
 
         $holidays = new backup_nested_element('holidays');
@@ -180,14 +178,14 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'name',
             'startdate',
             'enddate',
-            'timemodified'
+            'timemodified',
         ]);
 
         $cancelleddates = new backup_nested_element('cancelleddates');
         $cancelleddate = new backup_nested_element('cancelleddate', ['id'], [
             'cancelleddate',
             'reason',
-            'timemodified'
+            'timemodified',
         ]);
 
         // Build the tree in the order needed for restore.
@@ -232,8 +230,11 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
         if ($userinfo) {
             $recordingprogress->set_source_table('googlemeet_recording_progress', ['recordingid' => backup::VAR_PARENTID]);
             $recordingsub->set_source_table('googlemeet_recording_subs', ['googlemeetid' => backup::VAR_PARENTID]);
-            $practiceattempt->set_source_table('googlemeet_practice_attempts', ['googlemeetid' => backup::VAR_PARENTID],
-                'id ASC');
+            $practiceattempt->set_source_table(
+                'googlemeet_practice_attempts',
+                ['googlemeetid' => backup::VAR_PARENTID],
+                'id ASC'
+            );
             $attendance->set_source_table('googlemeet_attendance', ['eventid' => backup::VAR_PARENTID], 'id ASC');
         }
 

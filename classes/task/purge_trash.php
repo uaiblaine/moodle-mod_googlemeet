@@ -19,14 +19,15 @@ namespace mod_googlemeet\task;
 use mod_googlemeet\local\recording_cleanup;
 
 /**
- * Daily purge of recordings that stayed in the teacher trash longer than googlemeet/trashretentiondays (OPS-03).
+ * Daily purge of recordings that stayed in the teacher trash longer than googlemeet/trashretentiondays.
+ *
+ * Only recordings a teacher trashed by hand qualify; see {@see recording_cleanup::purge_expired_trash()}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class purge_trash extends \core\task\scheduled_task {
-
     /**
      * Task name.
      *
@@ -46,9 +47,18 @@ class purge_trash extends \core\task\scheduled_task {
             return;
         }
         $stats = recording_cleanup::purge_expired_trash(null, $days);
-        mtrace(sprintf('mod_googlemeet purge_trash: retention %d days, %d recording(s) purged '
+        mtrace(sprintf(
+            'mod_googlemeet purge_trash: retention %d days, %d recording(s) purged '
                 . '(analysis %d, progress %d, attempts %d, files %d, preferences %d, questions deleted %d, hidden %d).',
-            $days, $stats['recordings'], $stats['analysis'], $stats['progress'], $stats['attempts'], $stats['files'],
-            $stats['preferences'], $stats['questionsdeleted'], $stats['questionshidden']));
+            $days,
+            $stats['recordings'],
+            $stats['analysis'],
+            $stats['progress'],
+            $stats['attempts'],
+            $stats['files'],
+            $stats['preferences'],
+            $stats['questionsdeleted'],
+            $stats['questionshidden']
+        ));
     }
 }

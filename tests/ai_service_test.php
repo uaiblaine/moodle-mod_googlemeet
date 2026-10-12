@@ -29,8 +29,7 @@ defined('MOODLE_INTERNAL') || die();
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[CoversClass(\mod_googlemeet\ai_service::class)]
-class ai_service_test extends \advanced_testcase {
-
+final class ai_service_test extends \advanced_testcase {
     /**
      * Insert a minimal googlemeet activity record.
      *

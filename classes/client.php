@@ -24,14 +24,13 @@ use moodle_exception;
 use stdClass;
 
 /**
- * Oauth Client for mod_googlemeet.
+ * Google OAuth client for mod_googlemeet: Calendar event creation and Drive recording sync as the current user.
  *
  * @package     mod_googlemeet
  * @copyright   2023 Rone Santos <ronefel@hotmail.com>
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class client {
-
     /**
      * OAuth 2 client
      * @var \core\oauth2\client
@@ -61,18 +60,18 @@ class client {
     /** @var int Max allowed distance between a recording and its Gemini notes doc. */
     private const NOTES_PROXIMITY_SECONDS = 36 * 3600;
 
-    /** @var bool informs if the client is enabled */
+    /** @var bool False when googlemeet/issuerid names no enabled OAuth issuer. */
     public $enabled = true;
 
     /**
-     * Additional scopes required for drive.
+     * Google scopes always requested: Drive (recordings, transcripts, notes) and Calendar events.
      */
     const SCOPES = 'https://www.googleapis.com/auth/drive https://www.googleapis.com/auth/calendar.events';
 
     /**
      * Scopes requested from Google.
      *
-     * ANA-03: the Meet REST API read-only scope is only requested while real attendance is enabled
+     * The Meet REST API read-only scope is only requested while real attendance is enabled
      * for the site, so sites that do not use it never ask teachers for it.
      *
      * @return string Space-separated scopes.
@@ -132,13 +131,14 @@ class client {
     }
 
     /**
-     * Meet REST API attendance source authenticated as the current user (ANA-03).
+     * Meet REST API attendance source authenticated as the current user.
      *
      * @return \mod_googlemeet\local\attendance\meet_api_source
      */
     public function get_attendance_source(): \mod_googlemeet\local\attendance\meet_api_source {
         return new \mod_googlemeet\local\attendance\meet_api_source(
-            new \mod_googlemeet\local\attendance\meet_rest($this->get_user_oauth_client()));
+            new \mod_googlemeet\local\attendance\meet_rest($this->get_user_oauth_client())
+        );
     }
 
     /**
@@ -223,7 +223,7 @@ class client {
                     mimeType = "application/vnd.google-apps.folder" and
                     "me" in owners',
             'pageSize' => 1000,
-            'fields' => 'nextPageToken, files(id,owners)'
+            'fields' => 'nextPageToken, files(id,owners)',
         ];
 
         $folders = $this->list_all_pages($service, $folderparams);
@@ -252,12 +252,9 @@ class client {
         $client = $this->get_user_oauth_client();
         $loginurl = $client->get_login_url();
 
-        // SECURITY: open the OAuth login in a popup without an inline onClick handler.
-        // The URL is carried in a data-* attribute (HTML-escaped by html_writer) and the
-        // popup is opened from a small AMD inline listener, so no user-influenced value is
-        // interpolated into an executable inline-JS attribute. We must keep using a popup
-        // window (window.open) because the OAuth callback relies on it (callback.php closes
-        // the popup and reloads the parent).
+        // No inline onclick: the URL travels in a data-* attribute (escaped by html_writer) and an
+        // AMD inline listener opens it, so no URL value is interpolated into executable inline JS.
+        // It must stay a window.open() popup: callback.php reloads the opener and closes the popup.
         $buttonid = html_writer::random_id('googlemeet_login_');
         $button = html_writer::tag('button', get_string('logintoaccount', 'googlemeet'), [
             'type' => 'button',
@@ -315,9 +312,11 @@ class client {
         $logouturl->param('logout', true);
         $logouturl->param('sesskey', sesskey());
 
-        $img = html_writer::img('data:image/jpeg;base64,'.$userpicture, '');
+        $img = html_writer::img('data:image/jpeg;base64,' . $userpicture, '');
         $out = html_writer::start_div('', ['id' => 'googlemeet_auth-info']);
-        $out .= html_writer::link($userurl, $img,
+        $out .= html_writer::link(
+            $userurl,
+            $img,
             ['id' => 'googlemeet_picture-user', 'target' => '_blank', 'title' => get_string('manage', 'googlemeet')]
         );
         $out .= html_writer::start_div('', ['id' => 'googlemeet_user-name']);
@@ -325,7 +324,8 @@ class client {
         $out .= html_writer::span($name);
         $out .= html_writer::span($username);
         $out .= html_writer::end_div();
-        $out .= html_writer::link($logouturl,
+        $out .= html_writer::link(
+            $logouturl,
             $OUTPUT->pix_icon('logout', '', 'googlemeet', ['class' => 'm-0']),
             ['class' => 'btn btn-secondary btn-sm', 'title' => get_string('logout', 'googlemeet')]
         );
@@ -336,7 +336,7 @@ class client {
     }
 
     /**
-     * Checks whether the user is authenticate or not.
+     * Whether the current user has a valid Google login (memoised for this instance).
      *
      * @return bool true when logged in.
      */
@@ -374,7 +374,7 @@ class client {
     }
 
     /**
-     * Linked Google account info, cached in the session (PERF-01).
+     * Linked Google account info, cached in the session.
      *
      * Avoids the userinfo + avatar HTTP requests on every page load of a linked teacher.
      * Entries live for an hour (cache TTL) and are purged on logout/relink.
@@ -422,12 +422,8 @@ class client {
             $this->loggedin = null;
             self::purge_userinfo_cache();
 
-            // SECURITY: redirect the browser back to the activity after logout. The URL is a
-            // moodle_url built from $PAGE->url, and out(false) returns it without HTML entity
-            // encoding so it is safe to place inside a JS string literal (json_encode further
-            // guards against quote/script breakout). We must emit this tiny HTML page and stop
-            // execution here because logout is also reachable from inside the OAuth popup flow,
-            // where a normal redirect() would not reliably reload the originating page.
+            // End the request with a page that navigates back to $PAGE->url. out(false) gives the URL
+            // without HTML entities, and json_encode() keeps it from breaking out of the script literal.
             $jsurl = json_encode($url->out(false));
             $html = '<!DOCTYPE html><html><head><script type="text/javascript">' .
                     'window.location = ' . $jsurl . ';' .
@@ -451,7 +447,7 @@ class client {
     }
 
     /**
-     * Google REST service authenticated as the current user (DAT-04 Calendar sync).
+     * Google REST service authenticated as the current user, for {@see \mod_googlemeet\local\calendar_sync}.
      *
      * @return rest
      */
@@ -471,9 +467,9 @@ class client {
 
         $calendarid = 'primary';
 
-        // DAT-04: build the body with the same helper used by the edit sync, so times are formatted
-        // in the timezone actually sent as timeZone (not the server's) and the summary is the plain
-        // activity name (no random suffix: Drive names recordings after it).
+        // Same body as the edit sync, so times are formatted in the timezone actually sent as timeZone
+        // (not the server's) and the summary is the plain activity name: Meet names the recordings
+        // after it, and the Drive sync matches them by that name.
         $timezone = \core_date::get_user_timezone($USER);
         $eventrawpost = \mod_googlemeet\local\calendar_sync::build_event_body($googlemeet, $timezone);
         if (empty($eventrawpost['recurrence'])) {
@@ -483,7 +479,7 @@ class client {
         $service = new rest($this->get_user_oauth_client());
 
         $eventparams = [
-            'calendarid' => $calendarid
+            'calendarid' => $calendarid,
         ];
 
         $eventresponse = helper::request($service, 'insertevent', $eventparams, json_encode($eventrawpost));
@@ -491,21 +487,20 @@ class client {
         $conferenceparams = [
             'calendarid' => $calendarid,
             'eventid' => $eventresponse->id,
-            'conferenceDataVersion' => 1
+            'conferenceDataVersion' => 1,
         ];
 
         $conferencerawpost = [
             'conferenceData' => [
                 'createRequest' => [
-                    'requestId' => $eventresponse->id
-                ]
-            ]
+                    'requestId' => $eventresponse->id,
+                ],
+            ],
         ];
 
         $conferenceresponse = helper::request($service, 'createconference', $conferenceparams, json_encode($conferencerawpost));
 
         return $conferenceresponse;
-
     }
 
     /**
@@ -516,7 +511,8 @@ class client {
      *                         Required for background/cron contexts (no $PAGE, no HTTP).
      * @param bool $deferenrichment When true, only upsert Drive metadata and queue enrichment.
      *
-     * @return array|void Stats array ['inserted','updated','deleted','trashed','restored','found'] when $noredirect=true.
+     * @return array|void Stats array ['inserted','updated','deleted','trashed','restored','found'] when $noredirect=true;
+     *                    nothing when the user is not logged in to Google.
      */
     public function syncrecordings($googlemeet, $noredirect = false, bool $deferenrichment = false) {
         global $PAGE, $DB, $CFG;
@@ -535,9 +531,8 @@ class client {
             $name = $googlemeet->name;
             $customfilter = trim($googlemeet->recordingfilter ?? '');
 
-            // Build name filter: always include meetingcode + name as fallbacks,
-            // plus custom filter if set. This avoids the problem where a custom
-            // filter is an incorrect substring that doesn't match the actual filename.
+            // Always match the meeting code and the activity name, plus the custom filter when set,
+            // so a custom filter that matches no filename does not hide the recordings.
             $conditions = [];
             if ($meetingcode !== '') {
                 $conditions[] = 'name contains "' . $this->drive_quote($meetingcode) . '"';
@@ -548,7 +543,7 @@ class client {
             }
             $namefilter = '(' . implode(' or ', $conditions) . ')';
 
-            // If no folders found, try searching ALL of Drive (no parent filter).
+            // Without a Meet Recordings folder, search all of the user's Drive (no parent filter).
             if (empty($parents)) {
                 $recordingparams = [
                     'q' => 'trashed = false and
@@ -556,7 +551,7 @@ class client {
                             "me" in owners and
                             ' . $namefilter,
                     'pageSize' => 100,
-                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)'
+                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)',
                 ];
             } else {
                 $recordingparams = [
@@ -566,7 +561,7 @@ class client {
                             "me" in owners and
                             ' . $namefilter,
                     'pageSize' => 1000,
-                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)'
+                    'fields' => 'nextPageToken, files(id,name,permissionIds,createdTime,videoMediaMetadata,webViewLink)',
                 ];
             }
 
@@ -590,36 +585,44 @@ class client {
                 $existingids = [];
                 $existingnotes = [];
                 if (!$deferenrichment) {
-                    $existingids = $DB->get_fieldset_select('googlemeet_recordings', 'recordingid',
-                        'googlemeetid = ?', [$googlemeet->id]);
+                    $existingids = $DB->get_fieldset_select(
+                        'googlemeet_recordings',
+                        'recordingid',
+                        'googlemeetid = ?',
+                        [$googlemeet->id]
+                    );
                     $existingids = array_flip($existingids);
                     // Map recordingid => notestext so we know which existing recordings
                     // still lack notes (Gemini notes are often generated later).
-                    $existingnotes = $DB->get_records_menu('googlemeet_recordings',
-                        ['googlemeetid' => $googlemeet->id], '', 'recordingid, notestext');
+                    $existingnotes = $DB->get_records_menu(
+                        'googlemeet_recordings',
+                        ['googlemeetid' => $googlemeet->id],
+                        '',
+                        'recordingid, notestext'
+                    );
                 }
 
                 for ($i = 0; $i < $recordingscount; $i++) {
                     $recording = $recordings[$i];
 
-                    // If the recording has already been processed.
+                    // Drive has finished processing the video; otherwise the sync skips it as unprocessed.
                     if (isset($recording->videoMediaMetadata)) {
-                        // SECURITY: granting "anyone with the link" is what makes the recording
-                        // playable for non-owner students through the embedded player. The
-                        // 'makerecordingspublic' setting defaults to 1 to preserve that behaviour;
-                        // an admin can disable it to keep recordings private, but that breaks
-                        // playback for everyone except the Drive owner (a deliberate privacy/
-                        // playability trade-off).
-                        if (!$deferenrichment
+                        // Sharing as "anyone with the link" is what lets students who do not own the file
+                        // play it in the embedded player. googlemeet/makerecordingspublic (default on) can
+                        // be turned off to keep recordings private, at the cost of playback for anyone but
+                        // the Drive owner.
+                        if (
+                            !$deferenrichment
                                 && get_config('googlemeet', 'makerecordingspublic')
-                                && !in_array('anyoneWithLink', $recording->permissionIds)) {
+                                && !in_array('anyoneWithLink', $recording->permissionIds)
+                        ) {
                             $permissionparams = [
                                 'fileid' => $recording->id,
-                                'fields' => 'id'
+                                'fields' => 'id',
                             ];
                             $permissionrawpost = [
                                 "role" => "reader",
-                                "type" => "anyone"
+                                "type" => "anyone",
                             ];
                             helper::request($service, 'create_permission', $permissionparams, json_encode($permissionrawpost));
                         }
@@ -634,8 +637,8 @@ class client {
                         $recordings[$i]->createdTime = $createdtime->getTimestamp();
 
                         if (!$deferenrichment && !isset($existingids[$recording->id])) {
-                            // Only fetch the transcript and run yt-dlp for recordings we are
-                            // about to insert. Existing rows are left untouched by googlemeet_sync_recordings().
+                            // Only fetch the transcript (and run yt-dlp) for recordings about to be inserted:
+                            // googlemeet_sync_recordings() never writes a transcript to an existing row.
                             $transcriptdata = $this->find_transcript_for_recording($service, $parents, $recording->name);
                             if ($transcriptdata) {
                                 $recordings[$i]->transcriptfileid = $transcriptdata['fileid'];
@@ -741,11 +744,10 @@ class client {
      * Filter recordings to match only those belonging to this specific activity.
      *
      * The Drive API "contains" filter is broad and may return recordings from
-     * other activities with similar names. This method applies stricter filtering:
-     * 1. If custom filter is set, use it (case-insensitive contains)
-     * 2. Recording name must start with the activity name (case-insensitive)
-     * 3. Or recording name must contain the exact meeting code
-     * 4. Recording must not already exist in another activity (avoid duplicates)
+     * other activities with similar names. A recording already linked to this activity is kept;
+     * one linked only to other activities is dropped. A new recording is kept when its name
+     * (case-insensitive) contains the custom filter, contains the meeting code, starts with the
+     * activity name, or contains the activity name followed by "(" or "-".
      *
      * @param array $recordings Array of recording objects from Drive API
      * @param string $meetingcode The meeting code (e.g., "abc-defg-hij")
@@ -762,19 +764,23 @@ class client {
         }
 
         // Batch query: get all existing recordings by their IDs to avoid N+1 queries.
-        $recordingids = array_filter(array_map(function($r) {
+        $recordingids = array_filter(array_map(function ($r) {
             return $r->id ?? null;
         }, $recordings));
 
-        // Map Drive recording id => [googlemeetid => true]. A Drive file can legitimately belong to
-        // several activities: a duplicated/restored activity keeps the recordings of its source
-        // (DAT-03). Keying by recordingid alone kept only one arbitrary activity per file, so the
-        // copy's own (restored) recordings were skipped here and then trashed by the sync.
+        // Map Drive recording id => [googlemeetid => true]. A Drive file can belong to several
+        // activities (a duplicated or restored activity keeps its source's recordings); the copy's
+        // own rows must not be skipped here, or the sync would trash them.
         $existingrecordings = [];
         if (!empty($recordingids)) {
-            list($insql, $params) = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
-            $records = $DB->get_recordset_select('googlemeet_recordings', "recordingid $insql", $params, '',
-                'id, recordingid, googlemeetid');
+            [$insql, $params] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
+            $records = $DB->get_recordset_select(
+                'googlemeet_recordings',
+                "recordingid $insql",
+                $params,
+                '',
+                'id, recordingid, googlemeetid'
+            );
             foreach ($records as $rec) {
                 $existingrecordings[$rec->recordingid][(int)$rec->googlemeetid] = true;
             }
@@ -805,7 +811,7 @@ class client {
                 continue;
             }
 
-            // For new recordings, apply name-based filtering:
+            // For new recordings, apply name-based filtering.
 
             // Priority 1: If custom filter is set, check it first (case-insensitive contains).
             if (!empty($customfilterlower)) {
@@ -830,8 +836,8 @@ class client {
                 continue;
             }
 
-            // Check 4: Recording name contains the full activity name followed by space or parenthesis.
-            // This handles cases where the name might have a prefix or different format.
+            // Check 4: the name contains the activity name at a word boundary, followed by optional
+            // spaces and "(" or "-", e.g. a filename with a prefix before the activity name.
             $pattern = preg_quote($activitynamelower, '/');
             if (preg_match('/\b' . $pattern . '\s*[\(\-]/i', $recordingnamelower)) {
                 $filtered[] = $recording;
@@ -854,18 +860,17 @@ class client {
         // Get the base name without extension.
         $basename = pathinfo($videoname, PATHINFO_FILENAME);
 
-        // Search for transcript files (sbv, vtt, txt) with similar name. When no Meet Recordings
-        // folder was found ($parents empty), search all of Drive instead of emitting an invalid
-        // "() and ..." parent clause (which silently returns nothing), mirroring the all-Drive
-        // fallback used for the recording search.
+        // Search for text, VTT or SubRip files whose name contains the video's base name. Without a
+        // Meet Recordings folder ($parents empty) search all of Drive, as the recording search does,
+        // instead of sending an invalid "() and ..." parent clause.
         $parentclause = !empty($parents) ? '(' . $parents . ') and ' : '';
         $transcriptparams = [
             'q' => $parentclause . 'trashed = false and
                     "me" in owners and
                     (mimeType = "text/plain" or mimeType = "text/vtt" or mimeType = "application/x-subrip") and
-                    name contains "'.$this->drive_quote($basename).'"',
+                    name contains "' . $this->drive_quote($basename) . '"',
             'pageSize' => 10,
-            'fields' => 'nextPageToken, files(id,name,mimeType)'
+            'fields' => 'nextPageToken, files(id,name,mimeType)',
         ];
 
         try {
@@ -909,11 +914,13 @@ class client {
     /**
      * Find and fetch the Gemini meeting notes (a Google Doc) for a recording.
      *
-     * Notes are optional and often generated AFTER the recording appears, so this
-     * is called both for new recordings and for existing ones still missing notes.
+     * Notes are optional and often generated after the recording appears, so this
+     * is called both for new recordings and for existing ones still missing notes. The Google Docs
+     * the user owns are listed once per client instance and the match is chosen by
+     * {@see self::select_notes_candidate_for_recording()}.
      *
      * @param rest $service The REST service
-     * @param string $parents The parent folders query (may be empty)
+     * @param string $parents Unused: notes are searched across the whole Drive
      * @param string $videoname The video filename
      * @param int $recordingcreatedtime Recording creation timestamp.
      * @return array|null ['docid' => string, 'content' => string] or null
@@ -926,7 +933,7 @@ class client {
             'q' => 'trashed = false and "me" in owners and mimeType = "application/vnd.google-apps.document"',
             'orderBy' => 'createdTime desc',
             'pageSize' => 1000,
-            'fields' => 'nextPageToken, files(id,name,createdTime)'
+            'fields' => 'nextPageToken, files(id,name,createdTime)',
         ];
 
         try {
@@ -1002,11 +1009,11 @@ class client {
                 try {
                     $permissionparams = [
                         'fileid' => $recording->recordingid,
-                        'fields' => 'id'
+                        'fields' => 'id',
                     ];
                     $permissionrawpost = [
                         'role' => 'reader',
-                        'type' => 'anyone'
+                        'type' => 'anyone',
                     ];
                     helper::request($service, 'create_permission', $permissionparams, json_encode($permissionrawpost));
                 } catch (\Throwable $e) {
@@ -1070,6 +1077,10 @@ class client {
     /**
      * Select the best Gemini notes document for a recording from an already fetched docs list.
      *
+     * A candidate's name contains the recording prefix (see recording_notes_prefix()) and it was
+     * created within NOTES_PROXIMITY_SECONDS of the recording. Names mentioning Gemini, Notas or
+     * Notes are preferred over the rest; within the chosen group the nearest in time wins.
+     *
      * @param array $docs Google Docs Drive file objects.
      * @param string $videoname Recording filename.
      * @param int $recordingcreatedtime Recording creation timestamp.
@@ -1098,8 +1109,10 @@ class client {
             $doctime = self::google_time_to_timestamp($file->createdTime ?? null);
             if ($doctime === null) {
                 if ($debugdiscarded) {
-                    debugging('mod_googlemeet: notes candidate discarded without createdTime: ' . $filename,
-                        DEBUG_DEVELOPER);
+                    debugging(
+                        'mod_googlemeet: notes candidate discarded without createdTime: ' . $filename,
+                        DEBUG_DEVELOPER
+                    );
                 }
                 continue;
             }
@@ -1107,8 +1120,10 @@ class client {
             $distance = abs($doctime - $recordingcreatedtime);
             if ($distance > self::NOTES_PROXIMITY_SECONDS) {
                 if ($debugdiscarded) {
-                    debugging('mod_googlemeet: notes candidate discarded outside 36h window: ' . $filename,
-                        DEBUG_DEVELOPER);
+                    debugging(
+                        'mod_googlemeet: notes candidate discarded outside 36h window: ' . $filename,
+                        DEBUG_DEVELOPER
+                    );
                 }
                 continue;
             }
@@ -1126,7 +1141,7 @@ class client {
             return null;
         }
 
-        usort($pool, static function(array $a, array $b): int {
+        usort($pool, static function (array $a, array $b): int {
             return $a['distance'] <=> $b['distance'];
         });
 
@@ -1135,6 +1150,9 @@ class client {
 
     /**
      * Derive the filename prefix shared by Meet recordings and Gemini notes.
+     *
+     * Strips a trailing "- Recording" suffix (hyphen, en or em dash); when there is none, strips
+     * the file extension instead.
      *
      * @param string $videoname Recording filename.
      * @return string Prefix used for matching.
@@ -1207,10 +1225,9 @@ class client {
         // Drop <style> blocks Google Docs inlines in the body.
         $html = preg_replace('/<style\b[^>]*>.*?<\/style>/is', '', $html);
 
-        // Strip Google Docs' inline presentation (style/class/id attributes) so the
-        // plugin's own CSS governs appearance — otherwise the 32pt Roboto styling from
-        // the export overrides the notes panel. Semantic tags (h1-h6, ul/li, p, strong)
-        // survive and carry the structure.
+        // Strip Google Docs' inline presentation (style/class/id/dir/lang attributes) so the
+        // plugin's own CSS governs appearance; otherwise the export's fonts and sizes override the
+        // notes panel. Semantic tags (h1-h6, ul/li, p, strong) survive and carry the structure.
         $html = preg_replace('/\s(?:style|class|id|dir|lang)="[^"]*"/i', '', $html);
 
         $html = clean_text($html, FORMAT_HTML);
@@ -1219,16 +1236,22 @@ class client {
         // transcript appended at the end (shown in its own tab), and promo/disclaimer
         // paragraphs. Keep only the notes (Resumen/Summary/Resumo …). Markers are
         // localized (es/en/pt); a language-agnostic fallback also removes the transcript.
-        // (a) Drop everything before the first notes heading.
+        // Step (a): drop everything before the first notes heading.
         $html = preg_replace('/^.*?(?=<h[23]\b[^>]*>(?:(?!<\/h[23]>).)*?(?:Resumen|Summary|Resumo)\b)/isu', '', $html);
-        // (b) Drop the transcript appendix: localized markers first…
+        // Step (b): drop the transcript appendix: localized markers first...
         $html = preg_replace('/<p\b[^>]*>(?:(?!<\/p>).)*?📖\s*(?:Transcripci[oó]n|Transcript|Transcri[çc][aã]o).*$/isu', '', $html);
         $html = preg_replace('/<h2\b[^>]*>(?:(?!<\/h2>).)*?(?:Transcripci[oó]n|Transcript|Transcri[çc][aã]o).*$/isu', '', $html);
-        // …then language-agnostic: cut from the first timestamp heading (<h3>HH:MM:SS</h3>), used only by the transcript.
+        // ...then language-agnostic: cut from the first timestamp heading (<h3>HH:MM:SS</h3>), used only by the transcript.
         $html = preg_replace('/<h3\b[^>]*>(?:(?!<\/h3>).)*?\b\d{1,2}:\d{2}:\d{2}\b.*$/isu', '', $html);
-        // (c) Drop Gemini promo/disclaimer paragraphs (es/en/pt).
-        $html = preg_replace('/<p\b[^>]*>(?:(?!<\/p>).)*?(?:Revisa las notas de Gemini|Check Gemini.?s notes|Revise as notas do Gemini|Gemini (?:toma|tom[oó]|takes) notas|Obt[eé]n sugerencias|Get tips|Responde una breve encuesta|Take a .{0,14}survey|Responda .{0,14}pesquisa)(?:(?!<\/p>).)*?<\/p>/isu', '', $html);
-        // (d) Timestamp references point to the (removed) transcript anchors; flatten to plain text.
+        // Step (c): drop Gemini promo/disclaimer paragraphs (es/en/pt).
+        $html = preg_replace(
+            '/<p\b[^>]*>(?:(?!<\/p>).)*?(?:Revisa las notas de Gemini|Check Gemini.?s notes|Revise as notas do Gemini'
+                . '|Gemini (?:toma|tom[oó]|takes) notas|Obt[eé]n sugerencias|Get tips|Responde una breve encuesta'
+                . '|Take a .{0,14}survey|Responda .{0,14}pesquisa)(?:(?!<\/p>).)*?<\/p>/isu',
+            '',
+            $html
+        );
+        // Step (d): timestamp references point to the (removed) transcript anchors; flatten to plain text.
         $html = preg_replace('/<a\b[^>]*href="#[^"]*"[^>]*>(.*?)<\/a>/is', '$1', $html);
 
         return trim($html);
@@ -1285,7 +1308,7 @@ class client {
                 continue;
             }
 
-            // Skip timestamp lines (format: 00:00:00.000 --> 00:00:00.000 or 0:00:00.000,0:00:00.000).
+            // Skip timestamp lines, written as "00:00:00.000 --> 00:00:00.000" or "0:00:00.000,0:00:00.000".
             if (preg_match('/^\d{1,2}:\d{2}:\d{2}[.,]\d{3}/', $line)) {
                 continue;
             }
@@ -1310,22 +1333,22 @@ class client {
     }
 
     /**
-     * Create a meeting event in Google Calendar
+     * Format a duration as M:SS below an hour, else H:MM:SS.
      *
      * @param int $milli The time in milliseconds.
      *
      * @return string The formatted time
      */
-    protected function formatseconds($milli=0) {
+    protected function formatseconds($milli = 0) {
         $secs = $milli / 1000;
 
         if ($secs < MINSECS) {
-            return '0:'. str_pad(floor($secs), 2, "0", STR_PAD_LEFT);
+            return '0:' . str_pad(floor($secs), 2, "0", STR_PAD_LEFT);
         } else if ($secs >= MINSECS && $secs < HOURSECS) {
-            return floor($secs / MINSECS) .':'. str_pad(floor($secs % MINSECS), 2, "0", STR_PAD_LEFT);
+            return floor($secs / MINSECS) . ':' . str_pad(floor($secs % MINSECS), 2, "0", STR_PAD_LEFT);
         } else {
-            return floor($secs / HOURSECS) .':'.
-                str_pad(floor(($secs % HOURSECS) / MINSECS), 2, "0", STR_PAD_LEFT) .':'.
+            return floor($secs / HOURSECS) . ':' .
+                str_pad(floor(($secs % HOURSECS) / MINSECS), 2, "0", STR_PAD_LEFT) . ':' .
                 str_pad(floor(($secs % HOURSECS) % MINSECS), 2, "0", STR_PAD_LEFT);
         }
     }
@@ -1333,11 +1356,10 @@ class client {
     /**
      * Get the email of the logged in Google account
      *
-     * @return string The email
+     * @return string The email, or '' when no Google account is logged in
      */
     public function get_email() {
         $userinfo = $this->get_cached_userinfo();
         return $userinfo['username'] ?? '';
     }
-
 }

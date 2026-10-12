@@ -31,9 +31,10 @@ define('CLI_SCRIPT', true);
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
+/** Seconds to wait before each retry of a transient Gemini failure; one retry per entry. */
 const GOOGLEMEET_BACKFILL_BACKOFF = [30, 120, 300];
 
-list($options, $unrecognized) = cli_get_params([
+[$options, $unrecognized] = cli_get_params([
     'googlemeetid' => 0,
     'recordingid' => 0,
     'limit' => 0,
@@ -201,7 +202,7 @@ if ($processed < $totaleligible) {
  * Resolve activity, course module and context for a recording row.
  *
  * @param stdClass $recording Recording row.
- * @return array
+ * @return array [activity record, course module, context_module].
  */
 function googlemeet_backfill_resolve_context(stdClass $recording): array {
     global $DB;
@@ -220,6 +221,7 @@ function googlemeet_backfill_resolve_context(stdClass $recording): array {
  * @param int $recordingid Recording id.
  * @param int $count Requested question count.
  * @return int Created question count.
+ * @throws gemini_transient_exception When the last back-off delay is used up.
  */
 function googlemeet_backfill_generate_with_retries(ai_service $service, int $recordingid, int $count): int {
     $attempt = 0;
@@ -247,7 +249,7 @@ function googlemeet_backfill_generate_with_retries(ai_service $service, int $rec
  * @param stdClass $cm Course module.
  * @param context_module $context Module context.
  * @param int $recordingid Recording id.
- * @return array
+ * @return array Counts keyed total, draft and ready.
  */
 function googlemeet_backfill_question_counts(
     question_service $questionservice,

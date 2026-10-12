@@ -36,7 +36,6 @@ require_once($CFG->dirroot . '/question/engine/bank.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class question_service {
-
     /** @var string Prefix of the per-recording question tag (followed by the local recording id). */
     public const TAG_PREFIX = 'googlemeet-rec-';
 
@@ -71,12 +70,12 @@ class question_service {
      *
      * Core restore copies the module-context categories, questions (with their draft/ready
      * status) and tags verbatim, so after a restore:
-     *  - the category idnumber still carries the ORIGINAL course-module id, and
-     *  - each question is still tagged with the ORIGINAL recording id.
+     *  - the category idnumber still carries the original course-module id, and
+     *  - each question is still tagged with the original recording id.
      * This rewrites both to the new ids. It only touches categories/questions that live in the
      * given (new) module context, so it can never modify the source activity. It must run exactly
      * once per restore (from the restore step's after_restore()): the tag rewrite relies on the
-     * restore id mappings and is NOT idempotent.
+     * restore id mappings and is not idempotent.
      *
      * Tags whose recording was not part of the restore (e.g. a recording in the trash, which is not
      * backed up) are renamed to the orphan prefix so they can never collide with a recording id
@@ -95,10 +94,15 @@ class question_service {
 
         // 1. Category idnumber: googlemeet_cm_<old cmid> -> googlemeet_cm_<new cmid>.
         $newidnumber = self::category_idnumber($newcmid);
-        if ($oldcmid !== $newcmid
-                && !$DB->record_exists('question_categories', ['contextid' => $context->id, 'idnumber' => $newidnumber])) {
-            $category = $DB->get_record('question_categories',
-                ['contextid' => $context->id, 'idnumber' => self::category_idnumber($oldcmid)], 'id');
+        if (
+            $oldcmid !== $newcmid
+                && !$DB->record_exists('question_categories', ['contextid' => $context->id, 'idnumber' => $newidnumber])
+        ) {
+            $category = $DB->get_record(
+                'question_categories',
+                ['contextid' => $context->id, 'idnumber' => self::category_idnumber($oldcmid)],
+                'id'
+            );
             if ($category) {
                 $DB->set_field('question_categories', 'idnumber', $newidnumber, ['id' => $category->id]);
                 $stats['categories']++;
@@ -146,8 +150,12 @@ class question_service {
             // Remove every old binding first, then add the new ones: a chain such as 5->9, 9->12
             // must not drop the freshly added "9" tag.
             foreach ($oldrecordingids as $oldrecordingid) {
-                \core_tag_tag::remove_item_tag('core_question', 'question', $questionid,
-                    self::tag_for_recording($oldrecordingid));
+                \core_tag_tag::remove_item_tag(
+                    'core_question',
+                    'question',
+                    $questionid,
+                    self::tag_for_recording($oldrecordingid)
+                );
             }
             foreach (array_unique($newnames) as $name) {
                 \core_tag_tag::add_item_tag('core_question', 'question', $questionid, $context, $name);
@@ -297,7 +305,14 @@ class question_service {
         }
 
         $created = question_bank::get_qtype('multichoice')->save_question($question, $form);
-        \core_tag_tag::set_item_tags('core_question', 'question', $created->id, $context, [self::tag_for_recording($recordingid)], 0);
+        \core_tag_tag::set_item_tags(
+            'core_question',
+            'question',
+            $created->id,
+            $context,
+            [self::tag_for_recording($recordingid)],
+            0
+        );
         question_bank::notify_question_edited($created->id);
 
         return (int)$created->id;
@@ -363,8 +378,12 @@ class question_service {
         $records = $DB->get_records_sql($sql, $params);
         $questions = [];
         foreach ($records as $record) {
-            $answers = $DB->get_records('question_answers', ['question' => $record->id], 'id ASC',
-                'id, answer, answerformat, fraction');
+            $answers = $DB->get_records(
+                'question_answers',
+                ['question' => $record->id],
+                'id ASC',
+                'id, answer, answerformat, fraction'
+            );
             $answerdata = [];
             $correctindex = 0;
             $index = 0;
@@ -473,8 +492,12 @@ class question_service {
             throw new moodle_exception('invalidrecord', 'error', '', 'question');
         }
 
-        $answers = $DB->get_records('question_answers', ['question' => $questionid], 'id ASC',
-            'id, answer, answerformat, fraction');
+        $answers = $DB->get_records(
+            'question_answers',
+            ['question' => $questionid],
+            'id ASC',
+            'id, answer, answerformat, fraction'
+        );
         if (empty($answers) || !isset($answers[$answerid])) {
             throw new moodle_exception('invalidrecord', 'error', '', 'question');
         }
@@ -523,8 +546,12 @@ class question_service {
     ): array {
         global $DB;
 
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $googlemeet->id, 'deleted' => 0], 'id', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $recordingid, 'googlemeetid' => $googlemeet->id, 'deleted' => 0],
+            'id',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -585,7 +612,7 @@ class question_service {
         if (file_exists($path)) {
             require_once($path);
         }
-        $missing = array_filter($functions, static function(string $fn): bool {
+        $missing = array_filter($functions, static function (string $fn): bool {
             return !function_exists($fn);
         });
         if (!$missing) {
@@ -638,8 +665,12 @@ class question_service {
         if (!$category) {
             return [];
         }
-        $recordings = $DB->get_records('googlemeet_recordings',
-            ['googlemeetid' => $googlemeet->id, 'deleted' => 0], 'createdtime ASC, id ASC', 'id, name');
+        $recordings = $DB->get_records(
+            'googlemeet_recordings',
+            ['googlemeetid' => $googlemeet->id, 'deleted' => 0],
+            'createdtime ASC, id ASC',
+            'id, name'
+        );
         if (!$recordings) {
             return [];
         }
@@ -736,7 +767,7 @@ class question_service {
                 'error' => '',
             ];
             try {
-                // set_status() runs the leak gate on the whole batch before writing anything.
+                // The leak gate in set_status() checks the whole batch before writing anything.
                 $result['published'] = $this->set_status($rows, question_version_status::QUESTION_STATUS_READY);
                 $published += $result['published'];
             } catch (\Exception $e) {
@@ -762,17 +793,17 @@ class question_service {
     public function set_status(array $questionrows, string $status): int {
         global $DB;
 
-        if (!in_array($status, [
+        if (
+            !in_array($status, [
             question_version_status::QUESTION_STATUS_DRAFT,
             question_version_status::QUESTION_STATUS_READY,
-        ], true)) {
+            ], true)
+        ) {
             throw new moodle_exception('invalidrecord', 'error', '', 'question');
         }
 
-        // Puerta contra fugas internas (04-10-2026): al PUBLICAR (ready) se valida la
-        // versión completa de cada pregunta; si una falla, no se publica ninguna.
-        // The check is optional (local_questions may be absent); when the library is
-        // present the all-or-nothing semantics are preserved.
+        // Publishing runs the all-or-nothing leak gate first: if one question fails, none is published.
+        // See assert_publishable().
         if ($status === question_version_status::QUESTION_STATUS_READY) {
             $this->assert_publishable($questionrows);
         }
@@ -832,8 +863,8 @@ class question_service {
             throw new moodle_exception('invalidrecord', 'error', '', 'question');
         }
 
-        // Puerta contra fugas internas (04-10-2026): edición del docente (modo humano).
-        // Optional: skipped (with a debugging notice) if local_questions is not installed.
+        // Leak gate on the teacher's edited text; skipped (with a debugging notice) when local_questions
+        // is not installed.
         if (self::leak_check_available(['fugas_exigir_limpia'])) {
             $visibles = ['enunciado' => $stem, 'feedback_general' => $this->build_general_feedback($explanation, $citation)];
             foreach ($options as $i => $o) {
@@ -879,13 +910,15 @@ class question_service {
     public function is_generation_queued(int $recordingid): bool {
         global $DB;
 
-        return $DB->record_exists_select('task_adhoc',
+        return $DB->record_exists_select(
+            'task_adhoc',
             "(classname = :classname OR classname = :classname2) AND " . $DB->sql_like('customdata', ':needle', false, false),
             [
                 'classname' => '\\mod_googlemeet\\task\\generate_questions',
                 'classname2' => 'mod_googlemeet\\task\\generate_questions',
                 'needle' => '%"recordingid":' . $recordingid . '%',
-            ]);
+            ]
+        );
     }
 
     /**

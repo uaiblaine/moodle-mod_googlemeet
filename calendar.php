@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * "Add to my calendar": iCalendar (.ics) export of an activity's upcoming sessions (NOT-04).
+ * "Add to my calendar": iCalendar (.ics) export of an activity's upcoming sessions.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -38,8 +38,14 @@ require_capability('mod/googlemeet:view', $context);
 $now = time();
 $events = \mod_googlemeet\local\calendar_export::get_upcoming_events((int)$googlemeet->id, $now);
 $coursename = format_string($course->fullname, true, ['context' => context_course::instance($course->id), 'escape' => false]);
-$ics = \mod_googlemeet\local\calendar_export::build_ics($googlemeet, (int)$cm->id, $coursename, $events, $now,
-    core_date::get_user_timezone());
+$ics = \mod_googlemeet\local\calendar_export::build_ics(
+    $googlemeet,
+    (int)$cm->id,
+    $coursename,
+    $events,
+    $now,
+    core_date::get_user_timezone()
+);
 
 $filename = clean_filename(format_string($googlemeet->name, true, ['context' => $context, 'escape' => false])) ?: 'googlemeet';
 send_file($ics, $filename . '.ics', 0, 0, true, true, 'text/calendar');

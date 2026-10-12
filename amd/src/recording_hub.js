@@ -91,6 +91,7 @@ const loadStrings = () => getStrings(stringRequests).then(values => {
     stringRequests.forEach((request, index) => {
         strings[request.key] = values[index];
     });
+    return;
 });
 
 /**
@@ -184,16 +185,10 @@ const restoreHubState = () => {
  * @param {string} body Modal body.
  * @param {string} label Save button label.
  * @param {HTMLElement} triggerElement Element opening the modal.
- * @param {Function} callback Confirmation callback.
- * @returns {void}
+ * @returns {Promise} Resolves when confirmed, rejects when cancelled.
  */
-const confirmAction = (title, body, label, triggerElement, callback) => {
-    Notification.saveCancelPromise(title, body, label, {triggerElement: triggerElement})
-        .then(callback)
-        .catch(() => {
-            return;
-        });
-};
+const confirmAction = (title, body, label, triggerElement) =>
+    Notification.saveCancelPromise(title, body, label, {triggerElement: triggerElement});
 
 /**
  * Update a recording visibility action after the AJAX toggle response.
@@ -229,6 +224,7 @@ const updateVisibilityButton = (button, visible) => {
 const call = (methodname, args) => Ajax.call([{methodname: methodname, args: args}])[0]
     .then(() => {
         reloadHub();
+        return;
     })
     .fail(Notification.exception);
 
@@ -272,11 +268,16 @@ const refreshProgressUi = () => {
     const button = $('.googlemeet-mark-viewed');
     const aria = (strings.recording_progress_aria || '{$a}').replace('{$a}', state.label);
 
+    let badgeclass = 'googlemeet-progress-badge-unseen';
+    if (progress.completed) {
+        badgeclass = 'googlemeet-progress-badge-completed';
+    } else if (progress.watchedseconds > 0) {
+        badgeclass = 'googlemeet-progress-badge-partial';
+    }
+
     badge
         .removeClass('googlemeet-progress-badge-completed googlemeet-progress-badge-partial googlemeet-progress-badge-unseen')
-        .addClass(progress.completed
-            ? 'googlemeet-progress-badge-completed'
-            : (progress.watchedseconds > 0 ? 'googlemeet-progress-badge-partial' : 'googlemeet-progress-badge-unseen'))
+        .addClass(badgeclass)
         .attr('aria-label', aria);
     badge.find('[aria-hidden="true"]').text(progress.completed ? '\u2713' : '\u25cb');
     badge.find('.googlemeet-progress-status-text').text(state.label);
@@ -338,6 +339,7 @@ const sendProgress = (delta, completed, silent) => {
         progress.watchedseconds = parseInt(response.watchedseconds, 10) || 0;
         progress.completed = !!response.completed;
         refreshProgressUi();
+        return;
     }).fail(error => {
         progress.pendingseconds += delta;
         if (!silent) {
@@ -398,6 +400,10 @@ const bindRecordingProgress = () => {
         button.prop('disabled', true).text(strings.recording_progress_saving);
         sendProgress(delta, true, false).then(() => {
             refreshProgressUi();
+            return;
+        }).catch(() => {
+            // The failure was already reported by sendProgress().
+            return;
         });
     });
 
@@ -505,6 +511,7 @@ const copyTimestamp = timestamp => {
 
     return navigator.clipboard.writeText(timestamp).then(() => {
         feedback.text((strings.chapter_timestamp_copied || '{$a}').replace('{$a}', timestamp));
+        return;
     }).catch(() => {
         feedback.text(reference);
     });
@@ -574,7 +581,7 @@ const scrollChapterIntoPanel = button => {
 /**
  * Bind the mobile collapse toggle of the chapters panel.
  *
- * On small screens (<= 576px) the list starts collapsed under the player and the toggle
+ * On small screens (below 576px) the list starts collapsed under the player and the toggle
  * shows/hides it (aria-expanded + the hidden attribute on the list). On larger screens the
  * toggle is hidden by CSS and the list is always expanded.
  *
@@ -744,6 +751,7 @@ const copyMomentLink = (seconds, timestamp) => {
     }
     return navigator.clipboard.writeText(link).then(() => {
         feedback.text((strings.chapter_link_copied || '{$a}').replace('{$a}', timestamp));
+        return;
     }).catch(manual);
 };
 
@@ -1150,16 +1158,16 @@ const bindQuestionManagement = () => {
             strings.question_unpublish,
             strings.question_unpublish_confirm,
             strings.question_unpublish,
-            button,
-            () => {
-                call('mod_googlemeet_unpublish_questions', {
-                    recordingid: settings.recordingid,
-                    coursemoduleid: settings.cmid,
-                    questionids: [questionid],
-                    sesskey: settings.sesskey,
-                });
-            }
-        );
+            button
+        ).then(() => call('mod_googlemeet_unpublish_questions', {
+            recordingid: settings.recordingid,
+            coursemoduleid: settings.cmid,
+            questionids: [questionid],
+            sesskey: settings.sesskey,
+        })).catch(() => {
+            // Cancelled, or the request failed and call() already reported it.
+            return;
+        });
     });
 
     $('.googlemeet-question-discard').on('click', function() {
@@ -1169,16 +1177,16 @@ const bindQuestionManagement = () => {
             strings.question_discard,
             strings.question_discard_confirm,
             strings.question_discard,
-            button,
-            () => {
-                call('mod_googlemeet_discard_questions', {
-                    recordingid: settings.recordingid,
-                    coursemoduleid: settings.cmid,
-                    questionids: [questionid],
-                    sesskey: settings.sesskey,
-                });
-            }
-        );
+            button
+        ).then(() => call('mod_googlemeet_discard_questions', {
+            recordingid: settings.recordingid,
+            coursemoduleid: settings.cmid,
+            questionids: [questionid],
+            sesskey: settings.sesskey,
+        })).catch(() => {
+            // Cancelled, or the request failed and call() already reported it.
+            return;
+        });
     });
 
     // Selection, publish and bulk actions live in mod_googlemeet/question_review.
@@ -1231,6 +1239,7 @@ const bindRecordingManagement = () => {
             const visible = response.visible === true || response.visible === 1 ||
                 response.visible === '1' || response.visible === 'true';
             updateVisibilityButton(button, visible);
+            return;
         }).fail(Notification.exception);
     });
 
@@ -1239,6 +1248,8 @@ const bindRecordingManagement = () => {
         const title = $('.recording-name-text').first();
         const current = title.attr('data-originalname') || title.text().trim();
 
+        // The modal root, kept for the step that runs once the body is rendered.
+        let modalroot = null;
         Modal.create({
             title: strings.recording_rename,
             body: '<div class="mb-3">' +
@@ -1255,6 +1266,7 @@ const bindRecordingManagement = () => {
             returnElement: trigger,
         }).then(modal => {
             const root = modal.getRoot();
+            modalroot = root;
             root.on('click', '.googlemeet-recording-rename-save', function(event) {
                 event.preventDefault();
                 const saveButton = $(this);
@@ -1277,9 +1289,10 @@ const bindRecordingManagement = () => {
                     root.find('.googlemeet-recording-rename-save').trigger('click');
                 }
             });
-            modal.getBodyPromise().then(() => {
-                root.find('#googlemeet-recording-rename-input').val(current).focus().select();
-            });
+            return modal.getBodyPromise();
+        }).then(() => {
+            modalroot.find('#googlemeet-recording-rename-input').val(current).focus().select();
+            return;
         }).catch(Notification.exception);
     });
 };
@@ -1343,10 +1356,8 @@ const renderPracticeQuestion = (practice, player) => {
     $('.googlemeet-practice-loading, .googlemeet-practice-complete, .googlemeet-practice-error').addClass('d-none');
     $('.googlemeet-practice-question').removeClass('d-none');
     updatePracticeHeader(practice, player, false);
-    // Question stem/options/explanation arrive pre-sanitised: the WS builds them
-    // with format_text() (HTMLPurifier) in question_service, the standard Moodle
-    // boundary for question content. Do not client-escape — it would break
-    // legitimate formatting (bold, sub/sup) that questions rely on.
+    // Stem, options and explanation are format_text() output from question_service: insert them
+    // as HTML; escaping them here would break their formatting (bold, sub/sup).
     $('.googlemeet-practice-stem').html(question.stem);
     $('.googlemeet-practice-feedback').addClass('d-none').removeClass('alert alert-success alert-warning').empty();
     $('.googlemeet-practice-check').prop('disabled', true).removeClass('d-none');
@@ -1455,6 +1466,7 @@ const bindPracticePlayer = () => {
             practice.queue = practice.questions.slice();
             practice.index = 0;
             renderPracticeQuestion(practice, player);
+            return;
         }).fail(error => {
             $('.googlemeet-practice-loading').addClass('d-none');
             $('.googlemeet-practice-error')
@@ -1534,6 +1546,7 @@ const bindPracticePlayer = () => {
             $('.googlemeet-practice-next').removeClass('d-none').text(
                 practice.index + 1 >= practice.queue.length ? strings.practice_finish : strings.practice_next
             ).trigger('focus');
+            return;
         }).fail(error => {
             $('.googlemeet-practice-check').prop('disabled', false);
             $('.googlemeet-practice-error')
@@ -1684,7 +1697,7 @@ const bindReadMore = () => {
     }
     const measure = () => {
         body.classList.add('googlemeet-collapsed');
-        // Only collapse when at least ~30% more text is hidden; hiding two lines is just annoying.
+        // Collapse only when at least ~30% more text would be hidden; a line or two is not worth a toggle.
         const overflow = body.scrollHeight > body.clientHeight * 1.3;
         if (!overflow) {
             body.classList.remove('googlemeet-collapsed');
@@ -1716,7 +1729,7 @@ const bindReadMore = () => {
 };
 
 /**
- * "Imprimir resumen": print the lesson notes (print stylesheet hides player, tabs and actions).
+ * Print summary button: print the lesson notes (the print stylesheet hides player, tabs and actions).
  *
  * @returns {void}
  */
@@ -1810,7 +1823,7 @@ const bindKeypointChecklist = () => {
                 return;
             }
             return;
-        });
+        }).catch(Notification.exception);
     }
     section.classList.add('googlemeet-keypoints-interactive');
     counter.classList.remove('d-none');
@@ -1869,5 +1882,6 @@ export const init = config => {
             bindPrintSummary();
             bindPracticePlayer();
         });
+        return;
     }).catch(Notification.exception);
 };

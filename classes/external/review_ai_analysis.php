@@ -23,14 +23,15 @@ use core_external\external_value;
 use mod_googlemeet\local\ai_review;
 
 /**
- * IA-04: publish (mark as reviewed) the AI summary of one recording, or of every recording of the activity.
+ * Publish (mark as reviewed) the AI summary of one recording, or of every recording of the activity.
+ *
+ * The review rule lives in {@see \mod_googlemeet\local\ai_review}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class review_ai_analysis extends external_api {
-
     /**
      * Parameters.
      *
@@ -39,8 +40,12 @@ class review_ai_analysis extends external_api {
     public static function execute_parameters(): external_function_parameters {
         return new external_function_parameters([
             'coursemoduleid' => new external_value(PARAM_INT, 'Course module ID'),
-            'recordingid' => new external_value(PARAM_INT, 'Recording ID; 0 publishes every reviewable summary of the activity',
-                VALUE_DEFAULT, 0),
+            'recordingid' => new external_value(
+                PARAM_INT,
+                'Recording ID; 0 publishes every reviewable summary of the activity',
+                VALUE_DEFAULT,
+                0
+            ),
             'seen' => new external_value(PARAM_INT, 'Single: timemodified of the content the teacher reviewed. '
                 . 'All: time the teacher loaded the page. 0 = no check (publishes the current content)', VALUE_DEFAULT, 0),
         ]);
@@ -74,8 +79,12 @@ class review_ai_analysis extends external_api {
         }
 
         // Scope the recording to this activity (prevent IDOR).
-        $recording = $DB->get_record('googlemeet_recordings',
-            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0], 'id', IGNORE_MISSING);
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            'id',
+            IGNORE_MISSING
+        );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }

@@ -16,6 +16,10 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\task\process_recording_enrichment;
+use PHPUnit\Framework\Attributes\CoversClass;
+use PHPUnit\Framework\Attributes\CoversFunction;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -31,8 +35,14 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-class soft_delete_test extends \advanced_testcase {
-
+#[CoversFunction('googlemeet_sync_recordings')]
+#[CoversFunction('googlemeet_list_recordings')]
+#[CoversFunction('googlemeet_filter_recordings_by_query')]
+#[CoversFunction('googlemeet_reset_exhausted_autosync_events')]
+#[CoversFunction('googlemeet_get_accessible_recording')]
+#[CoversClass(\mod_googlemeet_external::class)]
+#[CoversClass(process_recording_enrichment::class)]
+final class soft_delete_test extends \advanced_testcase {
     /**
      * Create a course, module and context.
      *

@@ -30,18 +30,20 @@ require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 require_once(__DIR__ . '/../classes/subtitle_extractor.php');
 
-// Back-off schedule in seconds for retry attempts on transient Gemini errors.
-// Index = retrycount BEFORE incrementing. After 4 retries (final value 4), give up.
+// Transient Gemini failure policy; mirrors ai_service::record_transient_failure(), keep in step.
+/** @var int[] Back-off in seconds, indexed by the retrycount before this failure. */
 const TRANSIENT_BACKOFF = [
-    0 => 2 * 3600,    // 1st failure -> retry in 2h
-    1 => 4 * 3600,    // 2nd failure -> 4h
-    2 => 8 * 3600,    // 3rd failure -> 8h
-    3 => 24 * 3600,   // 4th failure -> 24h
+    0 => 2 * 3600, // 1st failure: retry in 2h.
+    1 => 4 * 3600, // 2nd failure: retry in 4h.
+    2 => 8 * 3600, // 3rd failure: retry in 8h.
+    3 => 24 * 3600, // Not reached while MAX_RETRIES is 4.
 ];
-const MAX_RETRIES = 4;            // give up after 4 transient retries
-const PERMANENT_RETRYCOUNT = 99;  // sentinel: permanent error, never retry
+/** @var int The 4th transient failure gives up. */
+const MAX_RETRIES = 4;
+/** @var int Sentinel retrycount: permanent error, never retried. */
+const PERMANENT_RETRYCOUNT = 99;
 
-list($options, $unrecognized) = cli_get_params([
+[$options, $unrecognized] = cli_get_params([
     'googlemeetid' => 0,
     'recordingid'  => 0,
     'dry-run'      => false,
@@ -82,17 +84,15 @@ if (empty($options['googlemeetid'])) {
 
 $dryrun = $options['dry-run'];
 $skipgemini = $options['skip-gemini'];
-// Resolve yt-dlp the same way subtitle_extractor does: configured path first,
-// then PATH. This is only a fast-fail with a helpful hint; the extractor performs
-// its own resolution. There is deliberately no /tmp fallback: /tmp is world-writable
-// (a planted binary would run as the web user) and systemd-tmpfiles wipes it.
+// Fast-fail with an install hint; the extractor resolves yt-dlp itself. Mirrors
+// subtitle_extractor::find_ytdlp() (configured path, then PATH), keep in step. There is
+// deliberately no /tmp fallback: /tmp is world-writable, so a planted binary would run.
 $ytdlp = trim((string)get_config('googlemeet', 'ytdlppath'));
 if ($ytdlp === '' || !is_executable($ytdlp)) {
     $which = trim((string)(shell_exec('command -v yt-dlp 2>/dev/null') ?: ''));
     $ytdlp = ($which !== '' && is_executable($which)) ? $which : '';
 }
 
-// Check yt-dlp is available (kept here for a fast-fail with a helpful install hint).
 if ($ytdlp === '' || !is_executable($ytdlp)) {
     cli_error("yt-dlp not found. Set the googlemeet/ytdlppath admin setting or install it "
         . "to a persistent path (NOT /tmp): "
@@ -105,7 +105,6 @@ $language = !empty($options['language'])
     ? $options['language']
     : (get_config('googlemeet', 'subtitlelanguage') ?: 'es');
 
-// Instantiate the canonical subtitle extractor with the resolved language.
 $extractor = new \mod_googlemeet\subtitle_extractor($language);
 
 // Get recordings to process.
@@ -192,8 +191,8 @@ foreach ($recordings as $recording) {
     // Get base URL (strip track-specific params).
     $baseurl = preg_replace('/&type=track.*$/', '', $timedtexturl);
 
-    // Download in fmt=1 format (simple XML with timestamps). Honour the resolved $language
-    // (CLI flag > site setting > 'es') instead of hard-coding Spanish.
+    // The fmt=1 format is the simple XML with timestamps that parse_xml() reads; try the ASR
+    // (auto-generated) track first. Mirrors subtitle_extractor::extract(), keep in step.
     $langparam = rawurlencode($language);
     $suburl = $baseurl . '&type=track&lang=' . $langparam . '&kind=asr&fmt=1';
     $subxml = $extractor->download_subtitle($suburl);
@@ -210,7 +209,7 @@ foreach ($recordings as $recording) {
         continue;
     }
 
-    // Step 3: Parse XML into readable transcript.
+    // Parse XML into readable transcript.
     $transcript = $extractor->parse_xml($subxml);
     $charcount = strlen($transcript);
     cli_writeln("  Downloaded {$charcount} characters of transcript.");
@@ -228,7 +227,7 @@ foreach ($recordings as $recording) {
         continue;
     }
 
-    // Step 4: Save transcript to googlemeet_ai_analysis table.
+    // Step 3: Save transcript to googlemeet_ai_analysis table.
     cli_writeln("  Step 3: Saving transcript to database...");
 
     $now = time();
@@ -252,7 +251,7 @@ foreach ($recordings as $recording) {
         ]);
     }
 
-    // Also save transcript to the recordings table for the fast-path.
+    // Also save transcript to the recordings table for the transcript fast path of process_video_analysis.
     $DB->update_record('googlemeet_recordings', (object)[
         'id' => $recording->id,
         'transcripttext' => $transcript,
@@ -260,7 +259,7 @@ foreach ($recordings as $recording) {
 
     cli_writeln("  Transcript saved (analysis #{$analysisid}).");
 
-    // Step 5: Run Gemini analysis.
+    // Step 4: Run Gemini analysis.
     if ($skipgemini) {
         cli_writeln("  SKIP-GEMINI: Transcript saved, AI analysis skipped.");
         $processed++;
@@ -279,8 +278,7 @@ foreach ($recordings as $recording) {
 
         $result = $client->analyze_transcript($transcript, $recording->name, $recording->duration);
 
-        // Save the analysis results.
-        // IA-04: new AI text waits for a teacher review before students see it.
+        // Save the analysis results; new AI text waits for a teacher review before students see it.
         $DB->update_record('googlemeet_ai_analysis', (object)([
             'id' => $analysisid,
             'summary' => $result->summary,
@@ -299,30 +297,29 @@ foreach ($recordings as $recording) {
         $keypointscount = count($result->keypoints);
         $topicscount = count($result->topics);
         cli_writeln("  AI analysis complete: summary={$summarylen} chars, {$keypointscount} key points, {$topicscount} topics.");
-
     } catch (\mod_googlemeet\gemini_transient_exception $e) {
         // Transient error (rate limit / high demand) → schedule retry with back-off.
-        $new_rc = $rc + 1;
-        if ($new_rc >= MAX_RETRIES) {
-            // Hemos agotado los reintentos, marcamos como permanente.
-            $next_unix = 0;
-            $new_rc = MAX_RETRIES; // pinned at 4, no further escalation
-            $log_suffix = "Max retries reached, giving up.";
+        $newrc = $rc + 1;
+        if ($newrc >= MAX_RETRIES) {
+            // Retries exhausted: no nextretry, and the retrycount check above skips the row from now on.
+            $nextunix = 0;
+            $newrc = MAX_RETRIES; // Capped: no further escalation.
+            $logsuffix = "Max retries reached, giving up.";
         } else {
-            $backoff = TRANSIENT_BACKOFF[$new_rc - 1] ?? 24 * 3600;
-            $next_unix = $now + $backoff;
-            $log_suffix = sprintf("Will retry at %s (in %d min).", userdate($next_unix, '%Y-%m-%d %H:%M'), (int)($backoff / 60));
+            $backoff = TRANSIENT_BACKOFF[$newrc - 1] ?? 24 * 3600;
+            $nextunix = $now + $backoff;
+            $logsuffix = sprintf("Will retry at %s (in %d min).", userdate($nextunix, '%Y-%m-%d %H:%M'), (int)($backoff / 60));
         }
         $DB->update_record('googlemeet_ai_analysis', (object)[
             'id' => $analysisid,
             'status' => 'failed',
             'error' => $e->getMessage(),
-            'retrycount' => $new_rc,
-            'nextretry' => $next_unix,
+            'retrycount' => $newrc,
+            'nextretry' => $nextunix,
             'timemodified' => $now,
         ]);
-        cli_writeln("  TRANSIENT ERROR (retrycount={$new_rc}): " . $e->getMessage());
-        cli_writeln("  " . $log_suffix);
+        cli_writeln("  TRANSIENT ERROR (retrycount={$newrc}): " . $e->getMessage());
+        cli_writeln("  " . $logsuffix);
         // Not a fatal error: the transcript is already saved.
     } catch (\moodle_exception $e) {
         // Permanent error → mark and don't retry.

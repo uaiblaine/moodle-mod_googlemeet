@@ -13,6 +13,7 @@
 //
 // You should have received a copy of the GNU General Public License
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+
 namespace mod_googlemeet\external;
 
 use core_external\external_api;
@@ -22,14 +23,13 @@ use core_external\external_value;
 use mod_googlemeet\local\sync_manager;
 
 /**
- * Status of the background "Sync with Google Drive" of an activity (PERF-02).
+ * Status of the background "Sync with Google Drive" of an activity.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class get_sync_status extends external_api {
-
     /**
      * Parameters.
      *

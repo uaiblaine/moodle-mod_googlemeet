@@ -33,8 +33,9 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * Weekly check that warns site admins when a googlemeet recurrence looks abandoned.
  */
 class check_stale_recurrence extends \core\task\scheduled_task {
-
     /**
+     * Task name.
+     *
      * @return string
      */
     public function get_name() {
@@ -73,7 +74,7 @@ class check_stale_recurrence extends \core\task\scheduled_task {
         $sent = 0;
         foreach ($stale as $info) {
             $stillstale[(int) $info->id] = true;
-            // DAT-06: the alert state lives in googlemeet.stalealerttime (0 = no open alert).
+            // The alert state lives in googlemeet.stalealerttime (0 = no open alert).
             $last = (int) $DB->get_field('googlemeet', 'stalealerttime', ['id' => $info->id]);
             if ($last === 0 || (time() - $last) > $renotifydays * DAYSECS) {
                 googlemeet_send_stale_alert($info);

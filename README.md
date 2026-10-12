@@ -4,8 +4,9 @@ Activity module that lets teachers schedule Google Meet rooms from Moodle, sync 
 from Google Drive and turn them into study material for students: per-recording pages with chapters,
 AI summaries, practice questions, materials and viewing progress.
 
-> This is a fork of [ronefel/moodle-mod_googlemeet](https://github.com/ronefel/moodle-mod_googlemeet),
-> modernised for **Moodle 5.0+ and PHP 8.2+**. The component name is still `mod_googlemeet`.
+> This is a fork of [hyukudan/moodle-mod_googlemeet](https://github.com/hyukudan/moodle-mod_googlemeet),
+> itself a fork of [ronefel/moodle-mod_googlemeet](https://github.com/ronefel/moodle-mod_googlemeet),
+> for **Moodle 5.2 and 5.3**. The component name is still `mod_googlemeet`.
 
 ## Features
 
@@ -53,9 +54,9 @@ AI summaries, practice questions, materials and viewing progress.
 
 ## Requirements
 
-- Moodle 5.0 or 5.1 (`requires = 2025041400`, `supported = [500, 501]`). Moodle 4.5 is not
-  supported by 2.29.0 and later.
-- PHP 8.2 or later.
+- Moodle 5.2 or 5.3 (`requires = 2026042000`, `supported = [502, 503]`). Moodle 5.1 and older
+  are not supported by 2.30.1+uai.1 and later.
+- PHP 8.3 or later (the Moodle 5.2 minimum).
 - A Google account (Google Workspace recommended) that organises the meetings and owns the recordings.
 - A Google Cloud project with an OAuth 2.0 client.
 - Moodle cron running **every minute** (sync, Calendar updates and AI run as adhoc tasks).
@@ -64,8 +65,7 @@ AI summaries, practice questions, materials and viewing progress.
 
 ## Installation
 
-1. Copy the plugin to `mod/googlemeet` (on Moodle 5.1 with the `public/` layout:
-   `public/mod/googlemeet`), or install it from the plugins directory.
+1. Copy the plugin to `public/mod/googlemeet`, or install it from the plugins directory.
 2. Visit *Site administration > Notifications* (or run `php admin/cli/upgrade.php`).
 3. Configure the Google OAuth 2 service and select it in the plugin settings
    (*Site administration > Plugins > Activity modules > Google Meet*, setting `issuerid`).
@@ -228,94 +228,33 @@ The plugin works without any of these; they are detected at run time.
 
 ## Changelog
 
-### 2.30.1 (2026-10-10)
-- Teaching context setting for AI prompts (`aicontext`); prompts no longer contain domain-specific
-  examples.
-- Generic CLI hints and sample data; licence headers completed.
-
-### 2.30.0 (2026-10-10)
-- Single cascade delete for recordings and activities; `cli/cleanup_orphans.php`; trash retention
-  (`trashretentiondays`, `purge_trash` task); "Delete all recordings" moves to the trash.
-- Course reset, backup of AI content without user data, numeric recording duration.
-- Activity index with next session and progress; background Drive sync with status polling; fewer
-  queries in lists; admin sync status page and sync log.
-- Reminders tolerate cron gaps, optional early reminder, Moodle app push, richer new-recording
-  notice, teacher alert when auto-sync gives up, "Add to my calendar".
-- Teacher review of AI content (`requireaireview`), Gemini safety threshold, stuck-analysis handling.
-- Google Calendar event updates on edit and safe deletion when the activity is deleted.
-- Custom completion rules, `room_entered` event, optional attendance from the Meet REST API.
-- Moodle app: activity and recording views.
-- GitHub Actions CI and Behat tests.
-
-### 2.29.1 (2026-10-09)
-- Layout fixes for the activity list filters, search result hints, viewing report width on phones,
-  chapter list on rotation, "Select all" label.
-
-### 2.29.0 (2026-10-09)
-- Requires Moodle 5.0. Key-points checklist stored per user; recording hub and list redesign;
-  12 recordings per page by default.
-- AI review flow with bulk publishing of practice questions.
-- Practice attempts stored; practice page (missed questions, by topic); teacher report with the new
-  `mod/googlemeet:viewreports` capability.
-
-### 2.28.1 (2026-10-09)
-- Friendly message for links to deleted or hidden recordings.
-
-### 2.28.0 (2026-10-09)
-- Practice questions are included in backup, restore, duplication and course copy; restored
-  activities no longer share the original's Calendar event.
-
-### 2.27.1 (2026-10-09)
-- Reminders only to active students; optional question publish check; organiser email can only be
-  changed by an admin or to the editor's own account; no yt-dlp fallback in `/tmp`; graceful pages
-  for invalid links; session cache for Google user info.
-
-### 2.27.0 / 2.26.0 (2026-10-08)
-- Hub and list design pass, print summary, dark mode fixes.
-- Chapter jumps, clickable timestamps, deep links (`&t=N`), transcript search.
-
-### 2.25.x (2026-07)
-- Virtual classroom: "Enter room" button, viewing progress, classroom hero, AI chapters,
-  backfill CLIs, Moodle calendar actions, live show/hide toggle.
-
-### 2.18 – 2.24
-- "Notes by Gemini" import; recording materials; soft delete with trash; sync robustness; search
-  across transcripts and notes; AMD modules; Spanish translation.
-
-### 2.10 – 2.14
-- Automatic sync after sessions; security hardening of web services; PHPUnit suite; subscriptions
-  to new recordings; recording hub; AI practice questions; materials; mobile practice.
-
-### 2.3 – 2.8
-- Exclusion periods, cancelled sessions, AI analysis with Gemini, pagination and sorting, recording
-  filter, manual transcript analysis, subtitle extraction with yt-dlp, CLI bulk processing.
-
-### Earlier
-- Modernisation of the upstream code (Moodle 4.0+, events-based logging, Ionic 5 app support).
+See [CHANGELOG.md](CHANGELOG.md).
 
 ## Security
 
 Please **do not** open public issues for security problems. Report them privately through
-[GitHub Security Advisories](https://github.com/hyukudan/moodle-mod_googlemeet/security/advisories/new).
+[GitHub Security Advisories](https://github.com/uaiblaine/moodle-mod_googlemeet/security/advisories/new).
 
 ## Contributing and tests
 
 Issues and pull requests are welcome at
-[github.com/hyukudan/moodle-mod_googlemeet](https://github.com/hyukudan/moodle-mod_googlemeet).
+[github.com/uaiblaine/moodle-mod_googlemeet](https://github.com/uaiblaine/moodle-mod_googlemeet).
 
 - PHPUnit: initialise Moodle's PHPUnit environment and run
   `vendor/bin/phpunit --testsuite mod_googlemeet_testsuite`.
 - Behat: features live in `tests/behat/`; run them with Moodle's Behat setup
   (`--tags=@mod_googlemeet`).
-- CI: `.github/workflows/ci.yml` runs [moodle-plugin-ci](https://moodlehq.github.io/moodle-plugin-ci/)
-  on PHP 8.2/8.4, Moodle 5.0/5.1 and PostgreSQL/MariaDB (lint, PHPMD, code style, validate, PHPDoc,
-  savepoints, Mustache, Grunt, PHPUnit, Behat).
+- CI: `.github/workflows/ci.yml` calls the
+  [moodle-an-hochschulen reusable workflow](https://github.com/moodle-an-hochschulen/moodle-workflows)
+  once per supported Moodle branch (5.3: full PHP x database matrix; 5.2: one database). Code
+  style, PHPDoc and lint gates run with zero warnings allowed.
 - AMD modules: edit `amd/src/` and rebuild `amd/build/` with `npx grunt amd`.
 
 ## Credits
 
 - Original author: Rone Santos ([ronefel/moodle-mod_googlemeet](https://github.com/ronefel/moodle-mod_googlemeet)).
-- Fork maintainer: [hyukudan](https://github.com/hyukudan).
+- Upstream fork maintainer: [hyukudan](https://github.com/hyukudan).
+- This fork: [uaiblaine](https://github.com/uaiblaine).
 - Parts of this fork were developed with the assistance of AI coding tools.
 
 ## License

@@ -34,9 +34,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  */
 #[CoversClass(provider::class)]
 final class keypoints_checklist_test extends \advanced_testcase {
-
     /**
-     * Hash changes with the key points and state of another list is ignored.
+     * The hash ignores whitespace and changes with the key points; a state saved for another list or length is ignored.
      */
     public function test_hash_and_state(): void {
         $hash = googlemeet_keypoints_hash(['A  point', 'B']);
@@ -49,7 +48,7 @@ final class keypoints_checklist_test extends \advanced_testcase {
     }
 
     /**
-     * Callback: only the current user, and only a valid format.
+     * The preference definition lets only the current user write it, and only as "<hash>:<bits>" (at most 200 bits).
      */
     public function test_preference_callback(): void {
         $this->resetAfterTest();
@@ -98,8 +97,10 @@ final class keypoints_checklist_test extends \advanced_testcase {
         set_user_preference($name, '1a2b3c4d:111', $other);
 
         $collection = provider::get_metadata(new \core_privacy\local\metadata\collection('mod_googlemeet'));
-        $names = array_map(static fn($t) => $t->get_name(), array_filter($collection->get_collection(),
-            static fn($t) => $t instanceof \core_privacy\local\metadata\types\user_preference));
+        $names = array_map(static fn($t) => $t->get_name(), array_filter(
+            $collection->get_collection(),
+            static fn($t) => $t instanceof \core_privacy\local\metadata\types\user_preference
+        ));
         $this->assertContains(provider::KEYPOINTS_PREFIX . '<recordingid>', $names);
 
         provider::export_user_preferences($user->id);
@@ -114,8 +115,11 @@ final class keypoints_checklist_test extends \advanced_testcase {
         provider::delete_data_for_user($list);
         // Check the table: the $user objects keep their own preference cache within the same second.
         $this->assertFalse($DB->record_exists('user_preferences', ['userid' => $user->id, 'name' => $name]));
-        $this->assertSame('1a2b3c4d:111', $DB->get_field('user_preferences', 'value',
-            ['userid' => $other->id, 'name' => $name]));
+        $this->assertSame('1a2b3c4d:111', $DB->get_field(
+            'user_preferences',
+            'value',
+            ['userid' => $other->id, 'name' => $name]
+        ));
 
         provider::delete_data_for_all_users_in_context($context);
         $this->assertFalse($DB->record_exists('user_preferences', ['name' => $name]));

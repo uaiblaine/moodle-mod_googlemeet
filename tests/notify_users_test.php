@@ -25,7 +25,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * Recipients of pre-session reminders (NOT-01).
+ * Recipients of pre-session reminders.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -34,7 +34,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversFunction('googlemeet_get_users_to_notify')]
 final class notify_users_test extends \advanced_testcase {
-
     /**
      * Create a course with a googlemeet activity and one future event.
      *
@@ -92,7 +91,7 @@ final class notify_users_test extends \advanced_testcase {
 
     /**
      * A role assignment in a non-course context whose instanceid equals the course id
-     * must not turn the user into a recipient (the original contextlevel bug).
+     * must not turn the user into a recipient.
      */
     public function test_non_course_context_with_matching_instanceid_is_ignored(): void {
         global $DB;
@@ -101,12 +100,10 @@ final class notify_users_test extends \advanced_testcase {
 
         [$course, , $eventid] = $this->create_fixture();
 
-        // Moodle's PHPUnit randomises id sequences per table, so a category id never
-        // naturally matches the course id. Force the match deterministically: reuse a
-        // category that already has that id, otherwise create a fresh (empty) category
-        // and renumber it. Only the category row, its path and its context's instanceid
-        // reference the category id (the context path holds context ids, not instance
-        // ids), so this keeps the context tree consistent.
+        // PHPUnit starts each table's id sequence at a different value, so a category id never
+        // matches the course id by chance. Reuse a category that already has that id, otherwise
+        // renumber a fresh, empty one. Only the category row, its path and its context's
+        // instanceid hold the category id (context paths hold context ids), so the tree stays consistent.
         $categoryid = (int)$course->id;
         if (!$DB->record_exists('course_categories', ['id' => $categoryid])) {
             $category = $gen->create_category();

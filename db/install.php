@@ -28,5 +28,4 @@
  */
 function xmldb_googlemeet_install() {
     global $CFG;
-
 }

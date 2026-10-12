@@ -27,7 +27,6 @@ use mod_googlemeet\local\attendance\source;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class attendance_source_double implements source {
-
     /** @var array Conferences returned. */
     public $conferences = [];
     /** @var array conference name => participants. */
@@ -38,7 +37,13 @@ class attendance_source_double implements source {
     public $calls = [];
 
     /**
-     * {@inheritDoc}
+     * Record the call and return the configured conferences.
+     *
+     * @param string $meetingcode Meeting code (abc-defg-hij).
+     * @param int $from Earliest start time.
+     * @param int $to Latest start time.
+     * @return array[] The $conferences property.
+     * @throws scope_exception When $scopeerror is set.
      */
     public function list_conferences(string $meetingcode, int $from, int $to): array {
         $this->calls[] = ['conferences', $meetingcode, $from, $to];
@@ -49,7 +54,10 @@ class attendance_source_double implements source {
     }
 
     /**
-     * {@inheritDoc}
+     * Record the call and return the configured participants of one conference.
+     *
+     * @param string $conference Conference resource name (conferenceRecords/...).
+     * @return array[] The $participants entry of that conference, or an empty array.
      */
     public function list_participants(string $conference): array {
         $this->calls[] = ['participants', $conference];

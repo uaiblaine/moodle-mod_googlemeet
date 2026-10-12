@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Lightweight "Join the live class" endpoint (ANA-02): logs room_entered and redirects to Meet.
+ * Lightweight "Join the live class" endpoint: logs room_entered and redirects to Meet.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -38,8 +38,12 @@ require_capability('mod/googlemeet:view', $context);
 
 $roomurl = room_entry::room_url($googlemeet);
 if ($roomurl === null) {
-    redirect(new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
-        get_string('roomunavailable', 'googlemeet'), null, \core\output\notification::NOTIFY_WARNING);
+    redirect(
+        new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
+        get_string('roomunavailable', 'googlemeet'),
+        null,
+        \core\output\notification::NOTIFY_WARNING
+    );
 }
 
 // Only log requests coming from the activity's own button: a forged cross-site link must not

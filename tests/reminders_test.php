@@ -26,8 +26,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * Pre-session reminders: cron-gap tolerant window (NOT-02), second reminder deduplicated
- * separately (NOT-04), push data and localised content (NOT-03, QA-03).
+ * Pre-session reminders: cron-gap tolerant window, second reminder deduplicated separately,
+ * push data and localised content.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -36,7 +36,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversClass(reminders::class)]
 final class reminders_test extends \advanced_testcase {
-
     /** @var int Fixed reference time for the tests. */
     private int $now;
 
@@ -79,19 +78,22 @@ final class reminders_test extends \advanced_testcase {
     }
 
     /**
-     * Map of "eventid:kind" for the due reminders.
+     * Sorted "eventid:kind" keys of the due reminders.
      *
      * @param int $now Reference time.
      * @return string[]
      */
     private function due_keys(int $now): array {
-        $keys = array_map(static function($event) {
+        $keys = array_map(static function ($event) {
             return $event->id . ':' . $event->kind;
         }, reminders::get_due_events($now));
         sort($keys);
         return $keys;
     }
 
+    /**
+     * Reset the database after each test and fix the reference time.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
@@ -99,7 +101,7 @@ final class reminders_test extends \advanced_testcase {
     }
 
     /**
-     * NOT-02: a run that comes back after a cron gap still sends the reminder while the session
+     * A run that comes back after a cron gap still sends the reminder while the session
      * has not started; started sessions and sessions outside the window are not due.
      */
     public function test_minutes_window_tolerates_cron_gap(): void {
@@ -120,7 +122,7 @@ final class reminders_test extends \advanced_testcase {
     }
 
     /**
-     * NOT-04: the hours reminder is due inside its window, and gives way to the minutes reminder
+     * The hours reminder is due inside its window, and gives way to the minutes reminder
      * once that one is due (a late run never sends both at once).
      */
     public function test_hours_window_and_handover(): void {
@@ -215,7 +217,7 @@ final class reminders_test extends \advanced_testcase {
         [$course, $googlemeet, $student] = $this->create_activity();
         $eventid = $this->add_event($googlemeet->id, $this->now + 20 * HOURSECS);
 
-        $due = array_values(array_filter(reminders::get_due_events($this->now), static function($event) use ($eventid) {
+        $due = array_values(array_filter(reminders::get_due_events($this->now), static function ($event) use ($eventid) {
             return (int)$event->id === $eventid;
         }));
         $this->assertCount(1, $due);
@@ -245,8 +247,10 @@ final class reminders_test extends \advanced_testcase {
         $messageproviders = [];
         require($CFG->dirroot . '/mod/googlemeet/db/messages.php');
         foreach (['notification', 'recordingavailable'] as $provider) {
-            $this->assertSame(MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
-                $messageproviders[$provider]['defaults']['airnotifier']);
+            $this->assertSame(
+                MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
+                $messageproviders[$provider]['defaults']['airnotifier']
+            );
         }
         $this->assertArrayHasKey('autosyncfailed', $messageproviders);
     }

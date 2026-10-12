@@ -51,10 +51,10 @@ class notify_event extends \core\task\scheduled_task {
      * Execute the task.
      */
     public function execute() {
-        // Guard against overlapping runs (or a run that outlives the 5-minute interval) both
-        // selecting the same not-yet-notified user before either records notify_done, which would
-        // double-send and then collide on the (eventid, userid) unique index. If another run
-        // holds the lock, skip this tick rather than wait.
+        // Defensive guard: cron and admin/cli/scheduled_task.php already lock a scheduled task by class
+        // name, but a direct execute() call is not covered. Two concurrent runs could both select a user
+        // before either records notify_done, double-sending and then colliding on the unique
+        // (eventid, userid, kind) index. If another run holds the lock, skip this tick rather than wait.
         $lockfactory = \core\lock\lock_config::get_lock_factory('mod_googlemeet_notify');
         $lock = $lockfactory->get_lock('notify_event', 0);
         if (!$lock) {
@@ -64,8 +64,7 @@ class notify_event extends \core\task\scheduled_task {
 
         try {
             // Due reminders (minutes-before and hours-before, each deduplicated by kind in
-            // googlemeet_notify_done). The lock prevents a concurrent run from selecting the same
-            // user before this one records notify_done, so the unique index is never violated.
+            // googlemeet_notify_done).
             $sent = \mod_googlemeet\local\reminders::run(time());
             if ($sent) {
                 mtrace("mod_googlemeet notify: {$sent} reminder(s) sent.");

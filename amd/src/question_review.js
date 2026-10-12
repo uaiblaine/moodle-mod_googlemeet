@@ -185,6 +185,7 @@ const publishBatch = ids => {
     }])[0].then(response => {
         showStatus('success', escapeHtml(fill(strings.question_published_count, response.count)));
         setTimeout(reloadHub, 900);
+        return;
     }).fail(error => {
         setBusy(false);
         showStatus('danger', batchError(error));
@@ -241,6 +242,7 @@ const publishActivity = () => {
     }])[0].then(response => {
         setBusy(false);
         showActivityOutcome(response);
+        return;
     }).fail(error => {
         setBusy(false);
         showStatus('danger', escapeHtml(error.message || strings.ai_error_unknown));
@@ -283,12 +285,15 @@ const bindEvents = () => {
         if (!ids.length) {
             return;
         }
+        // A rejection before the confirmation is the dialogue being cancelled: nothing to report.
+        let confirmed = false;
         Notification.saveCancelPromise(
             strings.question_bulk_discard,
             escapeHtml(strings.question_bulk_discard_confirm),
             strings.question_bulk_discard,
             {triggerElement: this}
         ).then(() => {
+            confirmed = true;
             setBusy(true);
             return Ajax.call([{
                 methodname: 'mod_googlemeet_discard_questions',
@@ -298,11 +303,14 @@ const bindEvents = () => {
                     questionids: ids,
                     sesskey: settings.sesskey,
                 },
-            }])[0].then(reloadHub).fail(error => {
+            }])[0];
+        }).then(reloadHub).catch(error => {
+            if (confirmed) {
                 setBusy(false);
                 showStatus('danger', escapeHtml(error.message || strings.ai_error_unknown));
-            });
-        }).catch(() => null);
+            }
+            return null;
+        });
     });
 
     $(document).on('click', '.googlemeet-question-publish-activity', function() {

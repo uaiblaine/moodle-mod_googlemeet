@@ -32,21 +32,20 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
 /**
- * The mod_googlemeet module does not store any data.
+ * Privacy provider for mod_googlemeet.
  */
 class provider implements
         // This plugin does store personal user data.
-        \core_privacy\local\metadata\provider,
-
-        // This plugin is a core_user_data_provider.
-        \core_privacy\local\request\plugin\provider,
+    \core_privacy\local\metadata\provider,
 
         // This plugin is capable of determining which users have data within it.
-        \core_privacy\local\request\core_userlist_provider,
+    \core_privacy\local\request\core_userlist_provider,
 
-        // This plugin stores user preferences (last chapter/timestamp jumped to per recording).
-        \core_privacy\local\request\user_preference_provider {
+        // This plugin is a core_user_data_provider.
+    \core_privacy\local\request\plugin\provider,
 
+        // This plugin stores per-recording user preferences (last position jumped to, key points checklist).
+    \core_privacy\local\request\user_preference_provider {
     /** @var string Prefix of the per-recording "last jump" user preference. */
     const LASTJUMP_PREFIX = 'mod_googlemeet_lastjump_';
 
@@ -59,7 +58,7 @@ class provider implements
      * @param collection $collection a reference to the collection to use to store the metadata.
      * @return collection the updated collection of metadata items.
      */
-    public static function get_metadata(collection $collection) : collection {
+    public static function get_metadata(collection $collection): collection {
         // Per-user notification dispatch log.
         $collection->add_database_table(
             'googlemeet_notify_done',
@@ -95,7 +94,7 @@ class provider implements
             'privacy:metadata:googlemeet_recording_progress'
         );
 
-        // ANA-05: one row per student practice answer.
+        // One row per student practice answer.
         $collection->add_database_table(
             'googlemeet_practice_attempts',
             [
@@ -131,11 +130,10 @@ class provider implements
         );
 
         // The googlemeet_ai_analysis table stores AI-generated material derived from the
-        // recordings (summary, key points, topics and a transcript). The transcript may
-        // incidentally contain the names or voices of session participants. The table has no
-        // userid column (it is keyed only to a recording), so this data is not associated with
-        // an individual Moodle user and cannot be exported or deleted per user; it is declared
-        // here for transparency.
+        // recordings (summary, key points, topics, chapters and a transcript). The transcript may
+        // incidentally contain the names or voices of session participants. That content is keyed
+        // only to a recording, so it cannot be exported or deleted per user; it is declared here
+        // for transparency. Only reviewedby links a row to a Moodle user.
         $collection->add_database_table(
             'googlemeet_ai_analysis',
             [
@@ -144,16 +142,16 @@ class provider implements
                 'topics' => 'privacy:metadata:googlemeet_ai_analysis:topics',
                 'chapters' => 'privacy:metadata:googlemeet_ai_analysis:chapters',
                 'transcript' => 'privacy:metadata:googlemeet_ai_analysis:transcript',
-                // IA-04: the teacher who published the AI content to students (exported/anonymised per user).
+                // The teacher who published the AI content to students (exported and anonymised per user).
                 'reviewedby' => 'privacy:metadata:googlemeet_ai_analysis:reviewedby',
                 'timereviewed' => 'privacy:metadata:googlemeet_ai_analysis:timereviewed',
             ],
             'privacy:metadata:googlemeet_ai_analysis'
         );
 
-        // The googlemeet_recordings table stores, per recording, the Drive file/link identifiers
-        // and the original Google Meet transcript text. The transcript may contain the names and
-        // speech of session participants. The table is keyed only to a recording (no userid
+        // The googlemeet_recordings table stores, per recording, the Drive file/link identifiers,
+        // the original Google Meet transcript text and the Gemini meeting notes. Both may contain the
+        // names and speech of session participants. The table is keyed only to a recording (no userid
         // column), so this data is not associated with an individual Moodle user and cannot be
         // exported or deleted per user; it is declared here for transparency.
         $collection->add_database_table(
@@ -181,8 +179,9 @@ class provider implements
             'privacy:metadata:google_gemini'
         );
 
-        // The plugin reads recordings from Google Drive and creates/reads calendar events
-        // (including the Meet room) in Google Calendar on behalf of the authenticated user.
+        // On behalf of the authenticated user, the plugin reads recordings, transcripts and notes from
+        // Google Drive (sharing recordings by link when makerecordingspublic is on) and creates, updates
+        // and deletes the Google Calendar events that carry the Meet room.
         $collection->add_external_location_link(
             'google_drive',
             [
@@ -199,12 +198,16 @@ class provider implements
             'privacy:metadata:google_calendar'
         );
 
-        $collection->add_user_preference(self::LASTJUMP_PREFIX . '<recordingid>',
-            'privacy:metadata:preference:lastjump');
-        $collection->add_user_preference(self::KEYPOINTS_PREFIX . '<recordingid>',
-            'privacy:metadata:preference:keypoints');
+        $collection->add_user_preference(
+            self::LASTJUMP_PREFIX . '<recordingid>',
+            'privacy:metadata:preference:lastjump'
+        );
+        $collection->add_user_preference(
+            self::KEYPOINTS_PREFIX . '<recordingid>',
+            'privacy:metadata:preference:keypoints'
+        );
 
-        // ANA-03 (track: w2-completion): real attendance read from Google Meet.
+        // Attendance read from the Google Meet REST API.
         \mod_googlemeet\local\attendance\privacy::add_metadata($collection);
 
         return $collection;
@@ -216,7 +219,7 @@ class provider implements
      * @param   int           $userid       The user to search.
      * @return  contextlist   $contextlist  The list of contexts used in this plugin.
      */
-    public static function get_contexts_for_userid(int $userid) : contextlist {
+    public static function get_contexts_for_userid(int $userid): contextlist {
 
         $sql = "SELECT c.id
                   FROM {context} c
@@ -339,7 +342,7 @@ class provider implements
 
         $userlist->add_from_sql('userid', $sql, $params);
 
-        // IA-04: teachers who published AI content.
+        // Teachers who published AI content.
         $sql = "SELECT gaa.reviewedby
                   FROM {course_modules} cm
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modulename
@@ -366,7 +369,7 @@ class provider implements
 
         $user = $contextlist->get_user();
 
-        list($contextsql, $contextparams) = $DB->get_in_or_equal($contextlist->get_contextids(), SQL_PARAMS_NAMED);
+        [$contextsql, $contextparams] = $DB->get_in_or_equal($contextlist->get_contextids(), SQL_PARAMS_NAMED);
 
         $sql = "SELECT cm.id AS cmid,
                        gnd.timesent
@@ -383,14 +386,14 @@ class provider implements
         $params = [
             'modname' => 'googlemeet',
             'contextlevel' => CONTEXT_MODULE,
-            'userid' => $user->id
+            'userid' => $user->id,
         ] + $contextparams;
 
         $notifications = $DB->get_recordset_sql($sql, $params);
 
         foreach ($notifications as $notification) {
             $notificationdata = [
-                'timesent' => \core_privacy\local\request\transform::datetime($notification->timesent)
+                'timesent' => \core_privacy\local\request\transform::datetime($notification->timesent),
             ];
 
             $context = \context_module::instance($notification->cmid);
@@ -469,7 +472,7 @@ class provider implements
 
         $progressrecords->close();
 
-        // ANA-05: practice attempts, one export file per recording.
+        // Practice attempts, one export file per recording.
         $sql = "SELECT gpa.id,
                        cm.id AS cmid,
                        gpa.recordingid,
@@ -519,7 +522,7 @@ class provider implements
             );
         }
 
-        // IA-04: AI summaries this user (a teacher) published to students.
+        // AI summaries this user (a teacher) published to students.
         $sql = "SELECT gaa.id,
                        cm.id AS cmid,
                        gr.id AS recordingid,
@@ -580,7 +583,7 @@ class provider implements
 
         $recordingids = $DB->get_fieldset_select('googlemeet_recordings', 'id', 'googlemeetid = ?', [$cm->instance]);
         if (!empty($recordingids)) {
-            list($insql, $inparams) = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
+            [$insql, $inparams] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
             $DB->delete_records_select('googlemeet_recording_progress', "recordingid $insql", $inparams);
             $DB->delete_records_select('googlemeet_ai_analysis', "recordingid $insql", $inparams);
             $names = [];
@@ -614,7 +617,6 @@ class provider implements
 
         $userid = $contextlist->get_user()->id;
         foreach ($contextlist->get_contexts() as $context) {
-
             if (!$context instanceof \context_module) {
                 continue;
             }
@@ -648,7 +650,7 @@ class provider implements
     }
 
     /**
-     * IA-04: forget who published the AI content (the content and its reviewed state stay).
+     * Forget who published the AI content (the content and its reviewed state stay).
      *
      * @param int $googlemeetid Instance id.
      * @param int[] $userids Users.
@@ -660,11 +662,13 @@ class provider implements
             return;
         }
         [$usql, $uparams] = $DB->get_in_or_equal($userids, SQL_PARAMS_NAMED, 'ru');
-        $DB->execute("UPDATE {googlemeet_ai_analysis}
+        $DB->execute(
+            "UPDATE {googlemeet_ai_analysis}
                          SET reviewedby = 0
                        WHERE reviewedby {$usql}
                          AND recordingid IN (SELECT id FROM {googlemeet_recordings} WHERE googlemeetid = :rgmid)",
-            $uparams + ['rgmid' => $googlemeetid]);
+            $uparams + ['rgmid' => $googlemeetid]
+        );
     }
 
     /**
@@ -715,7 +719,7 @@ class provider implements
             return;
         }
 
-        list($usersql, $userparams) = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
+        [$usersql, $userparams] = $DB->get_in_or_equal($userlist->get_userids(), SQL_PARAMS_NAMED);
 
         $select = "eventid IN (SELECT id FROM {googlemeet_events} WHERE googlemeetid = :googlemeetid) AND userid $usersql";
         $params = ['googlemeetid' => $cm->instance] + $userparams;
@@ -743,15 +747,21 @@ class provider implements
         global $CFG, $DB;
         require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
-        $preferences = $DB->get_records_select('user_preferences',
+        $preferences = $DB->get_records_select(
+            'user_preferences',
             'userid = :userid AND ' . $DB->sql_like('name', ':prefix'),
             ['userid' => $userid, 'prefix' => $DB->sql_like_escape(self::LASTJUMP_PREFIX) . '%'],
-            'name', 'id, name, value');
+            'name',
+            'id, name, value'
+        );
         \mod_googlemeet\local\attendance\privacy::export_preferences($userid);
-        $kppreferences = $DB->get_records_select('user_preferences',
+        $kppreferences = $DB->get_records_select(
+            'user_preferences',
             'userid = :userid AND ' . $DB->sql_like('name', ':prefix'),
             ['userid' => $userid, 'prefix' => $DB->sql_like_escape(self::KEYPOINTS_PREFIX) . '%'],
-            'name', 'id, name, value');
+            'name',
+            'id, name, value'
+        );
         foreach ($kppreferences as $preference) {
             $recordingid = (int)substr($preference->name, strlen(self::KEYPOINTS_PREFIX));
             $recordingname = $DB->get_field('googlemeet_recordings', 'name', ['id' => $recordingid]);

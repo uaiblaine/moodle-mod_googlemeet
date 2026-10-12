@@ -21,20 +21,18 @@ use mod_googlemeet\task\sync_recordings_task;
 use stdClass;
 
 /**
- * Manual "Sync with Google Drive" run in the background (PERF-02).
+ * Manual "Sync with Google Drive" run in the background.
  *
- * The button only queues an adhoc task (one per activity at a time) and the page polls
- * get_status() through a web service. The task runs the same Drive sync as before, as the
- * teacher who asked for it, under the existing per-activity lock `sync_<id>` shared with autosync.
- *
- * Adhoc tasks depend on cron frequency: run cron at least every minute for a snappy UI.
+ * The button only queues an adhoc task ({@see sync_recordings_task}, one per activity at a time) and
+ * the page polls get_status() through a web service. The task runs the Drive sync as the teacher who
+ * asked for it, under the per-activity lock `sync_<id>` shared with autosync and recording enrichment.
+ * The task starts on the next cron run, so the UI may wait up to one cron interval.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class sync_manager {
-
     /** @var int A queued/running row older than this no longer blocks a new request (lost task, dead cron). */
     public const STALE_SECONDS = 2 * HOURSECS;
 
@@ -78,7 +76,8 @@ class sync_manager {
      *
      * @param stdClass $googlemeet Activity record.
      * @param int $userid Teacher whose Google token is used.
-     * @return bool True when a new task was queued, false when one was already pending.
+     * @return bool True when a new task was queued, false when one was already pending or the queue
+     *     lock was not obtained within 5 seconds.
      */
     public static function request(stdClass $googlemeet, int $userid): bool {
         // Serialise concurrent clicks (two tabs, double click) on the check-then-insert.
@@ -94,8 +93,12 @@ class sync_manager {
             }
             $stale = sync_log::latest((int)$googlemeet->id, sync_log::KIND_MANUAL);
             if ($stale && in_array($stale->status, [sync_log::STATUS_QUEUED, sync_log::STATUS_RUNNING], true)) {
-                sync_log::finish((int)$stale->id, sync_log::STATUS_ERROR, null,
-                    get_string('sync_status_stale', 'googlemeet'));
+                sync_log::finish(
+                    (int)$stale->id,
+                    sync_log::STATUS_ERROR,
+                    null,
+                    get_string('sync_status_stale', 'googlemeet')
+                );
             }
 
             $logid = sync_log::start((int)$googlemeet->id, sync_log::KIND_MANUAL, sync_log::STATUS_QUEUED);
@@ -212,7 +215,10 @@ class sync_manager {
     }
 
     /**
-     * User-facing result text (same wording as the former synchronous sync).
+     * User-facing result text.
+     *
+     * Uses the strings of {@see client::build_sync_message()} and adds the enrichment notice when
+     * recordings were inserted or restored.
      *
      * @param array $stats
      * @return string
@@ -242,16 +248,20 @@ class sync_manager {
     /**
      * Status for the polling UI / web service.
      *
+     * A queued or running row older than STALE_SECONDS is reported as an error.
+     *
      * @param stdClass $googlemeet Activity record.
-     * @return array
+     * @return array Shape of {@see \mod_googlemeet\external\get_sync_status::execute_returns()}.
      */
     public static function get_status(stdClass $googlemeet): array {
         global $DB;
 
         $row = sync_log::latest((int)$googlemeet->id, sync_log::KIND_MANUAL);
         $status = $row ? (string)$row->status : 'none';
-        if ($row && in_array($status, [sync_log::STATUS_QUEUED, sync_log::STATUS_RUNNING], true)
-                && !self::get_active((int)$googlemeet->id)) {
+        if (
+            $row && in_array($status, [sync_log::STATUS_QUEUED, sync_log::STATUS_RUNNING], true)
+                && !self::get_active((int)$googlemeet->id)
+        ) {
             $status = sync_log::STATUS_ERROR;
             $row->message = get_string('sync_status_stale', 'googlemeet');
         }

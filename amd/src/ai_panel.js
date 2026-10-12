@@ -81,6 +81,7 @@ const loadStrings = () => getStrings(stringRequests).then(values => {
     stringRequests.forEach((request, index) => {
         strings[request.key] = values[index];
     });
+    return;
 });
 
 /**
@@ -241,9 +242,10 @@ const updateRecordingPreview = async(data, item, content) => {
  * @returns {Promise<void>}
  */
 const updateCardPreview = async(item, data, topics) => {
-    const summaryPreview = data.summary
-        ? (data.summary.length > 200 ? data.summary.substring(0, 200) + '...' : data.summary)
-        : '';
+    let summaryPreview = '';
+    if (data.summary) {
+        summaryPreview = data.summary.length > 200 ? data.summary.substring(0, 200) + '...' : data.summary;
+    }
     const cardBody = item.find('.googlemeet-card-body');
     const cardSummary = cardBody.find('.googlemeet-card-summary');
 
@@ -359,6 +361,22 @@ const displayAiAnalysis = async(recordingid, data, item, content) => {
 };
 
 /**
+ * Render a completed analysis, reporting a rendering failure through the notification API.
+ *
+ * The web service callbacks call this instead of chaining on displayAiAnalysis(), so a rendering
+ * error never reaches their own failure handlers (which describe a failed request).
+ *
+ * @param {number|string} recordingid Recording ID.
+ * @param {Object} data AI analysis response.
+ * @param {JQuery} item Recording card/list item.
+ * @param {JQuery} content Panel content.
+ * @returns {void}
+ */
+const showAiAnalysis = (recordingid, data, item, content) => {
+    displayAiAnalysis(recordingid, data, item, content).catch(Notification.exception);
+};
+
+/**
  * Load a transcript on demand.
  *
  * @param {number|string} recordingid Recording ID.
@@ -377,6 +395,7 @@ const loadTranscript = recordingid => {
             element.text(strings.ai_transcript_unavailable);
             loadedTranscripts[recordingid] = true;
         }
+        return;
     }).fail(() => {
         $('.googlemeet-ai-transcript-text[data-recordingid="' + recordingid + '"]')
             .text(strings.ai_transcript_unavailable);
@@ -444,7 +463,7 @@ const generateAiAnalysis = (recordingid, regenerate, forcedownload) => {
         generateButton.prop('disabled', false).text(strings.ai_regenerate);
 
         if (response.status === 'completed') {
-            displayAiAnalysis(recordingid, response, item, content).catch(Notification.exception);
+            showAiAnalysis(recordingid, response, item, content);
         } else if (response.status === 'failed') {
             showAiError(recordingid, response.error || strings.ai_error_unknown);
         } else if (response.status === 'processing') {
@@ -452,6 +471,7 @@ const generateAiAnalysis = (recordingid, regenerate, forcedownload) => {
         } else {
             showAiError(recordingid, strings.ai_status_pending);
         }
+        return;
     }).fail(ex => {
         clearInterval(progressInterval);
         content.find('.googlemeet-ai-loading').hide();
@@ -550,24 +570,25 @@ const showProcessingStatus = (recordingid, content, generateButton, queuedat) =>
         clearInterval(pollingIntervals[recordingid]);
     }
     pollingIntervals[recordingid] = setInterval(() => {
-        checkAnalysisStatus(recordingid, status => {
+        checkAnalysisStatus(recordingid).then(status => {
             if (status !== 'processing') {
                 clearInterval(pollingIntervals[recordingid]);
                 delete pollingIntervals[recordingid];
             }
-        });
+            return status;
+        }).catch(Notification.exception);
     }, 10000);
 };
 
 /**
- * Check the current status of an AI analysis.
+ * Check the current status of an AI analysis and update its panel.
  *
  * @param {number|string} recordingid Recording ID.
- * @param {Function} [callback] Callback receiving the status string.
- * @returns {void}
+ * @returns {JQuery.Promise} Resolves with the analysis status, 'stuck' when the worker died, or
+ *     'error' when the request failed; it does not reject on a failed request.
  */
-const checkAnalysisStatus = (recordingid, callback) => {
-    call('mod_googlemeet_get_ai_analysis', {
+const checkAnalysisStatus = recordingid => {
+    return call('mod_googlemeet_get_ai_analysis', {
         recordingid: recordingid,
         coursemoduleid: settings.cmid,
     }).then(response => {
@@ -578,30 +599,21 @@ const checkAnalysisStatus = (recordingid, callback) => {
         if (response.found && response.status === 'completed') {
             content.find('.googlemeet-ai-processing').hide();
             generateButton.prop('disabled', false).text(strings.ai_regenerate);
-            displayAiAnalysis(recordingid, response, item, content).catch(Notification.exception);
+            showAiAnalysis(recordingid, response, item, content);
         } else if (response.found && response.status === 'failed') {
             content.find('.googlemeet-ai-processing').hide();
             generateButton.prop('disabled', false).text(strings.ai_generate);
             showAiError(recordingid, response.error || strings.ai_error_unknown);
         } else if (response.found && response.status === 'processing' && response.stuck) {
-            // F-8: the worker died; stop polling and let the teacher retry (regenerate re-queues a stuck row).
+            // The worker died: stop polling and let the teacher retry (regenerate re-queues a stuck row).
             content.find('.googlemeet-ai-processing').hide();
             generateButton.prop('disabled', false).text(strings.ai_regenerate);
             showAiError(recordingid, strings.ai_status_stuck_panel);
-            if (callback) {
-                callback('stuck');
-            }
-            return;
+            return 'stuck';
         }
 
-        if (callback) {
-            callback(response.status);
-        }
-    }).fail(() => {
-        if (callback) {
-            callback('error');
-        }
-    });
+        return response.status;
+    }, () => 'error');
 };
 
 /**
@@ -692,7 +704,7 @@ const bindPanelEvents = () => {
     });
 
     $(document).on('click', '.googlemeet-ai-refresh-btn', function() {
-        checkAnalysisStatus($(this).attr('data-id'));
+        checkAnalysisStatus($(this).attr('data-id')).catch(Notification.exception);
     });
 
     $(document).on('click', '.googlemeet-ai-force-video-btn', function() {
@@ -705,6 +717,7 @@ const bindPanelEvents = () => {
             {triggerElement: button}
         ).then(() => {
             generateAiAnalysis(recordingid, true, true);
+            return;
         }).catch(() => {
             return;
         });
@@ -722,7 +735,8 @@ const bindPanelEvents = () => {
             setTimeout(() => {
                 button.html(originalHtml);
             }, 2000);
-        });
+            return;
+        }).catch(Notification.exception);
     });
 };
 
@@ -757,7 +771,8 @@ const bindManualEditEvents = () => {
                 $('#googlemeet-ai-edit-topics').val((response.topics || []).join(', '));
                 $('#googlemeet-ai-edit-transcript').val(response.transcript || '');
             }
-        });
+            return;
+        }).fail(Notification.exception);
 
         $('#googlemeet-ai-edit-modal').modal('show');
     });
@@ -797,6 +812,7 @@ const bindManualEditEvents = () => {
                     type: 'error',
                 });
             }
+            return;
         }).fail(ex => {
             button.prop('disabled', false).html(originalText);
             Notification.exception(ex);
@@ -852,6 +868,7 @@ const bindManualEditEvents = () => {
                     window.location.reload();
                 }, 1000);
             }
+            return;
         }).fail(ex => {
             button.prop('disabled', false).text(strings.ai_edit_save);
             Notification.exception(ex);
@@ -890,5 +907,6 @@ export const init = config => {
                 bindManualEditEvents();
             }
         });
+        return;
     }).catch(Notification.exception);
 };

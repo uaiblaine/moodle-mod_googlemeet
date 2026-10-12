@@ -19,7 +19,7 @@ namespace mod_googlemeet\task;
 use mod_googlemeet\local\calendar_sync;
 
 /**
- * Adhoc task: push an activity edit to its Google Calendar event (DAT-04).
+ * Adhoc task: push an activity edit to its Google Calendar event.
  *
  * Custom data: googlemeetid, editorid. The current activity record is read at run time, so
  * several quick edits converge on the latest values. Never throws: failures are logged and the
@@ -30,7 +30,6 @@ use mod_googlemeet\local\calendar_sync;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class calendar_update_event extends \core\task\adhoc_task {
-
     /**
      * Task name.
      *
