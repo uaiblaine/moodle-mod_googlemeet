@@ -173,6 +173,8 @@ class sync_manager {
         $impersonation = null;
         $status = sync_log::STATUS_ERROR;
         $stats = null;
+        // Exception text for the task log, which only administrators read.
+        $detail = null;
         try {
             if (!$user) {
                 throw new \moodle_exception('sync_status_nouser', 'googlemeet');
@@ -183,7 +185,8 @@ class sync_manager {
             $status = sync_log::STATUS_SUCCESS;
             $message = self::build_message($stats);
         } catch (\Throwable $e) {
-            $message = $e->getMessage();
+            $detail = $e->getMessage();
+            $message = self::error_message($e);
         } finally {
             if ($impersonation !== null) {
                 impersonation::end($impersonation);
@@ -194,8 +197,9 @@ class sync_manager {
         sync_log::finish($logid, $status, $stats, $message);
         $elapsed = round(microtime(true) - $start, 1);
         $counters = $stats ? ' ' . http_build_query($stats, '', ' ') : '';
+        $logdetail = $status !== sync_log::STATUS_SUCCESS ? ' detail="' . ($detail ?? $message) . '"' : '';
         mtrace("mod_googlemeet sync: kind=manual activity={$googlemeetid} user={$userid} result={$status}"
-            . "{$counters} seconds={$elapsed}" . ($status !== sync_log::STATUS_SUCCESS ? ' detail="' . $message . '"' : ''));
+            . "{$counters} seconds={$elapsed}" . $logdetail);
         return $status;
     }
 
@@ -234,6 +238,26 @@ class sync_manager {
         if ($creatoremail === '' || $linked !== \core_text::strtolower(trim($creatoremail))) {
             throw new \moodle_exception('isnotcreatoremail', 'googlemeet');
         }
+    }
+
+    /**
+     * Text stored for a failed run, which get_status() returns to the teacher.
+     *
+     * The plugin's own errors carry a message written for the teacher. Anything else (a Google
+     * error body, an HTML page, a database error) is replaced by a stable generic message and its
+     * detail goes to the developer debugging output; the 'message' field is PARAM_TEXT, so tag-like
+     * text there would also make the polling web service fail as a whole.
+     *
+     * @param \Throwable $e Exception of the run.
+     * @return string
+     */
+    private static function error_message(\Throwable $e): string {
+        $known = ['isnotcreatoremail', 'sync_status_notlinked', 'sync_status_nouser'];
+        if ($e instanceof \moodle_exception && $e->module === 'googlemeet' && in_array($e->errorcode, $known, true)) {
+            return $e->getMessage();
+        }
+        debugging('mod_googlemeet manual sync failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
+        return get_string('servererror');
     }
 
     /**
@@ -300,7 +324,8 @@ class sync_manager {
                 $message = '';
                 break;
             default:
-                $message = (string)$row->message;
+                // The 'message' return is PARAM_TEXT: a stored text with tags would fail the whole call.
+                $message = clean_param((string)$row->message, PARAM_TEXT);
         }
 
         $lastsync = (int)$DB->get_field('googlemeet', 'lastsync', ['id' => $googlemeet->id]);

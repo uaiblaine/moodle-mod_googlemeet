@@ -1721,19 +1721,36 @@ function googlemeet_get_holidays($googlemeetid) {
 }
 
 /**
+ * Calendar day of a session timestamp, in the site's default timezone.
+ *
+ * Every session-day decision (cancelled dates, holidays, the "today" flag) goes through this, so
+ * a viewer in another timezone and cron, which runs as a user in the site timezone, agree on the
+ * day of a session near midnight. The viewer's own timezone is only for displaying times.
+ *
+ * @param int $timestamp Unix timestamp.
+ * @return string Day as Y-m-d; such keys compare in calendar order.
+ */
+function googlemeet_session_day(int $timestamp): string {
+    $date = new DateTime('@' . $timestamp);
+    $date->setTimezone(core_date::get_server_timezone_object());
+    return $date->format('Y-m-d');
+}
+
+/**
  * Check if a given date falls within any holiday period.
+ *
+ * Days are site days ({@see googlemeet_session_day()}).
  *
  * @param int $timestamp The timestamp to check.
  * @param array $holidays Array of holiday period objects.
  * @return bool True if the date is within a holiday period.
  */
 function googlemeet_is_holiday($timestamp, $holidays) {
-    // Compare calendar days in the current user's timezone (usergetmidnight()), not the server's.
-    $datestart = usergetmidnight($timestamp);
+    $datestart = googlemeet_session_day((int)$timestamp);
 
     foreach ($holidays as $holiday) {
-        $holidaystart = usergetmidnight($holiday->startdate);
-        $holidayend = usergetmidnight($holiday->enddate);
+        $holidaystart = googlemeet_session_day((int)$holiday->startdate);
+        $holidayend = googlemeet_session_day((int)$holiday->enddate);
 
         if ($datestart >= $holidaystart && $datestart <= $holidayend) {
             return true;
@@ -1768,7 +1785,7 @@ function googlemeet_save_cancelled($googlemeet) {
             continue;
         }
 
-        $datekey = usergetmidnight((int)$cancelleddate);
+        $datekey = googlemeet_session_day((int)$cancelleddate);
         if (isset($cancelledbydate[$datekey]) && $cancelledbydate[$datekey]->reason !== '' && $reason === '') {
             continue;
         }
@@ -1801,16 +1818,17 @@ function googlemeet_get_cancelled($googlemeetid) {
 /**
  * Check if a given date is in the cancelled list.
  *
+ * Days are site days ({@see googlemeet_session_day()}).
+ *
  * @param int $timestamp The timestamp to check.
  * @param array $cancelleddates Array of cancelled date objects.
  * @return object|false The cancelled date object if found, false otherwise.
  */
 function googlemeet_is_cancelled($timestamp, $cancelleddates) {
-    // Day comparison in the current user's timezone, as in googlemeet_is_holiday().
-    $datestart = usergetmidnight($timestamp);
+    $datestart = googlemeet_session_day((int)$timestamp);
 
     foreach ($cancelleddates as $cancelled) {
-        $cancelledstart = usergetmidnight($cancelled->cancelleddate);
+        $cancelledstart = googlemeet_session_day((int)$cancelled->cancelleddate);
 
         if ($datestart === $cancelledstart) {
             return $cancelled;

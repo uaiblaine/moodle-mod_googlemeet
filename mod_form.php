@@ -251,12 +251,16 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $holidayelements[] = $mform->createElement(
             'date_selector',
             'holidaystartdate',
-            get_string('holidaystartdate', 'googlemeet')
+            get_string('holidaystartdate', 'googlemeet'),
+            // A day of the site calendar, compared through googlemeet_session_day().
+            ['timezone' => core_date::get_server_timezone()]
         );
         $holidayelements[] = $mform->createElement(
             'date_selector',
             'holidayenddate',
-            get_string('holidayenddate', 'googlemeet')
+            get_string('holidayenddate', 'googlemeet'),
+            // A day of the site calendar, compared through googlemeet_session_day().
+            ['timezone' => core_date::get_server_timezone()]
         );
 
         // Determine the number of existing holiday periods.
@@ -305,7 +309,9 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $cancelledelements[] = $mform->createElement(
             'date_selector',
             'cancelleddate',
-            get_string('cancelleddate', 'googlemeet')
+            get_string('cancelleddate', 'googlemeet'),
+            // A day of the site calendar, compared through googlemeet_session_day().
+            ['timezone' => core_date::get_server_timezone()]
         );
         $cancelledelements[] = $mform->createElement(
             'text',
@@ -467,11 +473,11 @@ class mod_googlemeet_mod_form extends moodleform_mod {
                 'cancelleddate ASC, id ASC'
             );
             $cancelleddates = array_values($cancelleddates);
-            $today = usergetmidnight(time());
+            $today = googlemeet_session_day(time());
             // Today and upcoming dates first (soonest first), then past dates (most recent first).
             usort($cancelleddates, static function ($a, $b) use ($today) {
-                $aday = usergetmidnight((int)$a->cancelleddate);
-                $bday = usergetmidnight((int)$b->cancelleddate);
+                $aday = googlemeet_session_day((int)$a->cancelleddate);
+                $bday = googlemeet_session_day((int)$b->cancelleddate);
                 $agroup = $aday >= $today ? 0 : 1;
                 $bgroup = $bday >= $today ? 0 : 1;
                 if ($agroup !== $bgroup) {
@@ -480,7 +486,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
                 if ($aday === $bday) {
                     return ((int)$a->id) <=> ((int)$b->id);
                 }
-                return $agroup === 0 ? $aday <=> $bday : $bday <=> $aday;
+                // Y-m-d keys compare in calendar order.
+                return $agroup === 0 ? strcmp($aday, $bday) : strcmp($bday, $aday);
             });
 
             $i = 0;

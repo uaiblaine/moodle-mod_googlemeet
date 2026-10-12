@@ -129,6 +129,9 @@ class practice_attempts {
     /**
      * Map every published (ready) question of the activity to its recording, with one query.
      *
+     * Only the latest version of each question bank entry counts, the rule of
+     * {@see question_service::latest_version_sql()}: an edited question is one question.
+     *
      * @param stdClass $googlemeet Activity record.
      * @param stdClass $cm Course-module record.
      * @param \context_module $context Module context.
@@ -151,7 +154,8 @@ class practice_attempts {
                    AND qv.status = :readystatus
                    AND ti.component = :component
                    AND ti.itemtype = :itemtype
-                   AND " . $DB->sql_like('t.name', ':prefix', false, false);
+                   AND " . $DB->sql_like('t.name', ':prefix', false, false)
+                   . question_service::latest_version_sql();
         $rows = $DB->get_records_sql($sql, [
             'categoryid' => $category->id,
             'readystatus' => question_version_status::QUESTION_STATUS_READY,
@@ -314,10 +318,11 @@ class practice_attempts {
                     continue;
                 }
                 $question['recordingid'] = $recordingid;
+                // Plain spelling: a PARAM_TEXT field that practice_session.js writes with .text().
                 $question['recordingname'] = format_string(
                     googlemeet_display_name((string)$recordings[$recordingid]->name),
                     true,
-                    ['context' => $context]
+                    ['context' => $context, 'escape' => false]
                 );
                 $byid[$qid] = $question;
             }

@@ -66,6 +66,26 @@ class question_service {
     }
 
     /**
+     * SQL condition keeping only the latest version of each question bank entry.
+     *
+     * Core's question editor saves an edit as a new question row and version, re-tags the new
+     * question id and leaves the old version with its recording tag, so every query that reads
+     * recording questions through the tag must drop the superseded versions. The status filter
+     * applies afterwards: a newer draft hides an older published version, unlike core's random
+     * loader, which takes the latest ready version. {@see local\list_aggregates::published_question_counts()}
+     * and {@see local\practice_attempts::get_ready_question_map()} must use the same rule.
+     *
+     * @param string $qv Alias of {question_versions} in the outer query.
+     * @param string $qbe Alias of {question_bank_entries} in the outer query.
+     * @return string SQL fragment starting with AND.
+     */
+    public static function latest_version_sql(string $qv = 'qv', string $qbe = 'qbe'): string {
+        return " AND {$qv}.version = (SELECT MAX(lv.version)
+                                        FROM {question_versions} lv
+                                       WHERE lv.questionbankentryid = {$qbe}.id)";
+    }
+
+    /**
      * Re-bind the private question bank of a restored/duplicated activity.
      *
      * Core restore copies the module-context categories, questions (with their draft/ready
@@ -354,6 +374,7 @@ class question_service {
             $params['readystatus'] = question_version_status::QUESTION_STATUS_READY;
         }
 
+        $latestsql = self::latest_version_sql();
         $sql = "SELECT q.id,
                        q.name,
                        q.questiontext,
@@ -372,6 +393,7 @@ class question_service {
                    AND ti.component = :component
                    AND ti.itemtype = :itemtype
                    AND t.name = :tagname
+                   {$latestsql}
                    {$statussql}
               ORDER BY q.id DESC";
 
@@ -574,6 +596,7 @@ class question_service {
             $params['readystatus'] = question_version_status::QUESTION_STATUS_READY;
         }
 
+        $latestsql = self::latest_version_sql();
         $sql = "SELECT q.id, q.qtype, qv.id AS versionid, qv.status
                   FROM {question} q
                   JOIN {question_versions} qv ON qv.questionid = q.id
@@ -585,6 +608,7 @@ class question_service {
                    AND ti.component = :component
                    AND ti.itemtype = :itemtype
                    AND t.name = :tagname
+                   {$latestsql}
                    {$statussql}";
         $records = $DB->get_records_sql($sql, $params);
         if (count($records) !== count($questionids)) {
@@ -686,6 +710,7 @@ class question_service {
             'itemtype' => 'question',
             'draftstatus' => question_version_status::QUESTION_STATUS_DRAFT,
         ];
+        $latestsql = self::latest_version_sql();
         $sql = "SELECT ti.id AS tiid, q.id, q.qtype, qv.id AS versionid, qv.status, t.name AS tagname
                   FROM {question} q
                   JOIN {question_versions} qv ON qv.questionid = q.id
@@ -697,6 +722,7 @@ class question_service {
                    AND ti.itemtype = :itemtype
                    AND qv.status = :draftstatus
                    AND t.name {$tagsql}
+                   {$latestsql}
               ORDER BY q.id ASC";
 
         $grouped = [];
@@ -904,14 +930,18 @@ class question_service {
     /**
      * Check whether a generation adhoc task is currently queued for this recording.
      *
+     * The LIKE only narrows the candidates: '"recordingid":1' is also a prefix of 12, 100, ... so
+     * the decoded custom data decides.
+     *
      * @param int $recordingid Recording id.
      * @return bool
      */
     public function is_generation_queued(int $recordingid): bool {
         global $DB;
 
-        return $DB->record_exists_select(
+        $candidates = $DB->get_fieldset_select(
             'task_adhoc',
+            'customdata',
             "(classname = :classname OR classname = :classname2) AND " . $DB->sql_like('customdata', ':needle', false, false),
             [
                 'classname' => '\\mod_googlemeet\\task\\generate_questions',
@@ -919,6 +949,13 @@ class question_service {
                 'needle' => '%"recordingid":' . $recordingid . '%',
             ]
         );
+        foreach ($candidates as $customdata) {
+            $data = json_decode((string)$customdata);
+            if (is_object($data) && isset($data->recordingid) && (int)$data->recordingid === $recordingid) {
+                return true;
+            }
+        }
+        return false;
     }
 
     /**

@@ -138,14 +138,15 @@ class mobile {
             );
         }
 
+        // Text goes to the app templates in its plain spelling: their <% %> double stashes escape it once.
         $items = [];
         foreach ($recordings as $recording) {
             $title = $titles[$recording->id]['title'] ?? $recording->displayname;
             $items[] = [
                 'id' => (int)$recording->id,
-                'title' => format_string($title, true, ['context' => $context]),
+                'title' => format_string($title, true, ['context' => $context, 'escape' => false]),
                 'subtitle' => !empty($titles[$recording->id]['hassubtitle'])
-                    ? format_string($titles[$recording->id]['subtitle'], true, ['context' => $context]) : '',
+                    ? format_string($titles[$recording->id]['subtitle'], true, ['context' => $context, 'escape' => false]) : '',
                 'date' => userdate($recording->createdtime, get_string('strftimedaydate', 'langconfig')),
                 'duration' => (string)$recording->duration,
                 'watched' => !empty($watched[$recording->id]),
@@ -273,15 +274,16 @@ class mobile {
             foreach (googlemeet_summary_paragraphs((string)$analysis->summary) as $paragraph) {
                 $summary[] = ['text' => format_text($paragraph, FORMAT_PLAIN, ['context' => $context])];
             }
+            // Plain spelling, as in recordings_page(): the template escapes key points and titles once.
             foreach (json_decode((string)$analysis->keypoints) ?: [] as $keypoint) {
                 if (is_scalar($keypoint) && trim((string)$keypoint) !== '') {
-                    $keypoints[] = ['text' => format_string((string)$keypoint, true, ['context' => $context])];
+                    $keypoints[] = ['text' => format_string((string)$keypoint, true, ['context' => $context, 'escape' => false])];
                 }
             }
             foreach (googlemeet_normalise_chapters($analysis->chapters ?? '') as $index => $chapter) {
                 $chapters[] = [
                     'index' => $index,
-                    'title' => format_string($chapter['title'], true, ['context' => $context]),
+                    'title' => format_string($chapter['title'], true, ['context' => $context, 'escape' => false]),
                     'start' => $chapter['start'],
                     'url' => googlemeet_get_recording_seek_url((string)$recording->webviewlink, (int)$chapter['startseconds']),
                 ];
@@ -316,9 +318,9 @@ class mobile {
         $data = [
             'cmid' => (int)$cm->id,
             'id' => (int)$recording->id,
-            'title' => format_string($title, true, ['context' => $context]),
+            'title' => format_string($title, true, ['context' => $context, 'escape' => false]),
             'subtitle' => !empty($titles[$recording->id]['hassubtitle'])
-                ? format_string($titles[$recording->id]['subtitle'], true, ['context' => $context]) : '',
+                ? format_string($titles[$recording->id]['subtitle'], true, ['context' => $context, 'escape' => false]) : '',
             'date' => userdate($recording->createdtime, get_string('strftimedaydate', 'langconfig')),
             'duration' => (string)$recording->duration,
             'watched' => $watched,

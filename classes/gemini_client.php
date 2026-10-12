@@ -408,8 +408,9 @@ PROMPT;
      * Log a model fallback in a visible way.
      *
      * Fallbacks change which model actually produced the result, so they are
-     * surfaced via mtrace() (visible in cron/task output) in addition to a
-     * developer-level debugging() message.
+     * surfaced via mtrace() under CLI (cron and task output) in addition to a
+     * developer-level debugging() message. A web request (AJAX or WS) gets only
+     * the debugging() line: mtrace() echoes there, into the JSON response body.
      *
      * @param string $failedmodel The configured model that failed.
      * @param \Throwable $e The exception that triggered the fallback.
@@ -418,7 +419,7 @@ PROMPT;
     private function log_fallback(string $failedmodel, \Throwable $e): void {
         $message = "Gemini: model '{$failedmodel}' failed ({$e->getMessage()}); "
             . "falling back to '" . $this->modelpolicy->get_fallback() . "'";
-        if (function_exists('mtrace')) {
+        if (defined('CLI_SCRIPT') && CLI_SCRIPT) {
             mtrace($message);
         }
         debugging($message, DEBUG_DEVELOPER);
@@ -877,7 +878,7 @@ PROMPT;
         // Start a resumable upload; key sent via header, never in the URL/query string.
         $url = self::UPLOAD_URL;
 
-        $curl = new \curl();
+        $curl = $this->create_curl();
         $curl->setHeader([
             'x-goog-api-key: ' . $this->apikey,
             'X-Goog-Upload-Protocol: resumable',
@@ -888,11 +889,13 @@ PROMPT;
         ]);
 
         $metadata = json_encode(['file' => ['display_name' => $displayname]]);
-        $response = $curl->post($url, $metadata);
+        // No redirects: core's emulated redirect would replay x-goog-api-key to the new location.
+        $response = $curl->post($url, $metadata, ['CURLOPT_FOLLOWLOCATION' => 0]);
         $info = $curl->get_info();
 
-        if ($info['http_code'] !== 200) {
-            debugging("Gemini File API: Failed to start upload, HTTP " . $info['http_code'], DEBUG_DEVELOPER);
+        $starthttpcode = (int) ($info['http_code'] ?? 0);
+        if ($starthttpcode !== 200) {
+            debugging("Gemini File API: Failed to start upload, HTTP " . $starthttpcode, DEBUG_DEVELOPER);
             throw new moodle_exception('ai_error', 'googlemeet', '', 'Failed to start file upload');
         }
 
@@ -913,43 +916,43 @@ PROMPT;
             throw new moodle_exception('ai_error', 'googlemeet', '', 'No upload URL received from API');
         }
 
+        // The key goes to whatever URL the header names, so only Google's own upload endpoint is accepted.
+        if (!self::is_trusted_upload_url($uploadurl)) {
+            $host = parse_url($uploadurl, PHP_URL_HOST);
+            debugging('Gemini File API: Refusing an upload URL on host ' . s((string) $host), DEBUG_DEVELOPER);
+            throw new moodle_exception('ai_error', 'googlemeet', '', 'Untrusted upload URL received from API');
+        }
+
         debugging("Gemini File API: Got upload URL, uploading file content...", DEBUG_DEVELOPER);
 
-        // Stream the file from disk so the video (up to ~2GB) is never loaded into PHP memory.
-        $fp = fopen($filepath, 'rb');
-        if ($fp === false) {
+        // Core \curl, so the site's proxy (and proxybypass) and the curlsecurityblockedhosts and
+        // curlsecurityallowedport rules apply. put() streams the file from disk through CURLOPT_INFILE, so
+        // the video (up to ~2GB) is never loaded into PHP memory; post() cannot, because it always sets
+        // CURLOPT_POSTFIELDS, which replaces the stream with an empty body. CURLOPT_CUSTOMREQUEST turns the
+        // PUT into the POST the resumable-upload protocol requires. No redirect is followed: core would
+        // replay the request, the key included, to the Location host. Core limits the protocols to HTTP
+        // and HTTPS; is_trusted_upload_url() has already required HTTPS.
+        $curl = $this->create_curl();
+        $curl->setHeader([
+            'x-goog-api-key: ' . $this->apikey,
+            'X-Goog-Upload-Offset: 0',
+            'X-Goog-Upload-Command: upload, finalize',
+        ]);
+        $response = $curl->put($uploadurl, ['file' => $filepath], [
+            'CURLOPT_CUSTOMREQUEST' => 'POST',
+            // Otherwise put() sends an anonymous basic-auth login to Google.
+            'CURLOPT_USERPWD' => false,
+            'CURLOPT_FOLLOWLOCATION' => 0,
+            'CURLOPT_TIMEOUT' => 600, // 10 minutes for large files.
+            'CURLOPT_CONNECTTIMEOUT' => 60,
+        ]);
+        if ($response === null) {
             throw new moodle_exception('ai_error', 'googlemeet', '', 'Could not open video file for upload');
         }
 
-        // A native cURL handle, not \curl: \curl::post() always sets CURLOPT_POST and CURLOPT_POSTFIELDS,
-        // which override the CURLOPT_INFILE stream and upload an empty body. CURLOPT_UPLOAD alone sends
-        // PUT, so the verb is forced to POST as the resumable-upload protocol requires. The upload URL
-        // comes from Google's File API response, so \curl's SSRF checks are not needed.
-        try {
-            $ch = curl_init();
-            curl_setopt_array($ch, [
-                CURLOPT_URL => $uploadurl,
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_UPLOAD => true,
-                CURLOPT_INFILE => $fp,
-                CURLOPT_INFILESIZE => $filesize,
-                CURLOPT_CUSTOMREQUEST => 'POST',
-                CURLOPT_TIMEOUT => 600, // 10 minutes for large files.
-                CURLOPT_CONNECTTIMEOUT => 60,
-                CURLOPT_HTTPHEADER => [
-                    'x-goog-api-key: ' . $this->apikey,
-                    'X-Goog-Upload-Offset: 0',
-                    'X-Goog-Upload-Command: upload, finalize',
-                ],
-            ]);
-
-            $response = curl_exec($ch);
-            $httpcode = (int) curl_getinfo($ch, CURLINFO_HTTP_CODE);
-            $curlerror = curl_errno($ch) ? curl_error($ch) : '';
-            curl_close($ch);
-        } finally {
-            fclose($fp);
-        }
+        $httpcode = (int) ($curl->get_info()['http_code'] ?? 0);
+        // A URL refused by the cURL security rules returns the refusal text with no transfer and no errno.
+        $curlerror = $curl->get_errno() ? (string) $curl->error : '';
 
         if ($curlerror !== '') {
             debugging("Gemini File API: Upload transport error: {$curlerror}", DEBUG_DEVELOPER);
@@ -970,6 +973,49 @@ PROMPT;
         debugging("Gemini File API: File uploaded successfully, URI: " . $filedata->file->uri, DEBUG_DEVELOPER);
 
         return $filedata->file;
+    }
+
+    /**
+     * Whether a File API upload URL may receive the API key and the video.
+     *
+     * The URL comes from the X-Goog-Upload-URL response header, and the content request carries the
+     * x-goog-api-key header, so only an https URL on the Gemini API host itself, under /upload/, with no
+     * userinfo and the default port, is accepted. Other *.googleapis.com hosts are refused as well:
+     * some of them (storage.googleapis.com) serve customer-controlled buckets.
+     *
+     * @param string $url The upload URL named by the upload-start response.
+     * @return bool
+     */
+    public static function is_trusted_upload_url(string $url): bool {
+        // Whitespace, control characters and backslashes are parsed differently by parse_url() and cURL.
+        if ($url === '' || preg_match('/[\s\x00-\x1f\x7f\\\\]/', $url)) {
+            return false;
+        }
+        $parts = parse_url($url);
+        if (!is_array($parts) || isset($parts['user']) || isset($parts['pass'])) {
+            return false;
+        }
+        if (strtolower($parts['scheme'] ?? '') !== 'https') {
+            return false;
+        }
+        if (strtolower($parts['host'] ?? '') !== parse_url(self::UPLOAD_URL, PHP_URL_HOST)) {
+            return false;
+        }
+        if (isset($parts['port']) && $parts['port'] !== 443) {
+            return false;
+        }
+        return str_starts_with($parts['path'] ?? '', '/upload/');
+    }
+
+    /**
+     * Create the HTTP client used by the File API upload.
+     *
+     * A seam for tests, which replace it with a double that answers the upload-start call.
+     *
+     * @return \curl
+     */
+    protected function create_curl(): \curl {
+        return new \curl();
     }
 
     /**

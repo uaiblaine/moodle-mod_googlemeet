@@ -27,6 +27,7 @@
     "activityname": "Clases de los martes",
     "herocompact": false,
     "courseid": 2,
+    "calendarurl": "https://example.com/calendar/view.php?view=upcoming&course=2",
     "hasnextevent": true,
     "nexteventislive": false,
     "nexteventissoon": true,
@@ -256,7 +257,7 @@
     </div>
     <div class="googlemeet-schedule-note">
       {{# str }} schedule_sync_note, mod_googlemeet {{/ str }}<br>
-      <a href="/calendar/view.php?view=upcoming&amp;course={{courseid}}" class="googlemeet-hero-schedule-link">{{# str }} hero_campus_calendar_link, mod_googlemeet {{/ str }}</a>
+      <a href="{{calendarurl}}" class="googlemeet-hero-schedule-link">{{# str }} hero_campus_calendar_link, mod_googlemeet {{/ str }}</a>
     </div>
   </details>
 {{/hasscheduleevents}}

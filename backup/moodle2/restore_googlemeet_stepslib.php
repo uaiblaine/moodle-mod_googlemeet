@@ -345,7 +345,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
      * Process an attendance restore.
      *
      * Unmatched participants (userid 0) keep userid 0; rows of users that cannot be mapped are
-     * skipped. The session is marked as fetched so the copy does not query Google again.
+     * skipped. after_execute() marks the session as fetched so the copy does not query Google again.
      *
      * @param object $data The data in object form
      * @return void
@@ -369,13 +369,39 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $data->timecreated = $this->apply_date_offset($data->timecreated);
         $data->timemodified = $this->apply_date_offset($data->timemodified);
         $DB->insert_record('googlemeet_attendance', $data);
+    }
 
-        if (!$DB->record_exists('googlemeet_attendance_sync', ['eventid' => $data->eventid])) {
+    /**
+     * Mark every restored session with attendance as fetched, with the counts of its restored rows.
+     *
+     * The sync table is not backed up: participants and matched are counted from the attendance
+     * rows the copy holds (rows of unmapped users were skipped), which is what the attendance page
+     * then lists. conferences is not derivable from the rows and stays 0; nothing displays it.
+     *
+     * @return void
+     */
+    protected function restore_attendance_sync(): void {
+        global $DB;
+
+        $googlemeetid = $this->get_new_parentid('googlemeet');
+        $counts = $DB->get_records_sql(
+            "SELECT a.eventid,
+                    COUNT(1) AS participants,
+                    SUM(CASE WHEN a.userid > 0 THEN 1 ELSE 0 END) AS matched
+               FROM {googlemeet_attendance} a
+              WHERE a.googlemeetid = :googlemeetid
+                AND NOT EXISTS (SELECT 1 FROM {googlemeet_attendance_sync} s WHERE s.eventid = a.eventid)
+           GROUP BY a.eventid",
+            ['googlemeetid' => $googlemeetid]
+        );
+        foreach ($counts as $count) {
             $DB->insert_record('googlemeet_attendance_sync', (object)[
-                'googlemeetid' => $data->googlemeetid,
-                'eventid' => $data->eventid,
-                'status' => 'done',
+                'googlemeetid' => $googlemeetid,
+                'eventid' => (int)$count->eventid,
+                'status' => \mod_googlemeet\local\attendance\service::STATUS_DONE,
                 'attempts' => 1,
+                'participants' => (int)$count->participants,
+                'matched' => (int)$count->matched,
                 'timemodified' => time(),
             ]);
         }
@@ -426,6 +452,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
      * Defines post-execution actions.
      */
     protected function after_execute() {
+        $this->restore_attendance_sync();
         $this->add_related_files('mod_googlemeet', 'intro', null);
         $this->add_related_files('mod_googlemeet', 'attachment', null);
         $this->add_related_files('mod_googlemeet', 'recordingmaterial', 'googlemeet_recording');

@@ -82,6 +82,7 @@ class list_aggregates {
                 AND ti.itemtype = :itemtype
                 AND qv.status = :readystatus
                 AND t.name {$insql}
+                " . question_service::latest_version_sql() . "
            GROUP BY t.name",
             $params
         );

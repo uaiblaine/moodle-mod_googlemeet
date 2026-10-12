@@ -255,11 +255,13 @@ class subtitle_extractor {
                 continue;
             }
 
-            // Convert seconds to M:SS or H:MM:SS.
-            $hours = floor($start / 3600);
-            $minutes = floor(($start % 3600) / 60);
-            $seconds = floor($start % 60);
-            $currentminute = floor($start / 60);
+            // Convert seconds to M:SS or H:MM:SS, on the whole second: % on a float with a fraction is
+            // deprecated since PHP 8.1.
+            $whole = (int) floor($start);
+            $hours = intdiv($whole, 3600);
+            $minutes = intdiv($whole % 3600, 60);
+            $seconds = $whole % 60;
+            $currentminute = intdiv($whole, 60);
 
             // Add timestamp marker at each new minute.
             if ($currentminute > $lastminute) {

@@ -787,5 +787,18 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101300, 'googlemeet');
     }
 
+    if ($oldversion < 2026101302) {
+        // Holiday and cancelled days were stored as midnight in the editing teacher's timezone but
+        // are read as site-timezone days now, so a teacher ahead of the site would see each day
+        // shifted back by one. The picked day is the site day whose midnight lies closest to the
+        // stored value: any teacher offset within 12 hours of the site timezone puts the stored
+        // midnight nearer to the picked day than to a neighbour. Beyond 12 hours (rare) the
+        // adjacent day is chosen and the teacher must correct it. Site midnights are left as they are.
+        require_once(__DIR__ . '/upgradelib.php');
+        mod_googlemeet_normalise_session_days();
+
+        upgrade_mod_savepoint(true, 2026101302, 'googlemeet');
+    }
+
     return true;
 }

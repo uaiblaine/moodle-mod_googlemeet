@@ -48,7 +48,12 @@ if ($ADMIN->fulltree) {
     $issuers = \core\oauth2\api::get_all_issuers();
 
     foreach ($issuers as $issuer) {
-        $options[$issuer->get('id')] = s($issuer->get('name'));
+        // Plain spelling: admin_setting_configselect escapes its options itself.
+        $options[$issuer->get('id')] = format_string(
+            $issuer->get('name'),
+            true,
+            ['context' => context_system::instance(), 'escape' => false]
+        );
     }
 
     $settings->add(new admin_setting_configselect(
