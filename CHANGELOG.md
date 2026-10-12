@@ -15,6 +15,7 @@ All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 - Cancelled dates, holidays and the "Today" label take the day of a session in the site's default
   timezone, for every viewer and for cron. A viewer in a distant timezone no longer sees a session
   late on a cancelled day as scheduled, and reminders and auto-sync skip the same day the page shows.
+- Holiday and cancelled dates saved before the site-timezone change (midnight in the editing teacher's timezone) are rounded to the nearest site midnight on upgrade, so they keep the day the teacher picked; the form sorts them by site day.
 - The hero's "campus calendar" link is built from wwwroot, so it works on a site served under a path.
 - A restored session's attendance shows its real "matched of participants" counts, counted from the
   restored attendance rows, instead of "0 matched of 0".
