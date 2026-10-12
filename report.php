@@ -51,7 +51,7 @@ if (
     !$groupid && $groups && !has_capability('moodle/site:accessallgroups', $context)
         && (int)$course->groupmode === SEPARATEGROUPS
 ) {
-    // Separate groups without access to all: never show students outside the user's groups.
+    // Separate groups without access to all: default to one of the user's groups; the builder enforces the fence.
     $groupid = (int)array_key_first($groups);
 }
 

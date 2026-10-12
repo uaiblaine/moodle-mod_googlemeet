@@ -630,9 +630,13 @@ class mod_googlemeet_external extends external_api {
         $recording = $DB->get_record(
             'googlemeet_recordings',
             ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
-            'id, transcripttext',
-            MUST_EXIST
+            'id, visible, transcripttext',
+            IGNORE_MISSING
         );
+        // A hidden recording is indistinguishable from a missing one for users who cannot edit recordings.
+        if (!$recording || (empty($recording->visible) && !has_capability('mod/googlemeet:editrecording', $context))) {
+            throw new \moodle_exception('recordingnotfound', 'googlemeet');
+        }
 
         $aiservice = new \mod_googlemeet\ai_service();
         $analysis = $aiservice->get_analysis($recordingid);
@@ -1528,7 +1532,12 @@ class mod_googlemeet_external extends external_api {
             'recordingid' => new external_value(PARAM_INT, 'Recording ID'),
             'coursemoduleid' => new external_value(PARAM_INT, 'Course module ID'),
             'watchedsecondsdelta' => new external_value(PARAM_INT, 'Visible heartbeat seconds to add', VALUE_DEFAULT, 0),
-            'completed' => new external_value(PARAM_BOOL, 'Mark the recording completed', VALUE_DEFAULT, false),
+            'completed' => new external_value(
+                PARAM_BOOL,
+                'Mark the recording as viewed by the student (does not count towards completion)',
+                VALUE_DEFAULT,
+                false
+            ),
         ]);
     }
 
@@ -1536,12 +1545,16 @@ class mod_googlemeet_external extends external_api {
      * Add heartbeat progress for the current user.
      *
      * The stored seconds are a page-visibility proxy, not real playback seconds from Drive.
-     * Completion is idempotent and cannot be unset through this endpoint.
+     * `completed` is measured progress only: it is set once watchedseconds reaches
+     * googlemeet_recording_completion_threshold() and is what the activity completion rules count
+     * ({@see \mod_googlemeet\completion\custom_completion::count_watched()}). The `completed`
+     * parameter keeps its name for the Moodle App but only sets `markedviewed`, the student's own
+     * "Viewed" mark, which never counts towards completion. Neither flag can be unset here.
      *
      * @param int $recordingid Recording ID.
      * @param int $coursemoduleid Course module ID.
      * @param int $watchedsecondsdelta Visible seconds to add.
-     * @param bool $completed Whether to force completion.
+     * @param bool $completed Whether the student marks the recording as viewed by hand.
      * @return array
      */
     public static function mark_recording_progress($recordingid, $coursemoduleid, $watchedsecondsdelta = 0, $completed = false) {
@@ -1573,7 +1586,7 @@ class mod_googlemeet_external extends external_api {
         }
 
         $delta = max(0, min(60, (int)$params['watchedsecondsdelta']));
-        $forcecompleted = !empty($params['completed']);
+        $markviewed = !empty($params['completed']);
         $now = time();
 
         $progress = $DB->get_record('googlemeet_recording_progress', [
@@ -1581,50 +1594,66 @@ class mod_googlemeet_external extends external_api {
             'userid' => $USER->id,
         ]);
 
-        if (!$progress && $delta <= 0 && !$forcecompleted) {
+        if (!$progress && $delta <= 0 && !$markviewed) {
             return [
                 'watchedseconds' => 0,
                 'completed' => false,
+                'markedviewed' => false,
             ];
         }
 
+        $isnew = false;
         if (!$progress) {
             $progress = (object)[
                 'recordingid' => $recording->id,
                 'userid' => $USER->id,
                 'watchedseconds' => 0,
                 'completed' => 0,
+                'markedviewed' => 0,
                 'timecreated' => $now,
                 'timemodified' => $now,
             ];
 
             try {
                 $progress->id = $DB->insert_record('googlemeet_recording_progress', $progress);
+                $isnew = true;
             } catch (\dml_exception $e) {
-                // A second tab may have inserted the same unique row first.
+                // A second tab may have inserted the same unique row first: it is capped like any other row.
                 $progress = $DB->get_record('googlemeet_recording_progress', [
                     'recordingid' => $recording->id,
                     'userid' => $USER->id,
                 ], '*', MUST_EXIST);
             }
-        } else {
-            // Do not let duplicated/late heartbeats add more time than plausibly elapsed
-            // since the last accepted write. A small grace keeps normal timer drift harmless.
-            $elapsedcap = max(0, $now - (int)$progress->timemodified + 5);
-            $delta = min($delta, $elapsedcap);
         }
 
+        // Credit at most the real time elapsed since the last accepted heartbeat (timemodified),
+        // with no per-call grace: a call that credits nothing leaves timemodified alone, so a
+        // burst of calls cannot restart the clock. A new row has no earlier heartbeat to measure
+        // from, so its first call only starts the clock. The hub sends one beat about every 30 s
+        // (amd/src/recording_hub.js); timer drift costs at most a second per beat.
+        $credit = $isnew ? 0 : min($delta, max(0, $now - (int)$progress->timemodified));
+
         $threshold = googlemeet_recording_completion_threshold($recording->duration);
-        $watchedseconds = max(0, (int)$progress->watchedseconds) + $delta;
-        $iscompleted = !empty($progress->completed) || $forcecompleted || $watchedseconds >= $threshold;
+        $watchedseconds = max(0, (int)$progress->watchedseconds) + $credit;
+        $iscompleted = !empty($progress->completed) || $watchedseconds >= $threshold;
+        $ismarkedviewed = !empty($progress->markedviewed) || $markviewed;
 
         $update = (object)[
             'id' => $progress->id,
             'watchedseconds' => $watchedseconds,
             'completed' => $iscompleted ? 1 : 0,
-            'timemodified' => $now,
+            'markedviewed' => $ismarkedviewed ? 1 : 0,
         ];
-        $DB->update_record('googlemeet_recording_progress', $update);
+        if ($credit > 0) {
+            $update->timemodified = $now;
+        }
+        if (
+            $credit > 0
+            || $iscompleted !== !empty($progress->completed)
+            || $ismarkedviewed !== !empty($progress->markedviewed)
+        ) {
+            $DB->update_record('googlemeet_recording_progress', $update);
+        }
 
         // A newly watched class may complete the activity without a page reload.
         if ($iscompleted && empty($progress->completed)) {
@@ -1634,6 +1663,7 @@ class mod_googlemeet_external extends external_api {
         return [
             'watchedseconds' => $watchedseconds,
             'completed' => $iscompleted,
+            'markedviewed' => $ismarkedviewed,
         ];
     }
 
@@ -1645,7 +1675,8 @@ class mod_googlemeet_external extends external_api {
     public static function mark_recording_progress_returns() {
         return new external_single_structure([
             'watchedseconds' => new external_value(PARAM_INT, 'Accumulated heartbeat seconds'),
-            'completed' => new external_value(PARAM_BOOL, 'Whether the recording is completed'),
+            'completed' => new external_value(PARAM_BOOL, 'Whether measured viewing time completed the recording'),
+            'markedviewed' => new external_value(PARAM_BOOL, 'Whether the student marked the recording as viewed by hand'),
         ]);
     }
 

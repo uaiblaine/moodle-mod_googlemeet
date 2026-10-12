@@ -313,6 +313,39 @@ final class calendar_sync_test extends \advanced_testcase {
     }
 
     /**
+     * The 5.2+ deletion path (format actions, not course_delete_module()) is an explicit activity deletion.
+     */
+    public function test_format_actions_deletion_queues_event_delete(): void {
+        global $DB;
+        set_config('coursebinenable', 0, 'tool_recyclebin');
+        $creator = $this->getDataGenerator()->create_user(['email' => 'profe@example.com']);
+        [$record, $cm] = $this->make_linked_activity($creator);
+
+        \core_courseformat\formatactions::cm($record->course)->delete($cm->id);
+
+        $this->assertFalse($DB->record_exists('googlemeet', ['id' => $record->id]));
+        $tasks = \core\task\manager::get_adhoc_tasks(calendar_delete_event::class);
+        $this->assertCount(1, $tasks);
+        $data = (array)reset($tasks)->get_custom_data();
+        $this->assertSame($record->eventid, $data['eventid']);
+        $this->assertSame('profe@example.com', $data['creatoremail']);
+    }
+
+    /**
+     * Deleting the whole course through the same format actions code path still queues nothing.
+     */
+    public function test_course_deletion_with_format_actions_queues_nothing(): void {
+        set_config('coursebinenable', 0, 'tool_recyclebin');
+        set_config('categorybinenable', 0, 'tool_recyclebin');
+        $creator = $this->getDataGenerator()->create_user(['email' => 'profe@example.com']);
+        [$record] = $this->make_linked_activity($creator);
+
+        delete_course($record->course, false);
+
+        $this->assertEmpty(\core\task\manager::get_adhoc_tasks(calendar_delete_event::class));
+    }
+
+    /**
      * An event already deleted in Google (404/410) counts as done.
      */
     public function test_delete_already_gone_is_success(): void {

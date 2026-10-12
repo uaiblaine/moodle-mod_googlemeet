@@ -215,9 +215,10 @@ final class custom_completion_test extends \advanced_testcase {
     }
 
     /**
-     * Marking a recording as watched through the web service updates the stored completion state.
+     * Measured progress through the web service updates the stored completion state; a manual mark does not.
      */
     public function test_progress_ws_completes_activity_without_reload(): void {
+        global $DB;
         [$course, $googlemeet, $cm, $student] = $this->setup_activity(['completionrecordings' => 1]);
         $recordingid = $this->create_recording($googlemeet->id);
 
@@ -225,7 +226,23 @@ final class custom_completion_test extends \advanced_testcase {
         $completion = new \completion_info($course);
         $this->assertEquals(COMPLETION_INCOMPLETE, $completion->get_data($cm, false, $student->id)->completionstate);
 
+        // The "Mark as viewed" button only marks the recording.
         \mod_googlemeet_external::mark_recording_progress($recordingid, $cm->id, 0, true);
+        $completion = new \completion_info($course);
+        $this->assertEquals(COMPLETION_INCOMPLETE, $completion->get_data($cm, false, $student->id)->completionstate);
+
+        // Heartbeats up to the threshold (8 minutes for a one-hour class), each capped at 60 seconds
+        // and at the time elapsed since the previous write, so the row is aged before every call.
+        $threshold = googlemeet_recording_completion_threshold('1:00:00');
+        for ($sent = 0; $sent < $threshold; $sent += 60) {
+            $DB->set_field(
+                'googlemeet_recording_progress',
+                'timemodified',
+                time() - MINSECS,
+                ['recordingid' => $recordingid, 'userid' => $student->id]
+            );
+            \mod_googlemeet_external::mark_recording_progress($recordingid, $cm->id, 60, false);
+        }
 
         $completion = new \completion_info($course);
         $this->assertEquals(COMPLETION_COMPLETE, $completion->get_data($cm, false, $student->id)->completionstate);

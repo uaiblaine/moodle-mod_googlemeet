@@ -89,12 +89,60 @@ class report_builder {
     }
 
     /**
+     * Whether the course is in separate groups mode and the user lacks moodle/site:accessallgroups.
+     *
+     * The activity does not support group mode or groupings (FEATURE_GROUPS and FEATURE_GROUPINGS are
+     * false, so the course module never carries its own mode), hence the COURSE group mode is the one
+     * that applies, forced or not.
+     *
+     * @param stdClass $course Course record.
+     * @param int $userid User id.
+     * @return bool
+     */
+    protected function is_fenced(stdClass $course, int $userid): bool {
+        return (int)$course->groupmode === SEPARATEGROUPS
+            && !has_capability('moodle/site:accessallgroups', $this->context, $userid);
+    }
+
+    /**
+     * Group ids the current user is fenced to, or null when the user is not fenced.
+     *
+     * A fenced user ({@see self::is_fenced()}) may only list students of their own course groups, and an
+     * empty array (a user in no group) means nobody.
+     *
+     * @return int[]|null
+     */
+    protected function get_fenced_groupids(): ?array {
+        global $USER;
+
+        $course = get_course($this->cm->course);
+        if (!$this->is_fenced($course, (int)$USER->id)) {
+            return null;
+        }
+        return array_map('intval', array_keys(groups_get_all_groups($course->id, (int)$USER->id, 0, 'g.id')));
+    }
+
+    /**
      * Students: active enrolments that can view the activity, minus report viewers (teachers).
      *
-     * @param int $groupid Group id, 0 for all.
+     * A fenced user ({@see self::is_fenced()}) only gets students of their own course groups, whatever
+     * group id is requested.
+     *
+     * @param int $groupid Group id, 0 for all (for a fenced user: all of their groups).
      * @return stdClass[] keyed by user id
      */
     public function get_students(int $groupid = 0): array {
+        $fenced = $this->get_fenced_groupids();
+        $groupids = $groupid;
+        if ($fenced !== null) {
+            if ($groupid && !in_array($groupid, $fenced, true)) {
+                return [];
+            }
+            if (!$fenced) {
+                return [];
+            }
+            $groupids = $groupid ?: $fenced;
+        }
         $names = array_unique(array_merge(['id'], \core_user\fields::get_name_fields(), $this->get_identity_fields()));
         $fields = implode(', ', array_map(static function ($f) {
             return 'u.' . $f;
@@ -102,7 +150,7 @@ class report_builder {
         $users = get_enrolled_users(
             $this->context,
             'mod/googlemeet:view',
-            $groupid,
+            $groupids,
             $fields,
             'u.lastname ASC, u.firstname ASC, u.id ASC',
             0,
@@ -116,7 +164,7 @@ class report_builder {
     /**
      * Build the matrix.
      *
-     * @param int $groupid Group id, 0 for all.
+     * @param int $groupid Group id, 0 for all (for a user fenced to their own groups: all of their groups).
      * @param bool $inactiveonly Only students without activity in INACTIVE_DAYS.
      * @param int|null $now Reference time.
      * @return array ['recordings' => stdClass[], 'rows' => array[], 'recordingstats' => array, 'totalstudents' => int]
@@ -224,16 +272,15 @@ class report_builder {
      * Groups the current user may filter by.
      *
      * The activity does not support group mode, so course groups are used; users without
-     * moodle/site:accessallgroups in a SEPARATEGROUPS course only see their own groups.
+     * moodle/site:accessallgroups in a SEPARATEGROUPS course only see their own groups, see {@see self::is_fenced()}
+     * for why the course mode is the one read.
      *
      * @param stdClass $course Course record.
      * @param int $userid Current user id.
      * @return array groupid => name ([] when the course has no groups)
      */
     public function get_allowed_groups(stdClass $course, int $userid): array {
-        $all = has_capability('moodle/site:accessallgroups', $this->context, $userid)
-            || (int)$course->groupmode !== SEPARATEGROUPS;
-        $groups = groups_get_all_groups($course->id, $all ? 0 : $userid);
+        $groups = groups_get_all_groups($course->id, $this->is_fenced($course, $userid) ? $userid : 0);
         $out = [];
         foreach ($groups as $group) {
             $out[(int)$group->id] = format_string($group->name, true, ['context' => $this->context]);

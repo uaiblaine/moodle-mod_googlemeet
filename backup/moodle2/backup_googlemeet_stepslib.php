@@ -112,6 +112,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'userid',
             'watchedseconds',
             'completed',
+            'markedviewed',
             'timecreated',
             'timemodified',
         ]);

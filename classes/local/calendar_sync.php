@@ -274,20 +274,33 @@ class calendar_sync {
     /**
      * How the activity is being deleted, from the call stack.
      *
-     * Only an explicit deletion of the activity (course_delete_module(), directly or through the
-     * asynchronous deletion task) may remove the Google event. Course deletion, "delete existing
-     * content" restores and any other path return 'course' / 'other' and leave Google alone: the
-     * same room is very often still used by next year's copy of the course.
+     * Only an explicit deletion of the activity may remove the Google event: the format actions
+     * deletion ({@see \core_courseformat\local\cmactions::delete()}, which course/mod.php and the
+     * asynchronous course_delete_modules task call directly on 5.2+) or the deprecated
+     * course_delete_module() wrapper over it. Course deletion, "delete existing content" restores
+     * and any other path return 'course' / 'other' and leave Google alone: the same room is very
+     * often still used by next year's copy of the course. Course deletion wins when both frames are
+     * in the stack. The generic method name `delete` is matched together with its class.
      *
      * @return string 'activity', 'course' or 'other'.
      */
     public static function deletion_context(): string {
-        $functions = array_column(debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS), 'function');
+        $frames = debug_backtrace(DEBUG_BACKTRACE_IGNORE_ARGS);
+        $functions = array_column($frames, 'function');
         if (array_intersect(['remove_course_contents', 'delete_course'], $functions)) {
             return 'course';
         }
         if (in_array('course_delete_module', $functions, true)) {
             return 'activity';
+        }
+        foreach ($frames as $frame) {
+            if (
+                ($frame['function'] ?? '') === 'delete'
+                    && isset($frame['class'])
+                    && is_a($frame['class'], \core_courseformat\local\cmactions::class, true)
+            ) {
+                return 'activity';
+            }
         }
         return 'other';
     }

@@ -3,6 +3,29 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.2 (unreleased)
+- Teacher report: in separate-groups mode, a user without "Access all groups" sees only the students
+  of their own groups within the activity's grouping, and nobody when they belong to no group (the
+  page and the download used to list every student in that case). The activity's effective group
+  mode is used instead of the course's.
+- `mod_googlemeet_get_ai_analysis` refuses a hidden recording to users who cannot edit recordings,
+  like the other recording web services.
+- Deleting the activity on Moodle 5.2 and 5.3 deletes its Google Calendar event again: core now
+  deletes modules through the course format actions, which the deletion check did not recognise.
+- "Mark as viewed" (recording hub and Moodle App) no longer completes the activity: it sets the new
+  `googlemeet_recording_progress.markedviewed` column, which shows the recording as "Viewed" to the
+  student but never counts towards completion. `completed` now means measured viewing time only
+  (heartbeat seconds reaching the completion threshold), and only it feeds the completion rules
+  and the teacher statistics. `mod_googlemeet_mark_recording_progress` keeps its `completed`
+  parameter (it now sets `markedviewed`) and returns `markedviewed`; the hub keeps sending
+  heartbeats after a manual mark so measured completion can still be reached. Existing rows are
+  grandfathered: no completion already granted is revoked. Privacy export and backup carry the
+  new field.
+- Heartbeats credit at most the real time elapsed since the last accepted one: the per-call 5-second
+  grace is gone, a call that credits nothing no longer restarts the clock (a burst of calls cannot
+  add time), a row another tab inserted first is capped the same way, and the first heartbeat of a
+  recording only starts the clock.
+
 ## 2.30.1+uai.1 (unreleased)
 - Requires Moodle 5.2 (`requires = 2026042000`); supports Moodle 5.2 and 5.3 (`supported = [502, 503]`).
   Moodle 5.0 and 5.1 are no longer supported.

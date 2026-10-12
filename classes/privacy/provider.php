@@ -88,6 +88,7 @@ class provider implements
                 'userid' => 'privacy:metadata:googlemeet_recording_progress:userid',
                 'watchedseconds' => 'privacy:metadata:googlemeet_recording_progress:watchedseconds',
                 'completed' => 'privacy:metadata:googlemeet_recording_progress:completed',
+                'markedviewed' => 'privacy:metadata:googlemeet_recording_progress:markedviewed',
                 'timecreated' => 'privacy:metadata:googlemeet_recording_progress:timecreated',
                 'timemodified' => 'privacy:metadata:googlemeet_recording_progress:timemodified',
             ],
@@ -438,6 +439,7 @@ class provider implements
                        gr.name AS recordingname,
                        grp.watchedseconds,
                        grp.completed,
+                       grp.markedviewed,
                        grp.timecreated,
                        grp.timemodified
                   FROM {context} c
@@ -458,6 +460,7 @@ class provider implements
                 'recordingname' => $progress->recordingname,
                 'watchedseconds' => (int)$progress->watchedseconds,
                 'completed' => (bool)$progress->completed,
+                'markedviewed' => (bool)$progress->markedviewed,
                 'timecreated' => \core_privacy\local\request\transform::datetime($progress->timecreated),
                 'timemodified' => \core_privacy\local\request\transform::datetime($progress->timemodified),
             ];
