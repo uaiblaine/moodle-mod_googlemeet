@@ -112,21 +112,22 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         // The copy must never act on the source activity's Google Calendar event: eventid is the
         // original's event (a later Calendar update or delete would hit it), so drop it. The Meet URL
         // is kept so the copy uses the same room; lastsync describes the original's Drive sync.
-        // The copy must never act on the source activity's Google Calendar event: eventid is the
-        // original's event (a later Calendar update or delete would hit it), so drop it. The Meet URL
-        // is kept so the copy uses the same room; lastsync describes the original's Drive sync.
         $data->eventid = null;
         $data->lastsync = null;
-        // The creator id names a user of the source site: keep it only as the mapped user (restore
-        // with users). Otherwise creatoremail is trusted only when the restoring user could have typed it
-        // into the add form: their own e-mail (recorded as the creator) or, for an administrator, any
-        // e-mail (recorded as its single active owner). A backup can carry any e-mail, and cron acts as
-        // whoever the creator is, so anything else is blanked and auto-sync switched off: the copy then
-        // acts as nobody. Backups older than the column carry none.
+        // Cron acts as the creator with their Google token, and a backup can carry any user id or
+        // e-mail (user mapping matches on values an .mbz can be edited to hold). So the restoring user
+        // must be allowed to name the creator, as in the add form: a mapped creator (restore with
+        // users) is kept only when it is the restorer or the restorer holds moodle/site:config.
+        // Otherwise creatoremail is kept only when the restorer could have typed it: their own e-mail
+        // (recorded as the creator) or, for an administrator, any e-mail (recorded as its single active
+        // owner). Anything else is blanked and auto-sync switched off: the copy then acts as nobody
+        // until its teacher links a Google account. Backups older than the column carry no id.
+        $restorerid = (int)$this->get_task()->get_userid();
         $creatoruserid = (int)($data->creatoruserid ?? 0);
-        $data->creatoruserid = $creatoruserid > 0 ? (int)$this->get_mappingid('user', $creatoruserid) : 0;
+        $mappedid = $creatoruserid > 0 ? (int)$this->get_mappingid('user', $creatoruserid) : 0;
+        $restorerisadmin = has_capability('moodle/site:config', \context_system::instance(), $restorerid);
+        $data->creatoruserid = ($mappedid > 0 && ($mappedid === $restorerid || $restorerisadmin)) ? $mappedid : 0;
         if ($data->creatoruserid === 0) {
-            $restorerid = (int)$this->get_task()->get_userid();
             $email = trim((string)($data->creatoremail ?? ''));
             if ($email !== '' && \mod_googlemeet\local\creator::may_user_name_email($restorerid, $email)) {
                 $own = (string)$DB->get_field('user', 'email', ['id' => $restorerid, 'deleted' => 0]);

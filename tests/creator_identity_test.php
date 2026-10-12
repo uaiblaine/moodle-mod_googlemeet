@@ -641,15 +641,32 @@ final class creator_identity_test extends \advanced_testcase {
     }
 
     /**
-     * Control: a restore with users maps the original creator, whoever restores.
+     * A restore with users by someone who may not name the creator does not keep the mapped creator:
+     * user mapping matches on values a crafted backup can hold.
      */
-    public function test_restore_with_users_maps_original_creator_for_teacher(): void {
-        $teacher = $this->create_restorer('teacher@example.com');
+    public function test_restore_with_users_drops_foreign_mapped_creator(): void {
+        $restorer = $this->create_restorer('restorer@example.com');
         $creator = $this->getDataGenerator()->create_user(['email' => 'creator@example.com']);
+        $course = $this->getDataGenerator()->create_course();
+        $this->make_activity([
+            'creatoremail' => 'creator@example.com', 'creatoruserid' => $creator->id, 'autosynchours' => 4,
+        ], $course);
+
+        $restored = $this->backup_and_restore((int)$course->id, true, $restorer);
+        $this->assertEquals(0, $restored->creatoruserid);
+        $this->assertSame('', $restored->creatoremail);
+        $this->assertEquals(0, $restored->autosynchours);
+    }
+
+    /**
+     * Control: the creator restoring their own activity with users keeps themselves as creator.
+     */
+    public function test_restore_with_users_keeps_restorer_as_creator(): void {
+        $creator = $this->create_restorer('creator@example.com');
         $course = $this->getDataGenerator()->create_course();
         $this->make_activity(['creatoremail' => 'creator@example.com', 'creatoruserid' => $creator->id], $course);
 
-        $restored = $this->backup_and_restore((int)$course->id, true, $teacher);
+        $restored = $this->backup_and_restore((int)$course->id, true, $creator);
         $this->assertEquals($creator->id, $restored->creatoruserid);
         $this->assertSame('creator@example.com', $restored->creatoremail);
     }

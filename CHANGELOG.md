@@ -38,9 +38,11 @@ All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
     `moodle/site:config`. The form reports `creatoremail_notyours`; `googlemeet_add_instance()` and
     `googlemeet_update_instance()` throw it too. Before, a teacher could type another user's e-mail
     (or restore a crafted backup carrying it) and cron would then use that user's Google token.
-  - A restore that cannot map the creator keeps the e-mail only when the restoring user may name it
-    (then records them, or for an administrator the single active owner); otherwise the e-mail is
-    blanked and auto-sync is turned off.
+  - A restore keeps a mapped creator (backup with users) only when the restoring user is that
+    creator or holds `moodle/site:config`, and otherwise keeps the e-mail only when the restoring
+    user may name it (then records them, or for an administrator the single active owner); anything
+    else blanks the e-mail and turns auto-sync off, so a copy restored by someone else needs its
+    teacher to link a Google account again.
   - The upgrade backfills the id when exactly one active user has the e-mail (case-insensitive),
     else leaves 0. An activity with no recorded id still answers with that single owner, but the
     answer is never written back (read paths used to persist it, binding the wrong user for good
