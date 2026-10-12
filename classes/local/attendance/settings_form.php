@@ -17,7 +17,7 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Activity form fields of real attendance (ANA-03).
+ * Activity form fields of real attendance.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

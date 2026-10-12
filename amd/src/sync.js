@@ -148,7 +148,7 @@ export const init = () => {
             return;
         }
         if (form.closest('[data-googlemeet-async-sync]').length) {
-            // Handled in the background by initSyncPanel() (PERF-02).
+            // Handled in the background by initSyncPanel().
             return;
         }
 

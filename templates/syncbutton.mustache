@@ -54,7 +54,7 @@
         {{/isloggedcreatoremail}}
       </div>
 
-      {{! track w2-calsync (PERF-02): background sync progress/result, filled by mod_googlemeet/sync. }}
+      {{! Background sync progress and result, filled in by mod_googlemeet/sync initSyncPanel(). }}
       <div class="googlemeet-sync-progress alert alert-info" data-region="googlemeet-sync-progress"
            role="status" aria-live="polite" {{^syncactive}}hidden{{/syncactive}}>
         <span class="googlemeet-sync-progress-text" data-region="googlemeet-sync-progress-text">{{syncstatusmessage}}</span>

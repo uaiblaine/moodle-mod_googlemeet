@@ -27,11 +27,11 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  * Send notifications when new recordings are synced.
  *
  * The notice names each lesson with its readable title and, when the AI analysis is ready (and,
- * if the site requires it, reviewed), a short summary and the chapter list (NOT-05). While an
- * analysis is still queued or running, the notice is postponed for a bounded time so it can
- * include that content. All texts come from the language pack, in the recipient's language
- * (QA-03); the HTML body is the mod_googlemeet/email_new_recordings template, wrapped by the
- * optional local_achievements email template when that plugin is installed.
+ * if the site requires it, reviewed), a short summary and the chapter list. While an analysis is
+ * still pending or processing, the notice is postponed (every AI_WAIT_STEP, up to AI_WAIT_MAX) so it
+ * can include that content. All texts come from the language pack, in the recipient's language;
+ * the HTML body is the mod_googlemeet/email_new_recordings template, wrapped by the optional
+ * local_achievements email template when that plugin is installed.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -179,7 +179,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
             $analyses[(int)$analysis->recordingid] = $analysis;
         }
 
-        // IA-04: AI content not yet reviewed by a teacher is never quoted (same rule as the web pages).
+        // AI content not yet reviewed by a teacher is never quoted (same rule as the web pages).
         $titles = self::lesson_titles($googlemeet);
 
         $lessons = [];
@@ -209,7 +209,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
     }
 
     /**
-     * Readable lesson titles (PLY-06) for the visible recordings of the activity.
+     * Readable lesson titles for the visible recordings of the activity.
      *
      * Computed directly instead of through googlemeet_get_lesson_titles(), whose per-request
      * cache could predate the recordings just synced when several tasks share a cron process.
@@ -228,7 +228,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
         );
         $items = [];
         foreach ($rows as $row) {
-            // IA-04: titles built from unreviewed AI topics would leak them into the email subject.
+            // Titles built from unreviewed AI topics would leak them into the notice.
             $topics = [];
             if ($row->status !== null && !\mod_googlemeet\local\ai_review::is_pending_review($row)) {
                 $topics = json_decode((string)$row->topics) ?: [];
@@ -364,7 +364,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
             $message->contexturl = $url->out(false);
             $message->contexturlname = $name;
             $message->courseid = $googlemeet->course;
-            // NOT-03: lets the Moodle app open the activity from the push notification.
+            // Lets the Moodle app open the activity from the push notification.
             $message->customdata = reminders::app_customdata((int)$cm->id, (int)$googlemeet->course, $url);
             return $message;
         } finally {

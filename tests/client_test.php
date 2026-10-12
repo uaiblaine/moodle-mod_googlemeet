@@ -45,6 +45,8 @@ class client_test_fake_drive_service {
     public array $calls = [];
 
     /**
+     * Queue the responses that call() returns, in order.
+     *
      * @param array $responses Responses returned by call().
      */
     public function __construct(array $responses) {
@@ -66,7 +68,7 @@ class client_test_fake_drive_service {
 }
 
 /**
- * Fake core\oauth2\client counting userinfo requests (PERF-01 cache tests).
+ * Fake core\oauth2\client counting userinfo requests (userinfo cache tests).
  */
 class client_test_fake_oauth_client {
     /** @var int Number of get_userinfo() calls (each one is an HTTP round-trip in real life). */
@@ -76,6 +78,8 @@ class client_test_fake_oauth_client {
     public static bool $loggedin = true;
 
     /**
+     * Fake core\oauth2\client::is_logged_in().
+     *
      * @return bool
      */
     public function is_logged_in(): bool {
@@ -83,6 +87,8 @@ class client_test_fake_oauth_client {
     }
 
     /**
+     * Fake core\oauth2\client::get_userinfo(), counting each call.
+     *
      * @return array
      */
     public function get_userinfo(): array {
@@ -96,6 +102,8 @@ class client_test_fake_oauth_client {
  */
 class client_userinfo_testable_client extends client {
     /**
+     * Return the counting fake instead of the configured OAuth client.
+     *
      * @return client_test_fake_oauth_client
      */
     protected function get_user_oauth_client() {

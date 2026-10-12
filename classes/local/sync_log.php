@@ -17,10 +17,10 @@
 namespace mod_googlemeet\local;
 
 /**
- * Operational log of Google syncs (PERF-02 manual sync status, DAT-04 calendar ops, OPS-04 admin page).
+ * Operational log of Google syncs, read by {@see sync_manager::get_status()} and {@see ops_status}.
  *
  * One row per run: manual Drive sync, autosync tick per activity, Calendar patch/delete. Rows hold
- * no personal data (no user id) and are purged after RETENTION_DAYS.
+ * no user id; rows older than RETENTION_DAYS are purged whenever start() writes a new one.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -57,11 +57,11 @@ class sync_log {
     public const TABLE = 'googlemeet_sync_log';
 
     /**
-     * Create a row.
+     * Create a row, purging expired rows first.
      *
      * @param int $googlemeetid
      * @param string $kind KIND_*
-     * @param string $status STATUS_*
+     * @param string $status STATUS_*; STATUS_RUNNING also stamps timestarted.
      * @param int|null $now
      * @return int Row id.
      */
@@ -97,8 +97,8 @@ class sync_log {
      *
      * @param int $id
      * @param string $status STATUS_*
-     * @param array|null $stats Sync counters.
-     * @param string $message Human readable result / error.
+     * @param array|null $stats Sync counters, stored as JSON.
+     * @param string $message Human readable result / error, truncated to 2000 characters.
      * @return void
      */
     public static function finish(int $id, string $status, ?array $stats = null, string $message = ''): void {

@@ -27,7 +27,7 @@ require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 
 /**
- * Backup/restore of practice attempts (ANA-05): included with user data, ids remapped.
+ * Backup/restore of practice attempts: included with user data, ids remapped.
  *
  * @package     mod_googlemeet
  * @category    test

@@ -21,7 +21,7 @@ use moodle_url;
 use renderer_base;
 
 /**
- * Teacher report page (ANA-04): template context for mod_googlemeet/report_page.
+ * Teacher report page: template context for mod_googlemeet/report_page.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

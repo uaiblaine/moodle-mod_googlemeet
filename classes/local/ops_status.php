@@ -17,10 +17,11 @@
 namespace mod_googlemeet\local;
 
 /**
- * Data for the admin "Google Meet sync status" page (OPS-04).
+ * Data for the admin "Google Meet sync status" page.
  *
  * Lets an admin see, without reading cron logs, which activities had autosync failures or gave
- * up in the last days, which AI analyses look stuck and when each activity last synced.
+ * up in the last days, which AI analyses look stuck, which Google Calendar updates failed and
+ * when each activity last synced.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -31,10 +32,10 @@ class ops_status {
     /** @var int Look-back window for failures. */
     public const WINDOW_DAYS = 7;
 
-    /** @var int Legacy fallback; the page uses ai_service::get_stuck_threshold() (googlemeet/aistuckminutes). */
+    /** @var int Not read: stuck_ai_analyses() uses ai_service::get_stuck_threshold() (googlemeet/aistuckminutes). */
     public const STUCK_PROCESSING_SECONDS = HOURSECS;
 
-    /** @var int A "pending" analysis older than this is considered stuck (cron runs every 10 min). */
+    /** @var int A "pending" analysis older than this is considered stuck (process_ai_analysis runs every 10 min). */
     public const STUCK_PENDING_SECONDS = 6 * HOURSECS;
 
     /** @var int Max rows of the "last sync" table. */
@@ -43,9 +44,9 @@ class ops_status {
     /**
      * Activities with failed, retrying or exhausted autosync in the window.
      *
-     * Combines the sync log (failed runs since this version) with googlemeet_events, which also
-     * covers older history: sessions waiting for a retry and sessions closed after reaching the
-     * maximum number of attempts.
+     * Combines the failed runs of the sync log with googlemeet_events, which also covers runs older
+     * than the log: sessions waiting for a retry and sessions closed after reaching the maximum
+     * number of attempts.
      *
      * @param int|null $now
      * @return \stdClass[] Keyed by googlemeet id: id, name, course, coursename, cmid, creatoremail, failedruns,
@@ -100,7 +101,7 @@ class ops_status {
     }
 
     /**
-     * Whether "exhausted" events of an activity are real give-ups (no successful autosync after them).
+     * Whether "exhausted" events of an activity are real give-ups (no successful autosync logged in the window).
      *
      * @param int $googlemeetid
      * @param int $since

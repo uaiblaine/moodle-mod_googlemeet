@@ -26,9 +26,9 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * PERF-03: the recordings list and the hub run a constant number of DB queries.
+ * The recordings list and the hub run a constant number of DB queries.
  *
- * Measured with $DB->perf_get_queries() around the real render functions with an increasing
+ * Counted with $DB->perf_get_queries() around the real render functions with an increasing
  * number of recordings, each with attached materials and published questions.
  *
  * @package     mod_googlemeet
@@ -39,7 +39,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 #[CoversClass(list_aggregates::class)]
 final class list_query_count_test extends \advanced_testcase {
 
-    /** @var int Allowed drift between small and large pages (spec: ± 3). */
+    /** @var int Queries the large activity may run above the small one. */
     private const TOLERANCE = 3;
 
     /**

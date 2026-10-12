@@ -17,9 +17,9 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Attendance read from the Google Meet REST API v2 (ANA-03).
+ * Attendance read from the Google Meet REST API v2.
  *
- * Findings that shape this class (Google docs, checked 2026-10):
+ * API constraints that shape this class:
  * - conferenceRecords.list only returns conferences where the authenticated user is the organizer,
  *   so it must run with the token of the Google account that owns the room (creatoremail).
  * - Participants expose a display name and, for signed-in users, an opaque id "users/{id}"; the

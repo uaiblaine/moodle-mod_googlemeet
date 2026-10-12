@@ -42,7 +42,7 @@ class restore_googlemeet_activity_task extends restore_activity_task {
     /**
      * Defines particular steps that this activity can have.
      *
-     * @return base_step.
+     * @return void
      */
     protected function define_my_steps() {
         $this->add_step(new restore_googlemeet_activity_structure_step('googlemeet_structure', 'googlemeet.xml'));

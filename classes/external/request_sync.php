@@ -22,9 +22,10 @@ use core_external\external_value;
 use mod_googlemeet\local\sync_manager;
 
 /**
- * Queue a background "Sync with Google Drive" for an activity (PERF-02).
+ * Queue a background "Sync with Google Drive" for an activity.
  *
- * Returns immediately; a second request while one is queued/running does not queue another.
+ * Returns immediately; a second request while one is queued/running does not queue another
+ * ({@see \mod_googlemeet\local\sync_manager::request()}).
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

@@ -17,7 +17,7 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Google Meet REST API v2 endpoints used for attendance (ANA-03).
+ * Google Meet REST API v2 endpoints used for attendance.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

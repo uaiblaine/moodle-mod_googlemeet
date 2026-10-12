@@ -27,7 +27,7 @@ global $CFG;
 require_once($CFG->libdir . '/adminlib.php');
 
 /**
- * OPS-04: structured autosync log and the admin status page data.
+ * Structured autosync log and the admin status page data.
  *
  * @package     mod_googlemeet
  * @category    test

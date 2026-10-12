@@ -18,7 +18,7 @@
  *
  * Mirrors the recording hub player (same markup and CSS classes) but loads questions from
  * several recordings; each answer is checked with the per-recording WS, which also stores
- * the attempt (ANA-05).
+ * the attempt.
  *
  * @module     mod_googlemeet/practice_session
  * @copyright  2026 PreparaOposiciones

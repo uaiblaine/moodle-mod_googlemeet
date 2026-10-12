@@ -33,15 +33,21 @@ final class notes_sanitize_test extends \advanced_testcase {
 
     /**
      * Invoke the private sanitize_notes_html() via reflection.
+     *
+     * @param string $html Raw Google Docs export.
+     * @return string
      */
     private function sanitize(string $html): string {
         $client = new \ReflectionClass(client::class);
         $method = $client->getMethod('sanitize_notes_html');
-        // sanitize_notes_html is static-safe: no instance state used.
+        // The method reads no instance state, so the constructor can be skipped.
         $instance = $client->newInstanceWithoutConstructor();
         return $method->invoke($instance, $html);
     }
 
+    /**
+     * Script tags and their content are removed; the text survives.
+     */
     public function test_strips_script_tags(): void {
         $this->resetAfterTest();
         $out = $this->sanitize('<html><body><p>Hola</p><script>alert(1)</script></body></html>');
@@ -50,6 +56,9 @@ final class notes_sanitize_test extends \advanced_testcase {
         $this->assertStringNotContainsString('alert(1)', $out);
     }
 
+    /**
+     * Headings and lists survive the cleaning.
+     */
     public function test_keeps_structure(): void {
         $this->resetAfterTest();
         $out = $this->sanitize('<html><body><h2>Temas</h2><ul><li>Punto A</li><li>Punto B</li></ul></body></html>');
@@ -57,6 +66,9 @@ final class notes_sanitize_test extends \advanced_testcase {
         $this->assertStringContainsString('<li>', $out);
     }
 
+    /**
+     * Empty input gives an empty string.
+     */
     public function test_empty_input_returns_empty(): void {
         $this->resetAfterTest();
         $this->assertSame('', $this->sanitize(''));

@@ -39,7 +39,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 #[CoversClass(\mod_googlemeet_external::class)]
 final class question_publish_test extends \advanced_testcase {
 
-    /** @var string Stem the local_questions leak gate rejects (pattern "pendiente_tarea"). */
+    /** @var string Stem the local_questions leak gate rejects (its "pendiente_tarea" pattern). */
     private const LEAKY_STEM = '<p>Queda pendiente de verificar esta cifra con el temario.</p>';
 
     /**
@@ -330,8 +330,8 @@ final class question_publish_test extends \advanced_testcase {
     }
 
     /**
-     * The per-recording publish WS (used by "Publicar seleccionadas" / "Publicar todas las de
-     * esta clase") rejects students and questions of another recording.
+     * The per-recording publish WS (behind "Publish selected" and "Publish all for this class")
+     * rejects students and questions of another recording.
      */
     public function test_ws_publish_questions_scope_and_capability(): void {
         $this->resetAfterTest();

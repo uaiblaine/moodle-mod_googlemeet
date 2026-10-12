@@ -20,17 +20,18 @@ use stdClass;
 use moodle_exception;
 use mod_googlemeet\gemini_transient_exception;
 
-// curl class lives in lib/filelib.php and is not autoloaded — load it eagerly
-// so adhoc/scheduled task contexts (which don't go through code that pulls
-// filelib.php) can still instantiate \curl.
+// The \curl class is defined in lib/filelib.php, which is not autoloaded and not loaded by every
+// task or CLI entry point.
 global $CFG;
 require_once($CFG->libdir . '/filelib.php');
 
 /**
- * Gemini API Client for mod_googlemeet.
+ * Client for the Gemini generateContent and File APIs.
  *
- * Handles communication with Google's Gemini AI API for generating
- * video summaries, key points, and transcripts.
+ * Produces the recording analysis (summary, key points, topics, chapters, transcript) from a video
+ * or a transcript, plus practice questions and chapters. Every generation call tries the configured
+ * model and then {@see self::FALLBACK_MODEL} ({@see model_policy}). The API key always travels in the
+ * x-goog-api-key header, never in a URL, so it cannot leak through a logged or thrown URL.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -59,7 +60,7 @@ class gemini_client {
     /** @var string Fallback model when primary fails */
     private const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
 
-    /** @var string Default safety threshold (IA-03): only clearly harmful content is blocked. */
+    /** @var string Default safety threshold: only clearly harmful content is blocked. */
     const DEFAULT_SAFETY_THRESHOLD = 'BLOCK_ONLY_HIGH';
 
     /** @var string[] Thresholds accepted by the Gemini API for googlemeet/aisafetythreshold. */
@@ -96,10 +97,7 @@ class gemini_client {
         $this->apikey = get_config('googlemeet', 'geminiapikey');
         $this->model = get_config('googlemeet', 'aimodel') ?: self::DEFAULT_MODEL;
 
-        // The model/fallback policy (primary configured model → FALLBACK_MODEL).
-        // Centralising it here keeps the fallback decision in one cohesive,
-        // extensible place; the request/parse logic below merely follows the
-        // attempt chain it produces.
+        // Attempt chain: the configured model, then FALLBACK_MODEL.
         $this->modelpolicy = new model_policy($this->model, self::FALLBACK_MODEL);
     }
 
@@ -173,7 +171,7 @@ class gemini_client {
      * @param string $videourl The Google Drive video URL
      * @param string $videoname The name of the video
      * @param string $duration The duration of the video
-     * @return stdClass Object containing summary, keypoints, topics, chapters, and transcript
+     * @return stdClass Object containing summary, keypoints, topics, chapters, transcript and language
      * @throws moodle_exception If the API call fails
      */
     public function analyze_video(string $videourl, string $videoname, string $duration): stdClass {
@@ -368,8 +366,10 @@ PROMPT;
     /**
      * Call the Gemini API with automatic fallback to a secondary model.
      *
-     * If the primary model fails with an API error (4xx/5xx), retries
-     * with the fallback model before throwing.
+     * Any moodle_exception from the primary model (HTTP error, transient overload, connection
+     * failure) is retried once on the fallback model before it is thrown. The caller parses the
+     * response, so a safety block ({@see self::assert_not_blocked()}) surfaces after this method
+     * returns and is never retried on another model.
      *
      * @param string $prompt The prompt to send
      * @return string The API response
@@ -386,8 +386,6 @@ PROMPT;
                 throw $e;
             } catch (moodle_exception $e) {
                 $lastexception = $e;
-                // If the policy offers a further model, log the fallback and
-                // continue; otherwise rethrow the failure to the caller.
                 if (!$this->modelpolicy->has_fallback_after($model)) {
                     throw $e;
                 }
@@ -428,8 +426,7 @@ PROMPT;
      * @throws moodle_exception If the API call fails
      */
     private function call_api_with_model(string $prompt, string $model): string {
-        // The API key is sent in the x-goog-api-key header (never in the URL/query
-        // string) so it cannot leak through a logged or thrown URL.
+        // Key sent via header, never in the URL/query string (see the class docblock).
         $url = self::API_BASE_URL . $model . ':generateContent';
 
         debugging("Gemini API: Starting request to {$url}", DEBUG_DEVELOPER);
@@ -448,7 +445,7 @@ PROMPT;
                 'topP' => 0.95,
                 'maxOutputTokens' => 8192,
             ],
-            // IA-03: class transcripts (e.g. law, health or security courses) often trip MEDIUM filters.
+            // Class transcripts (e.g. law, health or security courses) often trip the API's MEDIUM filters.
             'safetySettings' => self::build_safety_settings(),
         ];
 
@@ -533,7 +530,7 @@ PROMPT;
     }
 
     /**
-     * Safety settings sent with every generateContent request (IA-03).
+     * Safety settings sent with every generateContent request.
      *
      * Threshold from googlemeet/aisafetythreshold (default BLOCK_ONLY_HIGH); an unknown value falls back
      * to the default.
@@ -551,7 +548,7 @@ PROMPT;
     }
 
     /**
-     * Throw a {@see gemini_safety_exception} when Gemini blocked the prompt or the answer (IA-03).
+     * Throw a {@see gemini_safety_exception} when Gemini blocked the prompt or the answer.
      *
      * Covers promptFeedback.blockReason (prompt refused, no candidates) and a first candidate whose
      * finishReason is SAFETY (or the related PROHIBITED_CONTENT / BLOCKLIST / SPII reasons).
@@ -870,8 +867,7 @@ PROMPT;
         $filesize = filesize($filepath);
         debugging("Gemini File API: Uploading file {$displayname} ({$filesize} bytes)", DEBUG_DEVELOPER);
 
-        // Start resumable upload. The API key travels in the x-goog-api-key
-        // header (never the query string) so it cannot leak via a logged URL.
+        // Start a resumable upload; key sent via header, never in the URL/query string.
         $url = self::UPLOAD_URL;
 
         $curl = new \curl();
@@ -896,8 +892,8 @@ PROMPT;
         // Get the upload URL from response headers.
         $uploadurl = $curl->getResponse()['X-Goog-Upload-URL'] ?? null;
         if (!$uploadurl) {
-            // Try to get from response headers differently. Moodle's \curl exposes the raw
-            // header lines via get_raw_response() (an array), not get_raw_response_headers().
+            // The \curl::getResponse() keys keep the received case (HTTP/2 sends lowercase names):
+            // scan the raw header lines from get_raw_response() case-insensitively.
             $rawheaders = $curl->get_raw_response();
             $headerstr = is_array($rawheaders) ? implode("\n", $rawheaders) : (string) $rawheaders;
             if (preg_match('/x-goog-upload-url:\s*(.+)/i', $headerstr, $matches)) {
@@ -912,22 +908,16 @@ PROMPT;
 
         debugging("Gemini File API: Got upload URL, uploading file content...", DEBUG_DEVELOPER);
 
-        // Upload the actual file content as a stream so the whole video (up to
-        // ~2GB) is never loaded into PHP memory. We hand cURL the open file
-        // handle via CURLOPT_INFILE/CURLOPT_INFILESIZE with CURLOPT_UPLOAD, and
-        // force the HTTP verb to POST (CURLOPT_UPLOAD would otherwise use PUT)
-        // to match the resumable-upload protocol.
+        // Stream the file from disk so the video (up to ~2GB) is never loaded into PHP memory.
         $fp = fopen($filepath, 'rb');
         if ($fp === false) {
             throw new moodle_exception('ai_error', 'googlemeet', '', 'Could not open video file for upload');
         }
 
-        // We deliberately use a native cURL handle here instead of Moodle's \curl wrapper:
-        // \curl::post() always sets CURLOPT_POST + CURLOPT_POSTFIELDS, which overrides the
-        // CURLOPT_INFILE read stream and would upload an empty body. A raw handle with
-        // CURLOPT_UPLOAD/CURLOPT_INFILE streams the file straight from disk, so the full
-        // video (up to ~2GB) is never loaded into PHP memory. The upload URL is returned by
-        // Google's File API (trusted), so the SSRF protections of \curl are not needed here.
+        // A native cURL handle, not \curl: \curl::post() always sets CURLOPT_POST and CURLOPT_POSTFIELDS,
+        // which override the CURLOPT_INFILE stream and upload an empty body. CURLOPT_UPLOAD alone sends
+        // PUT, so the verb is forced to POST as the resumable-upload protocol requires. The upload URL
+        // comes from Google's File API response, so \curl's SSRF checks are not needed.
         try {
             $ch = curl_init();
             curl_setopt_array($ch, [

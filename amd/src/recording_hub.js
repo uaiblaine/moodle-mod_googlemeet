@@ -574,7 +574,7 @@ const scrollChapterIntoPanel = button => {
 /**
  * Bind the mobile collapse toggle of the chapters panel.
  *
- * On small screens (<= 576px) the list starts collapsed under the player and the toggle
+ * On small screens (below 576px) the list starts collapsed under the player and the toggle
  * shows/hides it (aria-expanded + the hidden attribute on the list). On larger screens the
  * toggle is hidden by CSS and the list is always expanded.
  *
@@ -1343,10 +1343,8 @@ const renderPracticeQuestion = (practice, player) => {
     $('.googlemeet-practice-loading, .googlemeet-practice-complete, .googlemeet-practice-error').addClass('d-none');
     $('.googlemeet-practice-question').removeClass('d-none');
     updatePracticeHeader(practice, player, false);
-    // Question stem/options/explanation arrive pre-sanitised: the WS builds them
-    // with format_text() (HTMLPurifier) in question_service, the standard Moodle
-    // boundary for question content. Do not client-escape — it would break
-    // legitimate formatting (bold, sub/sup) that questions rely on.
+    // Stem, options and explanation are format_text() output from question_service: insert them
+    // as HTML; escaping them here would break their formatting (bold, sub/sup).
     $('.googlemeet-practice-stem').html(question.stem);
     $('.googlemeet-practice-feedback').addClass('d-none').removeClass('alert alert-success alert-warning').empty();
     $('.googlemeet-practice-check').prop('disabled', true).removeClass('d-none');
@@ -1684,7 +1682,7 @@ const bindReadMore = () => {
     }
     const measure = () => {
         body.classList.add('googlemeet-collapsed');
-        // Only collapse when at least ~30% more text is hidden; hiding two lines is just annoying.
+        // Collapse only when at least ~30% more text would be hidden; a line or two is not worth a toggle.
         const overflow = body.scrollHeight > body.clientHeight * 1.3;
         if (!overflow) {
             body.classList.remove('googlemeet-collapsed');
@@ -1716,7 +1714,7 @@ const bindReadMore = () => {
 };
 
 /**
- * "Imprimir resumen": print the lesson notes (print stylesheet hides player, tabs and actions).
+ * Print summary button: print the lesson notes (the print stylesheet hides player, tabs and actions).
  *
  * @returns {void}
  */

@@ -957,8 +957,7 @@
     height: 12px;
 }
 
-/* Card with AI - subtle highlight. The AI state is already signalled by the media strip and
-   the "Análisis IA" badge, so keep this border quiet to avoid a wall of duplicate blue. */
+/* Card with AI: a quiet border, since the media strip and the AI badge already signal the AI state. */
 .googlemeet-recording-has-ai {
     border-left: 3px solid #c6dafc;
 }
@@ -1075,12 +1074,9 @@
     font-weight: 500;
 }
 
-/* Full-width AI panel row: a sibling of the card (not nested), spanning every grid column.
-   This replaces the old `.googlemeet-ai-expanded { grid-column: 1 / -1 }` card-stretch hack,
-   which left a hole in the row when a middle card expanded. The same row is reusable by the
-   upcoming list view (a full-width row after a list item). */
-/* Collapsed by default the row generates no grid item, so it never leaves an empty
-   full-width slot pushing cards around. Only when opened does it become a spanning row. */
+/* Full-width AI panel row: a sibling of the card (not nested), so the card keeps its size and the
+   panel opens as a row below it; the list view reuses it after each list item. Collapsed, it
+   generates no grid item; opened, it spans every grid column. */
 .googlemeet-ai-panel-row {
     display: none;
 }
@@ -1295,7 +1291,7 @@
     overflow: hidden;
 }
 
-/* Quiet grey pills instead of a wall of saturated blue; long phrase topics are clamped. */
+/* Quiet grey pills; long phrase topics are cut to one line with an ellipsis. */
 .googlemeet-ai-topic-badge {
     background: #f1f3f4;
     color: #3c4043 !important;
@@ -1481,7 +1477,7 @@
 }
 
 /* ===========================================
-   Card Grid (Tasks 2.4 / 2.5)
+   Card Grid
    =========================================== */
 .googlemeet-recordings-grid {
     display: grid;
@@ -1547,8 +1543,8 @@
     text-transform: capitalize;
     overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* Top-right badge stack: "Nueva" then "Análisis IA", stacked so they never overlap the
-   play circle or each other. */
+/* Top-right badge stack ("New", then the AI badge) so the badges never overlap the play circle
+   or each other. */
 .googlemeet-card-badges {
     position: absolute; right: 8px; top: 8px;
     display: flex; flex-direction: column; align-items: flex-end; gap: 4px;
@@ -1798,7 +1794,8 @@
     height: 18px;
     margin: 0;
 }
-/* On the tightest 3-column desktop layout, push the teacher actions onto their own row. */
+/* Overridden by the more specific .googlemeet-recording-card footer rules further down, which keep the CTA and the
+   actions menu on one row, also in the 3-column grid; the footer only exists inside a recording card. */
 @media only screen and (min-width: 1280px) {
     .googlemeet-card-footer { align-items: flex-start; }
     .googlemeet-card-actions { width: 100%; justify-content: flex-end; margin-left: 0; }
@@ -1830,8 +1827,7 @@
 }
 .googlemeet-card-topics .googlemeet-ai-topic-tag {
     background: #f1f3f4; color: #3c4043; border: 1px solid var(--gm-border, #e0e0e0); font-weight: 500;
-    /* Keep each chip on one bounded line so long legacy "topics" (full phrases) don't
-       wrap and inflate the card — the display adapts regardless of topic length. */
+    /* One bounded line per chip, so long phrase topics do not wrap and inflate the card. */
     max-width: 13rem;
     white-space: nowrap;
     overflow: hidden;
@@ -1854,7 +1850,7 @@
 }
 
 /* ===========================================
-   Filter bar + topic chips (Task 3.3)
+   Filter bar + topic chips
    =========================================== */
 .googlemeet-ai-topic-tag.googlemeet-topic-active,
 .googlemeet-topic-active { background: #174ea6; color: #fff; }
@@ -1872,8 +1868,8 @@
    block child after each list item, so it spans the full width when opened
    (its grid-column:1/-1 is simply ignored outside a grid).
    =========================================== */
-/* View toggle (Tarjetas/Lista): core pix icons are dark grey by default, which is
-   illegible on the active (dark/primary) button — force the active label + icon white. */
+/* View toggle (Cards/List): core pix icons are dark grey, illegible on the active (primary)
+   button, so the active label and icon are forced white. */
 .googlemeet-view-toggle .btn {
     display: inline-flex;
     align-items: center;
@@ -2085,13 +2081,12 @@
     .googlemeet-recording-listitem { transition: none; }
 }
 /* ════════════════════════════════════════════════════════════════════════
-   Controls-bar polish — Codex UX review (Opus-approved, surgical scope).
-   Does NOT touch AI-panel / modal buttons; only the recordings controls,
-   the card/list CTA and the in-row action icons.
+   Controls bar: recordings controls, card/list CTA and in-row action icons
+   (the AI panel and modal buttons keep their own styles).
    ════════════════════════════════════════════════════════════════════════ */
 
-/* View toggle ACTIVE: the .active class triggers the theme's darken (#122238 +
-   grey text → looks disabled). Force the unified navy + white, matching Ordenar. */
+/* Active view toggle: the theme darkens .active with grey text, which reads as disabled;
+   use the same navy and white as the active sort button. */
 #googlemeet_recordings .googlemeet-view-toggle .btn.btn-primary.active,
 #googlemeet_recordings .googlemeet-view-toggle .btn.btn-primary.active:hover,
 #googlemeet_recordings .googlemeet-view-toggle .btn.btn-primary.active:focus {
@@ -2102,7 +2097,7 @@
 #googlemeet_recordings .googlemeet-view-toggle .btn.btn-primary.active img {
     filter: brightness(0) invert(1);
 }
-/* View toggle INACTIVE: neutral grey outline so it doesn't compete with Ordenar/CTA. */
+/* Inactive view toggle: neutral grey outline so it does not compete with the sort buttons or the CTA. */
 .googlemeet-view-toggle .btn.btn-outline-secondary {
     background-color: var(--gm-white, #fff);
     border-color: #DADCE0;
@@ -2114,7 +2109,7 @@
     color: #3C4043;
 }
 
-/* Unify the primary navy across the CTA and the Ordenar active button. */
+/* Same primary navy on the CTA and the active sort button. */
 .googlemeet-card-cta.btn-primary,
 .googlemeet-sort-toggle .btn.btn-primary {
     background-color: #1E3A5F;
@@ -2128,10 +2123,9 @@
     color: #fff;
 }
 
-/* Filter bar: match the select / input / button to the control height + type.
-   The #id prefix + !important are required because RemUI styles form controls with
-   high specificity (its default select is 45px / 16px / 12px vertical padding, which
-   clipped the option text once the height was capped at 40px). */
+/* Filter bar: select, input and button share one 40px height and type size. The #id prefix and
+   !important beat themes (e.g. RemUI) whose high-specificity form-control padding clips the
+   option text at that height. */
 #googlemeet_recordings .googlemeet-recordings-filterbar .form-control,
 #googlemeet_recordings .googlemeet-recordings-filterbar .form-select,
 #googlemeet_recordings .googlemeet-recordings-filterbar .form-control-sm,
@@ -2154,8 +2148,8 @@
     border-radius: 8px;
 }
 
-/* AI toggle icon: secondary by default (was a heavy filled blue circle for every
-   AI recording, competing with the CTA). Accent only on hover / when expanded. */
+/* AI toggle icon: secondary by default so it does not compete with the CTA; accent only on
+   hover or when expanded. */
 .googlemeet-ai-toggle-btn,
 .googlemeet-ai-toggle-btn.googlemeet-ai-toggle-active {
     background: transparent;
@@ -2170,14 +2164,14 @@
     box-shadow: none;
 }
 
-/* Date chip: stop artificial capitalisation (PHP already lowercases the value). */
+/* Date chip: no capitalisation; googlemeet_format_date_chip() lowercases the value on purpose. */
 .googlemeet-listitem-date { text-transform: none; }
 
-/* "Análisis IA" badge: subtle border so it reads as a pill on white list rows. */
+/* AI badge: subtle border so it reads as a pill on white list rows. */
 .googlemeet-card-aibadge { border: 1px solid #C6DAFC; }
 
 /* ===========================================
-   F3 Classroom hero + lesson chapters
+   Classroom hero + lesson chapters
    =========================================== */
 .googlemeet-classroom-hero {
     display: grid;
@@ -3314,7 +3308,7 @@ mark.googlemeet-transcript-match-current {
     background: var(--bs-danger, #dc3545);
     color: #fff;
 }
-/* Disabled radios must not fade the answer text (Bootstrap dims disabled labels). */
+/* Answered (disabled) radios stay legible: Bootstrap fades a disabled .form-check-input to 0.5. */
 .googlemeet-practice-options-answered .form-check-input:disabled {
     opacity: 0.8;
 }
@@ -3373,7 +3367,7 @@ mark.googlemeet-transcript-match-current {
         padding: 0.55rem 0.65rem;
     }
 }
-/* ANA-06: viewing progress summary + "Pendientes" filter (student list). */
+/* Viewing progress summary and the All/Pending filter (student list). */
 .googlemeet-progress-summary {
     display: flex;
     margin-bottom: 0.75rem;
@@ -3429,7 +3423,8 @@ mark.googlemeet-transcript-match-current {
     outline: 3px solid var(--bs-focus-ring-color, rgba(13, 110, 253, 0.35));
     outline-offset: 1px;
 }
-/* UX-01: hero without upcoming sessions does not stretch to the "Última clase" card. */
+/* Compact hero (no upcoming sessions): the main card does not stretch to the height of the
+   "Latest class" card. */
 .googlemeet-classroom-hero-compact {
     align-items: start;
 }
@@ -3456,7 +3451,7 @@ mark.googlemeet-transcript-match-current {
     font-weight: 700;
     text-transform: uppercase;
 }
-/* L4: "not viewed" is the default state; keep it quiet so viewed/started stand out. */
+/* "Not viewed" is the default state; keep it quiet so viewed/started stand out. */
 .googlemeet-listitem-progress .googlemeet-progress-badge-unseen,
 .googlemeet-card-progress .googlemeet-progress-badge-unseen {
     border-color: transparent;
@@ -3464,7 +3459,7 @@ mark.googlemeet-transcript-match-current {
     color: var(--bs-secondary-color, #5f6368);
     font-weight: 600;
 }
-/* UX-02: compact lesson rows on phones (date + status, title, 2-line summary, actions). */
+/* Compact lesson rows on phones (date + status, title, 2-line summary, actions). */
 @media only screen and (max-width: 575.98px) {
     .googlemeet-recordings-listview .googlemeet-recording-listitem {
         display: grid;
@@ -3535,7 +3530,7 @@ mark.googlemeet-transcript-match-current {
         top: 4.5rem;
     }
 }
-/* UX-06 dark mode: follow Bootstrap 5.3 colour modes. The legacy --gm-* tokens and the
+/* Dark mode: follow Bootstrap 5.3 colour modes. The legacy --gm-* tokens and the
    hard-coded light surfaces used by the hub, chapters, lesson list and hero are remapped
    to theme variables only when a dark colour mode is active, so light mode is unchanged. */
 [data-bs-theme="dark"] .path-mod-googlemeet,
@@ -3727,7 +3722,7 @@ mark.googlemeet-transcript-match-current {
         content: none;
     }
 }
-/* Phones: keep the study tab short (the Materiales tab is one tap away; tighter key point rows). */
+/* Phones: keep the study tab short (the Materials tab is one tap away; tighter key point rows). */
 @media only screen and (max-width: 575.98px) {
     .googlemeet-study-cta-materials,
     .googlemeet-topics-hint {
@@ -3742,9 +3737,8 @@ mark.googlemeet-transcript-match-current {
     }
 }
 
-/* === track: hub === */
-/* Chapters panel: the toggle only exists on phones. Theme .btn rules (RemUI) load after this
-   file with the same specificity, so the selectors below carry an extra class. */
+/* Chapters panel: the toggle only exists on phones. Theme .btn rules (e.g. RemUI) load after this
+   file, so the selectors below carry an extra class to win on specificity. */
 .googlemeet-chapters-header .btn.googlemeet-chapters-toggle {
     display: none;
 }
@@ -3891,8 +3885,8 @@ mark.googlemeet-transcript-match-current {
     white-space: normal;
     text-align: left;
 }
-/* Dark mode fixes from the UI review (K-1, K-2, K-3). Theme primaries are often dark navy,
-   so links/times on dark surfaces use a light accent with >= 4.5:1 contrast. */
+/* Dark mode: theme primaries are often dark navy, so links and times on dark surfaces use a
+   light accent with >= 4.5:1 contrast. */
 [data-bs-theme="dark"] .path-mod-googlemeet {
     --gm-accent-on-dark: #8ab4f8;
 }
@@ -3912,7 +3906,7 @@ mark.googlemeet-transcript-match-current {
 }
 
 
-/* === track: ai === */
+/* Question review (bulk bar, correct answer tag) and practice answer states. */
 .path-mod-googlemeet .googlemeet-question-bulkbar {
     display: flex;
     flex-wrap: wrap;
@@ -3973,7 +3967,6 @@ mark.googlemeet-transcript-match-current {
 }
 
 
-/* === track: list === */
 /* Hero heading: the activity name is already the page title, the hero only states its role. */
 .googlemeet-classroom-hero .googlemeet-hero-heading {
     margin: 0;
@@ -3987,7 +3980,7 @@ mark.googlemeet-transcript-match-current {
 .googlemeet-progress-summary-meter .googlemeet-progress-started-segment {
     background-color: #f2c94c;
 }
-/* Teacher row: one visible primary action + labelled "Acciones" menu (review D-1, M-1). */
+/* Teacher row: one visible primary action + a labelled actions menu. */
 .googlemeet-row-actions .googlemeet-row-actions-toggle {
     min-height: 2rem;
 }
@@ -4011,7 +4004,7 @@ mark.googlemeet-transcript-match-current {
     overflow: visible;
     transform: none;
 }
-/* Teacher column: students' activity instead of the teacher's own progress (review D-2). */
+/* Teacher column: students' activity instead of the teacher's own progress. */
 .googlemeet-teacher-stats {
     display: flex;
     flex-direction: column;
@@ -4032,7 +4025,7 @@ mark.googlemeet-transcript-match-current {
     color: var(--bs-secondary-color, #5f6368);
     font-weight: 400;
 }
-/* The AI panel toggle used to be a round icon button: reset those styles inside the menu. */
+/* Inside the menu the AI panel toggle is a dropdown item: reset its round icon-button styles. */
 .googlemeet-row-actions-menu .dropdown-item.googlemeet-ai-toggle-btn,
 .googlemeet-row-actions-menu .dropdown-item.googlemeet-ai-toggle-btn.googlemeet-ai-toggle-active {
     display: block;
@@ -4050,7 +4043,8 @@ mark.googlemeet-transcript-match-current {
     background: var(--bs-dropdown-link-hover-bg, #e9ecef);
     color: var(--bs-dropdown-link-hover-color, #1e2125);
 }
-/* With the icons folded into one menu, CTA + "Acciones" fit on one row again in the 3-column grid. */
+/* With the teacher icons folded into one menu, the CTA and the actions menu fit on one row, also in
+   the 3-column grid. */
 .googlemeet-recording-card .googlemeet-card-footer {
     flex-wrap: nowrap;
     align-items: center;
@@ -4060,7 +4054,7 @@ mark.googlemeet-transcript-match-current {
     margin-left: auto;
     padding-left: 0;
 }
-/* Filter bar: live search + "Filtros" panel (open on desktop, collapsed on phones). Review L-5, L-7, X-3. */
+/* Filter bar: live search + "Filters" panel (open on desktop, collapsed on phones). */
 .googlemeet-recordings-filterbar {
     display: flex;
     flex-wrap: wrap;
@@ -4153,12 +4147,12 @@ mark.googlemeet-transcript-match-current {
         max-width: none;
     }
 }
-/* Sort / view buttons now live inside the filter form: keep their label vertically centred. */
+/* Sort / view buttons sit inside the filter form: keep their label vertically centred. */
 #googlemeet_recordings .googlemeet-filters-body .btn {
     display: inline-flex;
     align-items: center;
 }
-/* Dark mode: activity page (hero + recorded classes list). Review K-1, K-3 and DK01. */
+/* Dark mode: activity page (hero + recorded classes list). */
 [data-bs-theme="dark"] .path-mod-googlemeet .activity-description a,
 [data-bs-theme="dark"] .path-mod-googlemeet #intro a {
     color: var(--bs-link-color);
@@ -4199,7 +4193,8 @@ mark.googlemeet-transcript-match-current {
 [data-bs-theme="dark"] #googlemeet_recordings .googlemeet-teacher-stats .googlemeet-teacher-stats-opened:not(.googlemeet-teacher-stats-none) {
     color: var(--bs-emphasis-color);
 }
-/* Outline-secondary buttons (Acciones, Papelera, Filtros, inactive sort/view) were ~3:1 on the dark card. */
+/* Outline-secondary buttons (actions, trash, filters, inactive sort/view) reach only ~3:1 on the dark card
+   with the theme defaults. */
 [data-bs-theme="dark"] #googlemeet_recordings .btn.btn-outline-secondary {
     border-color: var(--bs-border-color);
     color: var(--bs-body-color);
@@ -4218,7 +4213,7 @@ mark.googlemeet-transcript-match-current {
 }
 
 
-/* === track: analytics === */
+/* Practice entry points and the teacher viewing report. */
 .googlemeet-hero-practice {
     display: flex;
     flex-wrap: wrap;
@@ -4325,7 +4320,7 @@ mark.googlemeet-transcript-match-current {
 }
 .googlemeet-report-scroll {
     /* Positioned so absolutely positioned descendants (the .visually-hidden cell labels) are
-       clipped by this scroller instead of widening the whole page (3640px on phones). */
+       clipped by this scroller instead of widening the whole page. */
     position: relative;
     overflow-x: auto;
     max-width: 100%;
@@ -4425,7 +4420,7 @@ mark.googlemeet-transcript-match-current {
     font-weight: 600;
 }
 
-/* === track: w2-notify === */
+/* Hero "Add to calendar" links. */
 .googlemeet-hero-addcalendar {
     display: flex;
     flex-wrap: wrap;
@@ -4449,7 +4444,7 @@ mark.googlemeet-transcript-match-current {
     text-decoration: underline;
 }
 
-/* === track: w2-aireview === */
+/* AI review: unreviewed-content banner, bulk publish bar and pending-review chip. */
 .googlemeet-ai-review-banner,
 .googlemeet-ai-review-bulk {
     display: flex;
@@ -4475,8 +4470,7 @@ mark.googlemeet-transcript-match-current {
     white-space: nowrap;
 }
 
-/* === track: w2-calsync === */
-/* PERF-02: background sync progress/result inside the sync panel. */
+/* Background sync progress/result inside the sync panel. */
 .googlemeet-sync-panel .googlemeet-sync-progress {
     display: flex;
     flex-wrap: wrap;
@@ -4495,7 +4489,7 @@ mark.googlemeet-transcript-match-current {
     font-weight: 600;
 }
 
-/* OPS-04: admin status page tables. */
+/* Admin status page tables. */
 .googlemeet-admin-status td {
     vertical-align: top;
 }

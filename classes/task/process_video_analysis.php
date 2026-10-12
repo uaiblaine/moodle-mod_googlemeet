@@ -29,7 +29,8 @@ use stdClass;
  * Analysis paths (in order of preference):
  * 1. Existing transcript text (fastest - already in DB)
  * 2. Google Drive auto-generated subtitles via yt-dlp (fast - no video download)
- * 3. Video download + Gemini File API upload (slowest - full video processing)
+ * 3. Video download + Gemini File API upload (slowest), only when the task's forcedownload
+ *    flag is set; otherwise the analysis fails with 'ai_subtitles_unavailable'
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -113,11 +114,10 @@ class process_video_analysis extends adhoc_task {
                     mtrace("Subtitle extraction failed. Forcedownload=true, falling back to video-based analysis...");
                     $result = $this->analyze_with_video($client, $recording);
                 } else {
-                    // Default: do not auto-download the video. Mark as failed with a stable
-                    // error code so the UI can offer the "Transcribe from video" opt-in. This is a
-                    // terminal state awaiting user action, NOT a transient error: clear nextretry
-                    // so the scheduled retry selection does not re-pick it every tick (it would,
-                    // if this row was previously in a transient-retry state with nextretry > 0).
+                    // Without the opt-in, fail with a stable error code so the UI can offer
+                    // "Transcribe from video". This waits for a user, so clear nextretry: a row left
+                    // in a transient-retry state would otherwise be re-picked by
+                    // ai_service::get_due_analyses() on every run.
                     mtrace("Subtitle extraction failed and forcedownload=false. Aborting without video download.");
                     $analysis->status = 'failed';
                     $analysis->error = 'ai_subtitles_unavailable';
@@ -144,7 +144,7 @@ class process_video_analysis extends adhoc_task {
             $analysis->retrycount = 0;
             $analysis->nextretry = 0;
             $analysis->timemodified = time();
-            // IA-04: new AI text waits for a teacher review before students see it.
+            // New AI text waits for a teacher review before students see it.
             foreach (\mod_googlemeet\local\ai_review::unreviewed_fields() as $key => $value) {
                 $analysis->$key = $value;
             }
@@ -153,15 +153,15 @@ class process_video_analysis extends adhoc_task {
             mtrace("Analysis saved successfully.");
 
         } catch (gemini_transient_exception $e) {
-            // Transient error (rate limit / overload): schedule a bounded retry with back-off
-            // instead of marking it permanently failed. The scheduled process_ai_analysis task
-            // re-picks the row once nextretry elapses (until MAX_TRANSIENT_RETRIES is reached).
+            // Transient error (rate limit / overload): schedule a bounded retry with back-off. The
+            // scheduled process_ai_analysis task re-picks the row once nextretry elapses, up to
+            // ai_service::MAX_TRANSIENT_RETRIES.
             mtrace("Transient error: " . $e->getMessage() . " (scheduling retry if attempts remain).");
             $aiservice = new ai_service();
             $aiservice->record_transient_failure($analysisid, (int) ($analysis->retrycount ?? 0), $e->getMessage());
 
         } catch (\mod_googlemeet\gemini_safety_exception $e) {
-            // IA-03: content blocked by Gemini's safety filters. Retrying the same content gives the same
+            // Content blocked by Gemini's safety filters. Retrying the same content gives the same
             // result, so no automatic retry, but the stored error explains it to the teacher.
             mtrace("Blocked by Gemini safety filters: " . ($e->debuginfo ?? ''));
             $aiservice = new ai_service();
@@ -308,12 +308,11 @@ class process_video_analysis extends adhoc_task {
     private function download_from_drive(string $fileid, string $filename): string {
         global $CFG;
 
-        // Create temp directory if it doesn't exist. Use the Moodle API so that
-        // the directory is created with the configured (restrictive) permissions
-        // rather than a world-writable 0777.
+        // The make_temp_directory() API applies the site's directory permissions; the recording must not sit in a
+        // world-writable folder.
         $tempdir = make_temp_directory('googlemeet_ai');
 
-        // Clean up old temp files first (older than 1 hour).
+        // Remove leftovers of earlier runs (older than 1 hour) that never reached their cleanup.
         $this->cleanup_old_temp_files($tempdir, 3600);
 
         // Generate temp filename.
@@ -363,9 +362,8 @@ class process_video_analysis extends adhoc_task {
 
         // Google Drive serves files above its virus-scan limit behind a confirmation interstitial
         // (an HTML page) instead of the file. Probe the URL once: if the response is that page,
-        // extract the confirm token and rewrite the download URL so the streamed download below
-        // fetches the actual file. A direct (small-file) response is ignored here — the real
-        // download is the CURLOPT_FILE streaming pass that follows.
+        // take its confirm token into the download URL. A direct (small-file) response is
+        // discarded; the real download is the streaming pass below.
         $probe = new \curl();
         $probehtml = $probe->get($downloadurl, [], [
             'CURLOPT_CONNECTTIMEOUT' => 60,
@@ -378,11 +376,8 @@ class process_video_analysis extends adhoc_task {
             mtrace("Large file detected, using confirm token...");
         }
 
-        // Download to file. Stream straight to disk via CURLOPT_FILE in a single
-        // pass. The file handle is opened and closed inside a try/finally so that
-        // it is always released, even if curl->get() throws between fopen and
-        // fclose (O14 - resource leak hardening). The outer finally in
-        // analyze_with_video() removes the temp file itself.
+        // Stream straight to disk via CURLOPT_FILE. analyze_with_video() only learns the path
+        // when this method returns, so the checks below unlink a rejected file themselves.
         $fp = fopen($tempfile, 'w');
         if (!$fp) {
             throw new \moodle_exception('ai_error', 'googlemeet', '', 'Cannot create temp file');
@@ -409,21 +404,15 @@ class process_video_analysis extends adhoc_task {
         $info = $curl2->get_info();
         $contenttype = isset($info['content_type']) ? strtolower((string)$info['content_type']) : '';
 
-        // Validate the download (S2 - harden error detection).
-        //
-        // A public-URL download from Drive returns an HTML error/interstitial page
-        // (HTTP 200 with text/html) instead of the video when the file is NOT
-        // shared publicly. Tier-3 analysis relies on the recording being public
-        // (the "makerecordingspublic" coordinator setting). When that is off, this
-        // download cannot succeed, so we detect the HTML page and fail gracefully
-        // with a clear message rather than uploading garbage to Gemini.
         if (!file_exists($tempfile)) {
             throw new \moodle_exception('ai_error', 'googlemeet', '', 'Download failed: no file was written');
         }
 
         $filesize = filesize($tempfile);
 
-        // Sniff the first bytes to decide whether this is an HTML error page.
+        // When the recording is not shared publicly (admin setting googlemeet/makerecordingspublic
+        // off), Drive answers HTTP 200 with an HTML page instead of the video. Sniff the first bytes
+        // and fail with 'ai_video_not_public' rather than upload that page to Gemini.
         $head = '';
         $sniff = fopen($tempfile, 'rb');
         if ($sniff) {

@@ -26,8 +26,8 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * New-recording notice with lesson content (NOT-05, QA-03) and the teacher alert when
- * auto-sync gives up without a recording (NOT-05).
+ * New-recording notice with lesson content, and the teacher alert when auto-sync gives up
+ * without a recording.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -98,7 +98,7 @@ final class notify_new_recordings_test extends \advanced_testcase {
      *
      * @param int $recordingid Recording id.
      * @param string $status Status.
-     * @param int $reviewed IA-04 review flag (1 = published to students).
+     * @param int $reviewed Review flag (1 = published to students).
      * @return int Analysis id.
      */
     private function create_analysis(int $recordingid, string $status = 'completed', int $reviewed = 1): int {
@@ -172,8 +172,7 @@ final class notify_new_recordings_test extends \advanced_testcase {
     }
 
     /**
-     * With review required by the site, unreviewed AI content is not quoted (tolerates the
-     * review field not existing).
+     * With review required by the site, unreviewed AI content is not quoted.
      */
     public function test_unreviewed_ai_content_is_not_quoted(): void {
         $this->resetAfterTest();

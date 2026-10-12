@@ -71,12 +71,12 @@ class question_service {
      *
      * Core restore copies the module-context categories, questions (with their draft/ready
      * status) and tags verbatim, so after a restore:
-     *  - the category idnumber still carries the ORIGINAL course-module id, and
-     *  - each question is still tagged with the ORIGINAL recording id.
+     *  - the category idnumber still carries the original course-module id, and
+     *  - each question is still tagged with the original recording id.
      * This rewrites both to the new ids. It only touches categories/questions that live in the
      * given (new) module context, so it can never modify the source activity. It must run exactly
      * once per restore (from the restore step's after_restore()): the tag rewrite relies on the
-     * restore id mappings and is NOT idempotent.
+     * restore id mappings and is not idempotent.
      *
      * Tags whose recording was not part of the restore (e.g. a recording in the trash, which is not
      * backed up) are renamed to the orphan prefix so they can never collide with a recording id
@@ -736,7 +736,7 @@ class question_service {
                 'error' => '',
             ];
             try {
-                // set_status() runs the leak gate on the whole batch before writing anything.
+                // The leak gate in set_status() checks the whole batch before writing anything.
                 $result['published'] = $this->set_status($rows, question_version_status::QUESTION_STATUS_READY);
                 $published += $result['published'];
             } catch (\Exception $e) {
@@ -769,10 +769,8 @@ class question_service {
             throw new moodle_exception('invalidrecord', 'error', '', 'question');
         }
 
-        // Puerta contra fugas internas (04-10-2026): al PUBLICAR (ready) se valida la
-        // versión completa de cada pregunta; si una falla, no se publica ninguna.
-        // The check is optional (local_questions may be absent); when the library is
-        // present the all-or-nothing semantics are preserved.
+        // Publishing runs the all-or-nothing leak gate first: if one question fails, none is published.
+        // See assert_publishable().
         if ($status === question_version_status::QUESTION_STATUS_READY) {
             $this->assert_publishable($questionrows);
         }
@@ -832,8 +830,8 @@ class question_service {
             throw new moodle_exception('invalidrecord', 'error', '', 'question');
         }
 
-        // Puerta contra fugas internas (04-10-2026): edición del docente (modo humano).
-        // Optional: skipped (with a debugging notice) if local_questions is not installed.
+        // Leak gate on the teacher's edited text; skipped (with a debugging notice) when local_questions
+        // is not installed.
         if (self::leak_check_available(['fugas_exigir_limpia'])) {
             $visibles = ['enunciado' => $stem, 'feedback_general' => $this->build_general_feedback($explanation, $citation)];
             foreach ($options as $i => $o) {

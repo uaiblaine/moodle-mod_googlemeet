@@ -117,7 +117,7 @@
 
   {{#showfilterbar}}
   {{! Search filters as you type (debounced auto-submit, server-side filtering and pagination). Topic, order
-      and view live in a "Filtros" panel that is open on desktop and collapsed on phones. }}
+      and view live in a "Filters" panel that is open on desktop and collapsed on phones. }}
   <form method="get" action="view.php#googlemeet_recordings_table" id="googlemeet-filter-form-{{coursemoduleid}}"
         class="googlemeet-recordings-filterbar mb-3" data-region="recordings-filterbar">
     <input type="hidden" name="id" value="{{coursemoduleid}}">
@@ -266,7 +266,8 @@
             </div>
           </div>
 
-          {{! Materials: download chips when files exist (teachers manage them from the "Acciones" menu). }}
+          {{! Materials: download chips for the first two files plus a link to the rest; teachers manage them
+              from the row's Actions menu. }}
           {{#hascapability}}
           {{#hasmaterials}}
           <div class="googlemeet-card-materials mt-2">
@@ -359,7 +360,7 @@
               {{#matchsnippet}}<span class="googlemeet-search-match-snippet">{{matchsnippet}}</span>{{/matchsnippet}}
             </div>
             {{/matchsource}}
-            {{! Materials row (same rules as the card view). }}
+            {{! Materials row: same visibility rules as the card view, but lists every file (no overflow link). }}
             {{#hascapability}}
             {{#hasmaterials}}
             <div class="googlemeet-card-materials mt-1">
@@ -434,11 +435,9 @@
         {{/isviewlist}}
 
         {{!
-          Expandable AI panel — rendered as a FULL-WIDTH sibling row AFTER the card
-          (not nested inside it), so expanding a middle card no longer leaves a grid hole.
-          The card keeps its normal single-column placement; this row spans grid-column: 1 / -1.
-          The structure is intentionally card-agnostic (keyed only by recording id) so the
-          upcoming list view can reuse the exact same panel row after a list item.
+          Expandable AI panel, rendered as a full-width sibling row after the card or list item
+          rather than nested inside it, so expanding one card leaves no hole in the grid (the open
+          row spans grid-column: 1 / -1). It is keyed only by recording id, so both views share it.
         }}
         {{#aienabled}}
             {{#hascapability}}
@@ -619,7 +618,7 @@
   var focuskey = 'mod_googlemeet_rq_focus_{{coursemoduleid}}';
   form.classList.add('googlemeet-filterbar-live');
 
-  // "Filtros" panel: open on desktop, collapsed on phones (the count badge shows what is active).
+  // "Filters" panel: open on desktop, collapsed on phones (the count badge shows what is active).
   var panel = form.querySelector('.googlemeet-filters-panel');
   var phone = window.matchMedia ? window.matchMedia('(max-width: 575.98px)') : null;
   var syncpanel = function() {
@@ -752,7 +751,7 @@ require([
     restoreRecordingAnchor();
 
     {{#hascapability}}
-      // Rename (from the row "Acciones" menu): edit the title inline in its row.
+      // Rename (from the row's Actions menu): edit the title inline in its row.
       $('.recordingeditname').on('click', function() {
         var recordingid = $(this).attr('data-id');
         var card = $('#googlemeet-recording-' + recordingid).find('.googlemeet-card-title').first();

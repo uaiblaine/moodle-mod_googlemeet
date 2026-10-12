@@ -22,7 +22,7 @@ use core_external\external_value;
 use mod_googlemeet\local\sync_manager;
 
 /**
- * Status of the background "Sync with Google Drive" of an activity (PERF-02).
+ * Status of the background "Sync with Google Drive" of an activity.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

@@ -30,6 +30,7 @@ define('CLI_SCRIPT', true);
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
 
+/** Seconds to wait before each retry of a transient Gemini failure; one retry per entry. */
 const GOOGLEMEET_BACKFILL_CHAPTERS_BACKOFF = [30, 120, 300];
 
 list($options, $unrecognized) = cli_get_params([
@@ -250,6 +251,7 @@ function googlemeet_backfill_chapters_transcript(stdClass $recording): string {
  * @param ai_service $service AI service.
  * @param int $recordingid Recording id.
  * @return array Generated chapters.
+ * @throws gemini_transient_exception When the last back-off delay is used up.
  */
 function googlemeet_backfill_chapters_generate_with_retries(ai_service $service, int $recordingid): array {
     $attempt = 0;

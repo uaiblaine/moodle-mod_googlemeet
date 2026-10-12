@@ -49,19 +49,10 @@ function googlemeet_print_header($googlemeet, $cm, $course) {
 /**
  * Handle the write actions triggered from the activity view (logout / sync).
  *
- * This centralises the action-dispatch logic that previously lived inline in
- * view.php, keeping that file focused on orchestration and presentation.
- *
- * Both actions require the `mod/googlemeet:editrecording` capability and a valid
- * session key. The `sync` action additionally requires the request to be a POST
- * (it performs DB writes and remote Google calls), so a plain GET to `?sync=1`
- * is ignored even if it carries a valid sesskey. The sync button rendered in
- * googlemeet_print_recordings() already submits via POST, so the user-facing
- * flow is unchanged. The `logout` action is left reachable via GET (sesskey
- * protected) so the OAuth account-management link keeps working as before.
- *
- * No redirect is performed: matching the previous behaviour, the page simply
- * continues rendering after the action runs.
+ * Both actions need mod/googlemeet:editrecording (without it the call does nothing) and a valid
+ * sesskey. Sync also needs a POST, so a GET to ?sync=1 is ignored even with a valid sesskey; it
+ * queues a background sync and redirects to the view. Logout stays reachable by GET (sesskey
+ * protected) for the OAuth account link and does not redirect: the page keeps rendering.
  *
  * @param object $googlemeet the googlemeet instance record
  * @param object $cm the course module record
@@ -83,11 +74,10 @@ function googlemeet_handle_view_actions($googlemeet, $cm, $course) {
     }
 
     $sync = optional_param('sync', 0, PARAM_BOOL);
-    // Sync performs DB writes and remote Google calls: only run it for a POST
-    // request (in addition to the sesskey check). Ignore plain GETs.
+    // Sync is a write: POST only, on top of the sesskey check.
     if ($sync && confirm_sesskey() && ($_SERVER['REQUEST_METHOD'] ?? '') === 'POST') {
-        // PERF-02: no-JS fallback of the async button. Only queue the background sync (the page
-        // polls its status when JS is on); never run Google calls inside the request.
+        // No-JS fallback of the async button. Only queue the background sync (the page polls its
+        // status when JS is on); never run Google calls inside the request.
         $redirecturl = new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]);
         $queued = \mod_googlemeet\local\sync_manager::request($googlemeet, (int)$GLOBALS['USER']->id);
         redirect($redirecturl, get_string($queued ? 'sync_status_queued' : 'sync_already_running', 'googlemeet'),
@@ -109,11 +99,10 @@ function googlemeet_reset_exhausted_autosync_events(int $googlemeetid): int {
         $max = 1;
     }
 
-    // Exhausted events were closed by process_autosync::close_event(), which stamps
-    // autosynced with a timestamp for BOTH success and give-up; only give-up leaves
-    // syncattempts >= max (success can too on the final attempt, but reopening those
-    // is harmless: the sync is idempotent and the event re-closes on the next tick).
-    // Reopening requires autosynced = 0 or the due-events query never selects them.
+    // The process_autosync::close_event() method stamps autosynced on both success and give-up; a
+    // give-up leaves syncattempts >= max (a success on the last attempt does too, and reopening it
+    // is harmless: the sync is idempotent and the event closes again on the next run). The due-events
+    // query only selects autosynced = 0 and syncattempts < max, hence both are reset.
     $eventids = $DB->get_fieldset_select(
         'googlemeet_events',
         'id',
@@ -199,7 +188,7 @@ function googlemeet_print_intro($googlemeet, $cm, $course, $ignoresettings = fal
 
     $options = [];
     if (!empty($googlemeet->displayoptions)) {
-        // Moodle 4.0+ uses JSON for displayoptions.
+        // JSON-encoded display options; the googlemeet table has no such column.
         $decoded = json_decode($googlemeet->displayoptions, true);
         if ($decoded !== null) {
             $options = $decoded;
@@ -215,9 +204,15 @@ function googlemeet_print_intro($googlemeet, $cm, $course, $ignoresettings = fal
 }
 
 /**
- * Get event data from the form.
+ * Build the unsaved googlemeet_events rows from the date, time and recurrence settings.
  *
- * @param stdClass $googlemeet moodleform.
+ * Holiday periods are read from the database, so googlemeet_save_holidays() must run first.
+ * Cancelled dates still produce rows; googlemeet_reconcile_cancelled_calendar_events() hides them
+ * from the core calendar. The form validation mirrors this loop in
+ * {@see mod_googlemeet_mod_form::has_events_with_period()}; keep them in step.
+ *
+ * @param stdClass $googlemeet Activity data from the form (id, eventdate, start/end hour and minute,
+ *     addmultiply, days, period, eventenddate).
  * @return array list of events
  */
 function googlemeet_construct_events_data_for_add($googlemeet) {
@@ -251,7 +246,7 @@ function googlemeet_construct_events_data_for_add($googlemeet) {
         $sdate = $startdate;
         $dayinfo = usergetdate($sdate);
         if ($CFG->calendar_startwday === '0') { // Week start from sunday.
-            $startweek = $sdate - $dayinfo['wday'] * DAYSECS; // Call new variable.
+            $startweek = $sdate - $dayinfo['wday'] * DAYSECS;
         } else {
             $wday = $dayinfo['wday'] === 0 ? 7 : $dayinfo['wday'];
             $startweek = $sdate - ($wday - 1) * DAYSECS;
@@ -294,18 +289,17 @@ function googlemeet_construct_events_data_for_add($googlemeet) {
 }
 
 /**
- * This excludes all Google Meet events.
+ * Delete every session of an instance with its notify_done rows and core calendar events.
+ *
  * @param int $googlemeetid
  * @return void
  */
 function googlemeet_delete_events($googlemeetid) {
     global $DB;
 
-    // Get event IDs for bulk delete instead of N+1 queries.
     $eventids = $DB->get_fieldset_select('googlemeet_events', 'id', 'googlemeetid = ?', [$googlemeetid]);
 
     if (!empty($eventids)) {
-        // Bulk delete notify_done records in a single query.
         list($insql, $params) = $DB->get_in_or_equal($eventids);
         $DB->delete_records_select('googlemeet_notify_done', "eventid $insql", $params);
     }
@@ -321,7 +315,9 @@ function googlemeet_delete_events($googlemeetid) {
 }
 
 /**
- * This creates new events given as timeopen and timeclose by $googlemeet.
+ * Replace every session of an instance with $events (wipe and recreate), with calendar mirrors.
+ *
+ * Used on add; updates go through googlemeet_merge_events() to keep existing rows.
  *
  * @param stdClass $googlemeet moodleform
  * @param array $events list of events
@@ -347,9 +343,10 @@ function googlemeet_set_events($googlemeet, $events) {
 /**
  * Reconcile core calendar mirrors with the instance cancelled-date list.
  *
- * The session identity is the scheduled start timestamp stored in googlemeet_events.eventdate.
- * Cancelled sessions are detected with googlemeet_is_cancelled(), the same day-level helper used
- * by the hero schedule. Core calendar mirrors are matched by instance + eventtype + timestart.
+ * Deletes the mirror of each cancelled session and recreates a missing one for a session that is
+ * not cancelled. Sessions are identified by googlemeet_events.eventdate; cancellation uses the same
+ * day-level googlemeet_is_cancelled() as googlemeet_get_upcoming_events(). Core calendar mirrors are
+ * matched by instance + eventtype + timestart.
  *
  * @param stdClass $googlemeet Activity record.
  * @return void
@@ -393,10 +390,11 @@ function googlemeet_reconcile_cancelled_calendar_events(stdClass $googlemeet): v
  *   - the `autosynced` timestamp (so an already auto-synced session is not re-processed), and
  *   - the related googlemeet_notify_done rows (so already-sent notifications are not re-sent).
  *
- * Only genuinely new dates are inserted, and only dates that no longer exist are deleted. Events
- * are matched by eventdate (the start timestamp), which uniquely identifies a session for an
- * instance. When a persisting event's duration changes, the row and its calendar mirror are
- * updated in place without touching its id, autosynced or notify_done.
+ * Only new dates are inserted, and only dates that are no longer scheduled are deleted, except past
+ * sessions with attendance read from Google Meet, which are kept. Events are matched by eventdate
+ * (the start timestamp), which uniquely identifies a session for an instance. When a persisting
+ * event's duration changes, the row and its calendar mirror are updated in place without touching
+ * its id, autosynced or notify_done.
  *
  * @param stdClass $googlemeet moodleform
  * @param array $events list of regenerated events (output of googlemeet_construct_events_data_for_add)
@@ -407,7 +405,7 @@ function googlemeet_merge_events($googlemeet, $events) {
 
     $googlemeetid = $googlemeet->id;
 
-    // Load existing events keyed by eventdate for O(1) matching.
+    // Existing events keyed by eventdate.
     $existingevents = $DB->get_records('googlemeet_events', ['googlemeetid' => $googlemeetid]);
     $existingbydate = [];
     foreach ($existingevents as $existing) {
@@ -452,9 +450,9 @@ function googlemeet_merge_events($googlemeet, $events) {
         }
     }
 
-    // ANA-03: a past session with attendance read from Google Meet is history, not schedule. Changing
-    // the start time or the recurrence must not orphan that attendance (Google keeps it ~30 days
-    // only), so such sessions are kept as they are.
+    // A past session with attendance read from Google Meet is history, not schedule. Changing the
+    // start time or the recurrence must not orphan that attendance (Google keeps it about 30 days
+    // only, so it cannot be fetched again later), so such sessions are kept as they are.
     $now = time();
     $withattendance = [];
     $pastids = [];
@@ -513,7 +511,8 @@ function googlemeet_merge_events($googlemeet, $events) {
 }
 
 /**
- * Build the redesigned classroom hero context.
+ * Build the context of the classroom hero (mod_googlemeet/hero): next session, schedule, room
+ * button, practice entry, "continue watching" card and progress summary.
  *
  * @param object $googlemeet Activity record.
  * @param object $cm Course-module record.
@@ -605,7 +604,7 @@ function googlemeet_get_classroom_hero_context($googlemeet, $cm, context_module 
 
     return array_merge([
         'activityname' => format_string($googlemeet->name),
-        // UX-01: without upcoming sessions the hero collapses instead of leaving a tall empty card.
+        // Without upcoming sessions the hero collapses instead of leaving a tall empty card.
         'herocompact' => !$nextevent,
         'showheroprogress' => $isstudentview && $progresssummary['total'] > 0,
         'hasrecordedcount' => $progresssummary['total'] > 0,
@@ -618,7 +617,7 @@ function googlemeet_get_classroom_hero_context($googlemeet, $cm, context_module 
         'courseid' => (int)$cm->course,
         'hascontinue' => false,
         'hasroomcta' => false,
-        // Track analytics: activity-wide practice entry point (students only; null hides it).
+        // Activity-wide practice entry point; null (hidden) for question managers or without ready questions.
         'practicecta' => \mod_googlemeet\local\practice_attempts::hero_cta_context($googlemeet, $cm, $context,
             (int)$GLOBALS['USER']->id),
     ], $eventcontext,
@@ -667,7 +666,7 @@ function googlemeet_get_room_cta_context($googlemeet, context_module $context, ?
         $roomclasses .= ' btn-primary googlemeet-room-cta-live';
         $roomlabel = get_string('room_enter_live', 'googlemeet');
     } else if ($nextevent && !empty($nextevent->issoon)) {
-        // "Soon" is currently 30 minutes, satisfying the owner's T-10 minimum.
+        // Students may enter from "soon", 30 minutes before the start (see googlemeet_get_upcoming_events()).
         $roomactive = true;
         $roomclasses .= ' btn-primary googlemeet-room-cta-soon';
         $roomlabel = get_string('room_enter_soon', 'googlemeet');
@@ -689,7 +688,7 @@ function googlemeet_get_room_cta_context($googlemeet, context_module $context, ?
         'roomactive' => $roomactive,
         'roomdisabled' => !$roomactive,
         'roomclasses' => $roomclasses,
-        // ANA-02: go through enter.php so the entry is logged before redirecting to Meet.
+        // Go through enter.php so the entry is logged before redirecting to Meet.
         'roomurl' => \mod_googlemeet\local\room_entry::entry_url((int)$context->instanceid)->out(false),
         'roomlabel' => $roomlabel,
         'roomnote' => $roomnote,
@@ -768,7 +767,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
     if (!$recording) {
         return ['hascontinue' => false];
     }
-    // IA-04: no unreviewed summary snippet for students.
+    // No unreviewed summary snippet for students.
     if (!empty($recording->summary) && !$caneditrecording && \mod_googlemeet\local\ai_review::is_pending_review(
             (object)['status' => 'completed', 'reviewed' => $recording->aireviewed])) {
         $recording->summary = '';
@@ -813,11 +812,12 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
 /**
  * The current user's viewing progress over the visible recordings of an activity (cached per request).
  *
+ * "watched" counts completed recordings and "started" those with viewing time but not completed,
+ * the same split as the per-lesson badges of googlemeet_recording_progress_state(), so the hero
+ * summary never contradicts them.
+ *
  * @param stdClass $googlemeet Activity record.
  * @param context_module $context Module context.
- * "watched" matches the list's "Vista" badge (completed) and "started" its "Empezada" badge (some viewing
- * time, not completed), so the hero copy never contradicts the per-lesson badges.
- *
  * @return array ['total' => int, 'watched' => int, 'started' => int, 'pending' => int, 'pct' => int,
  *     'startedpct' => int, 'completedids' => int[]]
  */
@@ -854,7 +854,7 @@ function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $c
         'started' => $started,
         'pending' => max(0, $total - $watched),
         'pct' => $pct,
-        // Kept so that both segments of the stacked bar never add up to more than 100%.
+        // Capped so that both segments of the stacked bar never add up to more than 100%.
         'startedpct' => $total > 0 ? min(100 - $pct, (int)round($started * 100 / $total)) : 0,
         'completedids' => $completedids,
     ];
@@ -862,7 +862,7 @@ function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $c
 }
 
 /**
- * Template fields for the "N vistas · M empezadas de T clases" summary.
+ * Template fields for the "N viewed · M started of T classes" progress summary.
  *
  * @param array $summary Result of googlemeet_get_progress_summary().
  * @return array
@@ -929,7 +929,10 @@ function googlemeet_get_recordings_student_stats(context_module $context, array 
 }
 
 /**
- * This creates new events given as timeopen and timeclose by googlemeet.
+ * Print the recordings panel: search and topic filters, the paginated list or cards and, for
+ * teachers, the trash and the Google Drive sync panel.
+ *
+ * Prints nothing when the Google client is not enabled.
  *
  * @param object $googlemeet
  * @param object $cm
@@ -938,7 +941,7 @@ function googlemeet_get_recordings_student_stats(context_module $context, array 
  * @param string|null $orderoverride Optional order override from URL parameter.
  * @param string $query Free-text search.
  * @param string $topic Topic filter.
- * @param bool $pendingonly Only recordings the current user has not marked as viewed (ANA-06).
+ * @param bool $pendingonly Only recordings the current user has not completed (ignored with editrecording).
  * @return void
  */
 function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $orderoverride = null, $query = '', $topic = '',
@@ -967,7 +970,7 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
 
     $html = '<div id="googlemeet_recordings" class="googlemeet_recordings googlemeet-view-' . $recordingsview . '">';
 
-    // Check if AI features are enabled (single config fetch).
+    // AI features need the site switch and an API key.
     $aiconfig = get_config('googlemeet');
     $aienabled = !empty($aiconfig->enableai) && !empty($aiconfig->geminiapikey);
     $cangenerateai = $aienabled && has_capability('mod/googlemeet:generateai', $context);
@@ -982,10 +985,10 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
 
     $page = max(0, (int) $page);
 
-    // Fetch ALL recordings (no SQL limit) so search/topic filters apply before pagination.
+    // Fetch every recording (no SQL limit): the search and topic filters run in PHP before pagination.
     $allrecordings = googlemeet_list_recordings($params, $aienabled, $order, 0, 0);
 
-    // Distinct topics for the filter chips come from the UNFILTERED set.
+    // Distinct topics for the filter chips come from the unfiltered set.
     $alltopics = googlemeet_collect_topics($allrecordings);
 
     // Distinguishable lesson titles (computed over the whole activity so duplicates are detected).
@@ -1046,7 +1049,7 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
     $teacherstats = ($hascapability && !empty($recordings))
         ? googlemeet_get_recordings_student_stats($context, $recordingids) : [];
 
-    // PERF-03: page-level aggregates instead of one question/file query per recording.
+    // Page-level aggregates instead of one question/file query per recording.
     $pagerecordingids = array_map(static fn($r) => (int)$r->id, $recordings);
     $questioncounts = \mod_googlemeet\local\list_aggregates::published_question_counts($googlemeet, $cm, $context,
         $pagerecordingids);
@@ -1126,7 +1129,7 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
                 'timedeletedformatted' => !empty($deletedrecording->timedeleted)
                     ? userdate($deletedrecording->timedeleted)
                     : get_string('never', 'googlemeet'),
-                // OPS-03: when the retention task will purge it ('' when automatic purge is off).
+                // When the retention task will purge it ('' when automatic purge is off).
                 'purgenotice' => \mod_googlemeet\local\recording_cleanup::purge_notice(
                     (int)$deletedrecording->timedeleted, $retentiondays, null, (string)$deletedrecording->trashreason),
             ];
@@ -1180,7 +1183,7 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
         $viewurlparams + ['rview' => 'list']))->out(false);
 
     $hasactivefilters = trim((string)$query) !== '' || trim((string)$topic) !== '' || $pendingonly;
-    $html .= \mod_googlemeet\local\ai_review::render_bulk_banner($googlemeet, $cm, $context); // IA-04.
+    $html .= \mod_googlemeet\local\ai_review::render_bulk_banner($googlemeet, $cm, $context);
     $html .= $OUTPUT->render_from_template('mod_googlemeet/recordingstable', [
         'recordings' => $recordings,
         'hasrecordings' => !empty($recordings),
@@ -1219,7 +1222,7 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
         'hasactivefilters' => $hasactivefilters,
         // Keep the filter bar while a search returns nothing, so the query can still be edited.
         'showfilterbar' => !empty($recordings) || $hasactivefilters,
-        // Filters folded into the "Filtros" panel on phones: topic and a non-default order.
+        // Filters folded into the "Filters" panel on phones: topic and a non-default order.
         'activefiltercount' => (trim((string)$topic) !== '' ? 1 : 0)
             + ($order !== (strtoupper((string)($googlemeet->recordingsorder ?? 'DESC')) === 'ASC' ? 'ASC' : 'DESC') ? 1 : 0),
         'showprogresssummary' => $showprogresssummary,
@@ -1266,7 +1269,7 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
 
         $syncstatus = \mod_googlemeet\local\sync_manager::get_status($googlemeet);
         $html .= $OUTPUT->render_from_template('mod_googlemeet/syncbutton', [
-            // Track w2-calsync (PERF-02): async sync panel state.
+            // Async sync panel state.
             'cmid' => $cm->id,
             'syncactive' => $syncstatus['active'],
             'syncstatusmessage' => $syncstatus['active'] ? $syncstatus['message'] : '',
@@ -1288,9 +1291,8 @@ function googlemeet_print_recordings($googlemeet, $cm, $context, $page = 0, $ord
 /**
  * Transcript shown in the teacher-only hub tab.
  *
- * Prefers the AI analysis transcript and falls back to the recording's own (Meet or subtitle) transcript,
- * as the AI web services and chapter/question generation already do: analyses built from an existing
- * transcript store an empty analysis transcript.
+ * Prefers the transcript of a completed AI analysis and falls back to the recording's own (Meet or
+ * subtitle) transcript when the analysis stored none.
  *
  * @param stdClass|false|null $analysis googlemeet_ai_analysis row.
  * @param stdClass $recording googlemeet_recordings row.
@@ -1357,7 +1359,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
         }
     }
     if ($canmanagequestions && $questions) {
-        // Teacher view: how students did on each question in the practice (ANA-05 attempts).
+        // Teacher view: how students did on each question in the practice.
         $practicestats = \mod_googlemeet\local\practice_attempts::get_question_stats((int)$googlemeet->id,
             (int)$recording->id);
         foreach ($questions as &$question) {
@@ -1373,7 +1375,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
     }
 
     $analysis = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recording->id]);
-    // IA-04: an unreviewed analysis is hidden from students (teachers see it with a review banner).
+    // An unreviewed analysis is hidden from students (teachers see it with a review banner).
     $aireview = \mod_googlemeet\local\ai_review::hub_context($analysis, $context, (int)$cm->id,
         $aienabled && has_capability('mod/googlemeet:generateai', $context));
     $analysiscompleted = $analysis && $analysis->status === 'completed' && $aireview['aicontentvisible'];
@@ -1398,7 +1400,6 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
     if ($rorder) {
         $backparams['rorder'] = $rorder;
     }
-    // PERF-03: two LIMIT 1 queries instead of loading every recording of the activity.
     // Previous/next are chronological whatever the list order (students think in class dates).
     [$previousrecording, $nextrecording] = \mod_googlemeet\local\list_aggregates::hub_neighbours($recording,
         !$caneditrecording);
@@ -1431,8 +1432,8 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
         $starttime = min($starttime, $durationseconds);
     }
     $playerurl = $canembed ? googlemeet_get_recording_seek_url((string)$recording->webviewlink, $starttime) : '';
-    // Approximate "continue where you left off": the last chapter/timestamp this user jumped to.
-    // Drive's iframe does not expose its playback position, so this is not the real position.
+    // Approximate "continue where you left off": the last chapter/timestamp this user jumped to,
+    // not the real playback position (see googlemeet_lastjump_preference_name()).
     $lastjump = 0;
     if ($canembed && $starttime === 0 && isloggedin() && !isguestuser()) {
         $lastjump = max(0, (int)get_user_preferences(googlemeet_lastjump_preference_name((int)$recording->id), 0));
@@ -1550,7 +1551,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
             ? $questionservice->count_activity_drafts($googlemeet, $cm, $context) : 0,
         'generationqueued' => $questionservice->is_generation_queued($recording->id),
         'summaryactive' => $summaryactive,
-        // Preguntas is never the initially-active tab (default is Resumen, or Materiales); always false.
+        // The Questions tab is never initially active (Summary is, or Materials with tab=materials).
         'questionsactive' => false,
         'showmaterials' => $showmaterials,
         'materialsactive' => $materialsactive,
@@ -1618,7 +1619,6 @@ function googlemeet_get_recording_materials(context_module $context, int $record
  * Save the teacher attachment files submitted through the mod form draft area.
  *
  * Files are stored in the module context under the 'attachment' file area (itemid 0).
- * No DB schema is needed: they live in mdl_files keyed by context + file area.
  *
  * @param object $googlemeet Instance object from the form (needs ->coursemodule and ->attachments).
  * @return void
@@ -1729,10 +1729,10 @@ function googlemeet_get_recording_seek_url(string $webviewlink, int $seconds): s
 }
 
 /**
- * This clears the url.
+ * Extract the Google Meet room from a URL as https://meet.google.com/xxx-xxxx-xxx.
  *
  * @param string $url
- * @return mixed The url if valid or false if invalid
+ * @return string|null The normalised URL, or null when the text holds no Meet room code.
  */
 function googlemeet_clear_url($url) {
     $pattern = "/meet.google.com\/[a-zA-Z0-9]{3}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{3}/";
@@ -1746,7 +1746,7 @@ function googlemeet_clear_url($url) {
 }
 
 /**
- * This checks if have recordings from the googlemeet.
+ * Whether the activity has any recording outside the trash.
  *
  * @param int $googlemeetid
  * @return boolean
@@ -1754,8 +1754,6 @@ function googlemeet_clear_url($url) {
 function googlemeet_has_recording($googlemeetid) {
     global $DB;
 
-    // Use record_exists() instead of get_records() for efficiency.
-    // record_exists() stops at first match, while get_records() loads all data.
     return $DB->record_exists('googlemeet_recordings', ['googlemeetid' => $googlemeetid, 'deleted' => 0]);
 }
 
@@ -1944,11 +1942,12 @@ function googlemeet_send_notification($user, $event) {
 }
 
 /**
- * Records the sending of the notification to not send repeated.
+ * Record that a reminder kind was sent to a user for a session, so it is not sent again.
  *
  * @param int $userid
  * @param int $eventid
  * @param int $kind reminder kind (\mod_googlemeet\local\reminders::KIND_*)
+ * @return int New googlemeet_notify_done id.
  */
 function googlemeet_notify_done($userid, $eventid, int $kind = 0) {
     global $DB;
@@ -1963,15 +1962,13 @@ function googlemeet_notify_done($userid, $eventid, int $kind = 0) {
 }
 
 /**
- * Removes records of past event notification notifications.
+ * Delete the notify_done rows of sessions that have already started (no reminder is due for them).
  */
 function googlemeet_remove_notify_done_from_old_events() {
     global $DB;
 
     $now = time();
 
-    // Bulk delete using subquery instead of N+1 queries.
-    // Delete all notify_done records for events that have already passed.
     $sql = "DELETE FROM {googlemeet_notify_done}
              WHERE eventid IN (SELECT id FROM {googlemeet_events} WHERE eventdate < :now)";
 
@@ -1979,10 +1976,10 @@ function googlemeet_remove_notify_done_from_old_events() {
 }
 
 /**
- * Mount the body content of the notification.
+ * Build the HTML body of a reminder from the site's emailcontent template (or the default string).
  *
  * @param object $user db record of user
- * @param object $event db record of event
+ * @param object $event Due reminder row (see \mod_googlemeet\local\reminders::get_due_events()).
  * @return string - the content of the notification after assembly.
  */
 function googlemeet_get_messagehtml($user, $event) {
@@ -2045,11 +2042,16 @@ function googlemeet_format_time_diff($seconds) {
 }
 
 /**
- * upcoming googlemeet events.
+ * Upcoming and in-progress sessions of an activity, with their display status.
  *
- * @param int $googlemeetid db record of user
- * @param int $maxevents Maximum number of events to return (default 3). Use 0 with $nolimit for all events.
+ * Each session gets a status: cancelled, live (started, not ended), soon (starts within 30 minutes)
+ * or scheduled.
+ *
+ * @param int $googlemeetid Activity instance id.
+ * @param int $maxevents Maximum number of events to return (default 3), clamped to 1-10; ignored when $nolimit is set.
  * @param bool $nolimit Whether to skip the display limit.
+ * @return array hasupcomingevents and upcomingevents (stdClass[]); with events, also starttime, endtime,
+ *     duration and hasliveevent of the first one.
  */
 function googlemeet_get_upcoming_events($googlemeetid, $maxevents = 3, bool $nolimit = false) {
     global $DB, $USER;

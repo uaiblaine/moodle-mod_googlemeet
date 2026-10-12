@@ -19,10 +19,10 @@ namespace mod_googlemeet\local;
 use stdClass;
 
 /**
- * Pre-session reminders (NOT-02, NOT-03, NOT-04).
+ * Pre-session reminders.
  *
  * Two independent reminders per session, each deduplicated in googlemeet_notify_done by its kind:
- *  - KIND_MINUTES: "minutesbefore" minutes before the start (the historical reminder);
+ *  - KIND_MINUTES: "minutesbefore" minutes before the start (0 = off);
  *  - KIND_HOURS: "notifyhoursbefore" hours before the start (0 = off).
  *
  * The send window is tolerant to cron gaps: a reminder is due from its lead time until the
@@ -199,7 +199,7 @@ class reminders {
             $message->contexturl = $url->out(false);
             $message->contexturlname = $a->name;
             $message->courseid = $event->courseid;
-            // NOT-03: lets the Moodle app open the activity from the push notification.
+            // Lets the Moodle app open the activity from the push notification.
             $message->customdata = self::app_customdata((int)$event->cmid, (int)$event->courseid, $url);
             return $message;
         } finally {

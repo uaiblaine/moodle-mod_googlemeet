@@ -19,7 +19,7 @@ namespace mod_googlemeet;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * IA-03: Gemini safety settings and the SAFETY finish reason.
+ * Gemini safety settings and the SAFETY finish reason.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -132,7 +132,7 @@ final class gemini_safety_test extends \advanced_testcase {
     }
 
     /**
-     * A normal response is not affected; other non-text failures keep their old error.
+     * A normal response is not affected; other responses without text keep the generic parse error.
      */
     public function test_normal_and_other_responses(): void {
         $this->resetAfterTest();

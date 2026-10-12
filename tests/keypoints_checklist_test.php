@@ -36,7 +36,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 final class keypoints_checklist_test extends \advanced_testcase {
 
     /**
-     * Hash changes with the key points and state of another list is ignored.
+     * The hash ignores whitespace and changes with the key points; a state saved for another list or length is ignored.
      */
     public function test_hash_and_state(): void {
         $hash = googlemeet_keypoints_hash(['A  point', 'B']);
@@ -49,7 +49,7 @@ final class keypoints_checklist_test extends \advanced_testcase {
     }
 
     /**
-     * Callback: only the current user, and only a valid format.
+     * The preference definition lets only the current user write it, and only as "<hash>:<bits>" (at most 200 bits).
      */
     public function test_preference_callback(): void {
         $this->resetAfterTest();

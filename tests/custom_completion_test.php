@@ -29,7 +29,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 require_once($CFG->libdir . '/completionlib.php');
 
 /**
- * Tests for the custom completion rules (ANA-01).
+ * Tests for the custom completion rules.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -116,6 +116,9 @@ final class custom_completion_test extends \advanced_testcase {
         return new custom_completion($cminfo, $userid);
     }
 
+    /**
+     * The rules reach cm customdata; only rules with a non-zero value are available and described.
+     */
     public function test_feature_and_customdata(): void {
         [$course, , $cm] = $this->setup_activity(['completionrecordings' => 2, 'completionwatchpercent' => 0,
             'completionpractice' => 5]);
@@ -134,6 +137,9 @@ final class custom_completion_test extends \advanced_testcase {
         $this->assertCount(2, $descriptions);
     }
 
+    /**
+     * The recordings rule counts watched recordings that are visible and not in the trash.
+     */
     public function test_recordings_rule_counts_only_visible_classes(): void {
         [$course, $googlemeet, $cm, $student] = $this->setup_activity(['completionrecordings' => 2]);
 
@@ -153,6 +159,9 @@ final class custom_completion_test extends \advanced_testcase {
             $this->completion_for($course, $cm, $student->id)->get_state('completionrecordings'));
     }
 
+    /**
+     * The watch percent rule is measured against visible recordings and is never met without any.
+     */
     public function test_watch_percent_rule(): void {
         [$course, $googlemeet, $cm, $student] = $this->setup_activity(['completionwatchpercent' => 50]);
 
@@ -174,6 +183,9 @@ final class custom_completion_test extends \advanced_testcase {
             $this->completion_for($course, $cm, $student->id)->get_state('completionwatchpercent'));
     }
 
+    /**
+     * The practice rule counts distinct questions answered, right or wrong, not attempts.
+     */
     public function test_practice_rule_counts_distinct_questions(): void {
         [$course, $googlemeet, $cm, $student] = $this->setup_activity(['completionpractice' => 2]);
         $recordingid = $this->create_recording($googlemeet->id);
@@ -189,6 +201,9 @@ final class custom_completion_test extends \advanced_testcase {
             $this->completion_for($course, $cm, $student->id)->get_state('completionpractice'));
     }
 
+    /**
+     * Marking a recording as watched through the web service updates the stored completion state.
+     */
     public function test_progress_ws_completes_activity_without_reload(): void {
         [$course, $googlemeet, $cm, $student] = $this->setup_activity(['completionrecordings' => 1]);
         $recordingid = $this->create_recording($googlemeet->id);
@@ -203,6 +218,9 @@ final class custom_completion_test extends \advanced_testcase {
         $this->assertEquals(COMPLETION_COMPLETE, $completion->get_data($cm, false, $student->id)->completionstate);
     }
 
+    /**
+     * The updater only recalculates under automatic tracking with a rule fed by the changed data.
+     */
     public function test_updater_is_noop_without_relevant_rule(): void {
         [, , $cm, $student] = $this->setup_activity(['completionpractice' => 3]);
         $this->assertFalse(completion_updater::progress_changed($cm, $student->id));

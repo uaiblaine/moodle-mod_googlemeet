@@ -173,10 +173,10 @@ $functions = array(
         'classname' => 'mod_googlemeet_external',
         'methodname' => 'check_practice_answer',
         'description' => 'Check a Google Meet recording student practice answer',
-        'type' => 'write', // ANA-05: also stores the attempt.
+        'type' => 'write', // It also stores the attempt.
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
-        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE], // UX-05: used by the Moodle App.
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ),
     'mod_googlemeet_mark_recording_progress' => array(
         'classname' => 'mod_googlemeet_external',
@@ -185,9 +185,8 @@ $functions = array(
         'type' => 'write',
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
-        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE], // UX-05: used by the Moodle App.
+        'services' => [MOODLE_OFFICIAL_MOBILE_SERVICE],
     ),
-    // track: analytics.
     'mod_googlemeet_get_practice_session' => array(
         'classname' => 'mod_googlemeet\\external\\get_practice_session',
         'description' => 'Get an activity-wide practice session (failed questions or by topic)',
@@ -195,7 +194,6 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:view',
     ),
-    // track: w2-aireview (IA-04).
     'mod_googlemeet_review_ai_analysis' => array(
         'classname' => 'mod_googlemeet\\external\\review_ai_analysis',
         'description' => 'Publish the reviewed AI summary of a recording (or of every recording of the activity) to students',
@@ -203,7 +201,6 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
     ),
-    // track: w2-calsync.
     'mod_googlemeet_request_sync' => array(
         'classname' => 'mod_googlemeet\\external\\request_sync',
         'description' => 'Queue a background Google Drive sync of an activity (PERF-02)',
@@ -218,7 +215,6 @@ $functions = array(
         'ajax' => true,
         'capabilities' => 'mod/googlemeet:editrecording',
     ),
-    // track: w2-completion.
     'mod_googlemeet_log_room_entered' => array(
         'classname' => 'mod_googlemeet\\external\\log_room_entered',
         'description' => 'Log that the user enters the live Google Meet room and return its URL',

@@ -22,7 +22,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Fetches, matches and stores real attendance of the live sessions (ANA-03).
+ * Fetches, matches and stores real attendance of the live sessions.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -322,7 +322,8 @@ class service {
     }
 
     /**
-     * Normalise a person name for matching: lower case, accents folded, punctuation removed.
+     * Normalise a person name for matching: lower case, accents folded (those of {@see googlemeet_fold()}
+     * plus grave accents, ç and ï; others are kept), punctuation removed.
      *
      * @param string $name Name.
      * @return string
@@ -351,8 +352,8 @@ class service {
     /**
      * Assign a Moodle user to each participant: e-mail, then a remembered Google id, then the name.
      *
-     * A name only matches when exactly one candidate fits. Google never returns e-mails through the
-     * Meet API today, but sources that provide them are matched first.
+     * A name only matches when exactly one candidate fits. {@see meet_api_source} returns no e-mail
+     * addresses; e-mail is matched first for sources that provide it.
      *
      * @param \stdClass $googlemeet Activity record.
      * @param array[] $participants Aggregated participants.
@@ -476,7 +477,8 @@ class service {
     /**
      * Replace the stored attendance of a session, merging participants matched to the same user.
      *
-     * Manual links made by the teacher on a previous fetch are kept for the same Google id/name.
+     * Teacher decisions from a previous fetch (manual link or unlink) win over automatic matching
+     * for the same person ({@see person_key()}).
      *
      * @param \stdClass $googlemeet Activity record.
      * @param int $eventid Session id.
@@ -487,7 +489,6 @@ class service {
     public static function store(\stdClass $googlemeet, int $eventid, array $participants, int $now): void {
         global $DB;
 
-        // Teacher decisions (manual link or unlink) win over automatic matching on every re-fetch.
         $manual = [];
         [$msql, $mparams] = $DB->get_in_or_equal([self::MATCH_MANUAL, self::MATCH_UNLINKED], SQL_PARAMS_NAMED);
         foreach ($DB->get_records_select('googlemeet_attendance', "eventid = :eventid AND matchedby $msql",

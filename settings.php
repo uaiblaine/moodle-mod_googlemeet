@@ -25,7 +25,7 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// Track w2-calsync (OPS-04): admin page with autosync failures, stuck AI analyses and last syncs.
+// Sync status page: autosync failures, stuck AI analyses, failed Calendar updates and last syncs.
 if ($hassiteconfig) {
     $ADMIN->add('modsettings', new admin_externalpage(
         'mod_googlemeet_status',
@@ -36,7 +36,7 @@ if ($hassiteconfig) {
 }
 
 if ($ADMIN->fulltree) {
-    // Track w2-calsync (OPS-04): link to the status page from the plugin settings.
+    // Link to the sync status page from the plugin settings.
     $settings->add(new admin_setting_heading(
         'googlemeet/adminstatus_heading',
         '',
@@ -100,7 +100,7 @@ if ($ADMIN->fulltree) {
         $minutes
     ));
 
-    // NOT-04 (track: w2-notify): default for the second, earlier reminder (0 = off).
+    // Activity-form default for the second, earlier reminder (0 = off).
     $settings->add(new admin_setting_configselect(
         'googlemeet/notifyhoursbefore',
         get_string('notifyhoursbefore', 'googlemeet'),
@@ -162,8 +162,8 @@ if ($ADMIN->fulltree) {
         ''
     ));
 
-    // The list must stay in sync with gemini_client::DEFAULT_MODEL / FALLBACK_MODEL,
-    // otherwise the configured model never matches what the code actually requests.
+    // Keep in step with the private constants gemini_client::DEFAULT_MODEL (this setting's default)
+    // and FALLBACK_MODEL (the option labelled fallback).
     $aimodels = [
         'gemini-3.5-flash' => 'Gemini 3.5 Flash (Stable, default)',
         'gemini-3.1-flash-lite' => 'Gemini 3.1 Flash Lite (Stable, cheap/fast, fallback)',
@@ -197,8 +197,8 @@ if ($ADMIN->fulltree) {
         0
     ));
 
-    // track: w2-aireview.
-    // IA-04: AI summaries/key points/topics/chapters stay hidden from students until a teacher publishes them.
+    // AI summaries, key points, topics and chapters stay hidden from students until a teacher publishes them.
+    // See \mod_googlemeet\local\ai_review.
     $settings->add(new admin_setting_configcheckbox(
         'googlemeet/requireaireview',
         get_string('requireaireview', 'googlemeet'),
@@ -206,7 +206,7 @@ if ($ADMIN->fulltree) {
         1
     ));
 
-    // IA-03: Gemini content-safety threshold.
+    // Gemini content-safety threshold.
     $settings->add(new admin_setting_configselect(
         'googlemeet/aisafetythreshold',
         get_string('aisafetythreshold', 'googlemeet'),
@@ -220,7 +220,8 @@ if ($ADMIN->fulltree) {
         ]
     ));
 
-    // F-8: minutes in "processing" before an analysis is shown as stuck and the cleanup marks it failed.
+    // Minutes in "processing" before an analysis is shown as stuck and the cleanup marks it failed;
+    // read through ai_service::get_stuck_threshold(), which never goes below MIN_STUCK_MINUTES.
     $settings->add(new admin_setting_configtext(
         'googlemeet/aistuckminutes',
         get_string('aistuckminutes', 'googlemeet'),
@@ -229,10 +230,8 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // When enabled, synced recordings are granted "anyone with the link" read access on Google
-    // Drive so enrolled students (who are not the Drive owner) can play the embedded recording.
-    // Default 1 preserves prior behaviour; disabling improves privacy but breaks playback for
-    // everyone except the Google account that owns the recordings.
+    // When enabled, synced recordings get "anyone with the link" read access on Google Drive so
+    // students (not the Drive owner) can play the embedded player; disabled, only the owner can play them.
     $settings->add(new admin_setting_configcheckbox(
         'googlemeet/makerecordingspublic',
         get_string('makerecordingspublic', 'googlemeet'),
@@ -288,7 +287,7 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // Track w2-data (OPS-03): automatic purge of the recordings trash.
+    // Days a trashed recording is kept before the purge_trash task deletes it (0 = never).
     $settings->add(new admin_setting_configtext(
         'googlemeet/trashretentiondays',
         get_string('trashretentiondays', 'googlemeet'),
@@ -297,7 +296,7 @@ if ($ADMIN->fulltree) {
         PARAM_INT
     ));
 
-    // track: w2-completion. ANA-03: real attendance from the Google Meet REST API (off by default).
+    // Real attendance from the Google Meet REST API (off by default; each activity also opts in).
     $settings->add(new admin_setting_heading(
         'googlemeet/attendance_heading',
         get_string('attendance_heading', 'googlemeet'),

@@ -17,7 +17,7 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Google rejected the call because the token does not carry the Meet scope (ANA-03).
+ * Google rejected the call because the token does not carry the Meet scope.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

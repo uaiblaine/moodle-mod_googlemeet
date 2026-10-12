@@ -19,12 +19,10 @@ namespace mod_googlemeet;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Excepción lanzada cuando Gemini API devuelve un error transitorio
- * (rate limit, sobrecarga, 429/500/503). El caller debe aplicar back-off
- * y reintentar más tarde.
+ * The Gemini API returned a transient error (rate limit, overload, HTTP 429/500/503).
  *
- * Hereda de \moodle_exception para que los bloques catch existentes que
- * atrapan moodle_exception o \Exception sigan funcionando sin cambios.
+ * The caller should back off and retry later. Extends \moodle_exception so catch blocks for
+ * moodle_exception or \Exception still handle it. Thrown by {@see gemini_client::handle_http_response()}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

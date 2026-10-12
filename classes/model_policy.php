@@ -17,21 +17,11 @@
 namespace mod_googlemeet;
 
 /**
- * Model selection and fallback policy for the Gemini client.
+ * Model selection and fallback policy for {@see gemini_client}.
  *
- * Encapsulates which model is tried first and the ordered chain of models to
- * attempt when an earlier one fails. This keeps the model/fallback policy in a
- * single cohesive, testable place instead of being spread across hardcoded
- * constants and if-checks inside {@see gemini_client}.
- *
- * The policy is a small immutable value object: given a primary model and a
- * fallback model it exposes an ordered attempt chain `[primary, fallback]`
- * (de-duplicated, so a client already configured on the fallback model yields a
- * single-element chain and therefore performs no redundant retry).
- *
- * This is intentionally minimal and Gemini-specific. It is the natural seam to
- * extend later (e.g. a longer fallback chain, or a per-provider policy) without
- * touching the request/parse logic in {@see gemini_client}.
+ * Immutable value object: given a primary and a fallback model it exposes the ordered
+ * attempt chain `[primary, fallback]`, de-duplicated so a client already configured on
+ * the fallback model makes no redundant retry.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -77,11 +67,7 @@ class model_policy {
     /**
      * Get the ordered chain of models to attempt.
      *
-     * The first element is always the primary model; the fallback model is
-     * appended only when it differs from the primary, so a client already
-     * configured on the fallback yields a single-element chain (and thus no
-     * redundant retry). This preserves the existing behaviour where a primary
-     * that equals the fallback is never retried.
+     * The primary model comes first; the fallback is appended only when it differs from it.
      *
      * @return string[] Ordered, de-duplicated list of model names to try.
      */

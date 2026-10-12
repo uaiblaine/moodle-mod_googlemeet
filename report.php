@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Teacher viewing report (ANA-04): students x recordings, inactivity filter, most failed questions.
+ * Teacher viewing report: students x recordings, inactivity filter, most failed questions.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

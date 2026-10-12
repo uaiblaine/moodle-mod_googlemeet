@@ -23,7 +23,7 @@ use mod_googlemeet\task\calendar_update_event;
 use stdClass;
 
 /**
- * Keep the Google Calendar event of an activity in step with Moodle edits and deletions (DAT-04).
+ * Keep the Google Calendar event of an activity in step with Moodle edits and deletions.
  *
  * The event is created on the room creator's primary calendar when the activity is added. Edits
  * (name, date, times, recurrence) are pushed with events.patch and deleting the activity removes
@@ -31,8 +31,8 @@ use stdClass;
  * the form never waits on (or fails because of) Google. Failures are logged (sync log + mtrace)
  * and the teacher who made the change gets a notice; nothing is retried automatically.
  *
- * Caveat (documented): any manual change made directly in Google Calendar to the summary, times
- * or recurrence is overwritten by the next Moodle edit of those fields.
+ * A change made directly in Google Calendar to the summary, times or recurrence is overwritten by
+ * the next Moodle edit of any synced field: the patch always sends all of them.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -67,7 +67,8 @@ class calendar_sync {
      * Turn the stored "eventid" into a Calendar API event id.
      *
      * add_instance() stores the `eid` parameter of the event htmlLink, which is base64url of
-     * "<eventId> <calendarEmail>". Older/other values that are not in that form are returned as-is.
+     * "<eventId> <calendarEmail>". A value not in that form is taken as the event id itself. Either
+     * way the recurring-instance suffix is stripped ({@see series_id()}).
      *
      * @param string|null $stored Value of googlemeet.eventid.
      * @return string Event id, '' when none.
@@ -243,7 +244,7 @@ class calendar_sync {
     /**
      * Whether another activity (any course) still uses the same Google event or the same Meet room.
      *
-     * Restored, duplicated and copied activities (DAT-03) keep the Meet URL but drop the eventid, so
+     * Restored, duplicated and copied activities keep the Meet URL but drop the eventid, so
      * comparing eventids alone misses them; the URL / meeting code is what they share.
      *
      * @param string $storedeventid googlemeet.eventid value ('' when unknown).
@@ -398,8 +399,8 @@ class calendar_sync {
             return 'skipped';
         }
         if (self::is_event_shared((string)$googlemeet->eventid, $googlemeetid)) {
-            // Legacy copies (before DAT-03) share the eventid: neither may drive the event. Logged
-            // once per run without notifying the teacher on every save.
+            // Copies restored by older plugin versions kept the eventid: neither may drive the shared
+            // event. Only traced, so the teacher is not notified on every save.
             self::trace($googlemeetid, 'update', 'skipped', get_string('calsync_reason_shared', 'googlemeet'));
             return 'skipped';
         }
@@ -557,7 +558,7 @@ class calendar_sync {
     }
 
     /**
-     * Structured mtrace line (OPS-04).
+     * Structured mtrace line.
      *
      * @param int $googlemeetid
      * @param string $op

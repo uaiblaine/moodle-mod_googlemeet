@@ -29,7 +29,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 
 /**
- * Tests for practice attempts persistence (ANA-05) and the activity-wide practice modes.
+ * Tests for practice attempts persistence and the activity-wide practice modes.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -99,7 +99,7 @@ final class practice_attempts_test extends \advanced_testcase {
                 'keypoints' => json_encode(['k']),
                 'topics' => json_encode($topics),
                 'status' => 'completed',
-                'reviewed' => 1, // IA-04: published, so students see its topics.
+                'reviewed' => 1, // Published, so students see its topics.
                 'timecreated' => time(),
                 'timemodified' => time(),
             ]);
@@ -190,7 +190,7 @@ final class practice_attempts_test extends \advanced_testcase {
     }
 
     /**
-     * Failed selection uses the LATEST attempt per question and only serves published, visible questions.
+     * Failed selection uses the latest attempt per question and only serves published, visible questions.
      */
     public function test_failed_selection_uses_latest_attempt(): void {
         global $DB;

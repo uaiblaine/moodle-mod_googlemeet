@@ -17,7 +17,7 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Rows of the teacher attendance view and its export (ANA-03).
+ * Rows of the teacher attendance view and its export.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

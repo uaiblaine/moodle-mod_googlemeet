@@ -29,7 +29,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * Mobile app (Moodle App site plugin) views (UX-05).
+ * Mobile app (Moodle App site plugin) views.
  *
  * - Activity view: description (with images, via format_module_intro + core-format-text), join
  *   button (logs room_entered through a WS, then opens Meet), upcoming sessions and a paginated
@@ -194,8 +194,9 @@ class mobile {
     /**
      * Whether the current user may see the AI analysis of a class.
      *
-     * Same rule as the web pages (IA-04, {@see \mod_googlemeet\local\ai_review}): completed, and
-     * reviewed by a teacher when the site requires it; teachers always see it.
+     * Same rule as the web pages ({@see \mod_googlemeet\local\ai_review::is_visible_to_user()}): the
+     * analysis is completed and either reviewed when the site requires review, or the user holds
+     * mod/googlemeet:editrecording.
      *
      * @param \stdClass|false $analysis Analysis row.
      * @param \context_module $context Module context.

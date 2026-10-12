@@ -21,11 +21,7 @@ use PHPUnit\Framework\Attributes\CoversClass;
 defined('MOODLE_INTERNAL') || die();
 
 /**
- * Unit tests for mod_googlemeet\subtitle_extractor::parse_xml().
- *
- * parse_xml() is a public method that has no external dependencies (no DB, no
- * network, no shell commands). It receives a raw XML string and returns a
- * formatted transcript string, making it fully unit-testable.
+ * Tests for mod_googlemeet\subtitle_extractor: parse_xml() formatting, and extract() without yt-dlp.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -36,23 +32,15 @@ defined('MOODLE_INTERNAL') || die();
 class subtitle_extractor_test extends \advanced_testcase {
 
     /**
-     * Build an instance of subtitle_extractor without triggering the yt-dlp
-     * file-system check (we only need parse_xml() which is pure PHP).
+     * Build an extractor for the parse_xml() tests.
      *
-     * We use reflection to set the private $ytdlppath so the constructor does
-     * not call find_ytdlp() with a real filesystem lookup — but since we only
-     * exercise parse_xml(), which has no state dependency, direct instantiation
-     * also works correctly regardless of yt-dlp availability.
+     * The constructor still looks yt-dlp up, but parse_xml() does not depend on the result.
      *
      * @return \mod_googlemeet\subtitle_extractor
      */
     private function make_extractor(): \mod_googlemeet\subtitle_extractor {
         return new \mod_googlemeet\subtitle_extractor('es');
     }
-
-    // =========================================================================
-    // Basic well-formed XML
-    // =========================================================================
 
     /**
      * Single text node with a sub-minute timestamp.
@@ -125,10 +113,6 @@ class subtitle_extractor_test extends \advanced_testcase {
         $this->assertStringContainsString('Long video text', $result);
     }
 
-    // =========================================================================
-    // HTML entities
-    // =========================================================================
-
     /**
      * Common HTML entities are decoded in the output.
      *
@@ -148,7 +132,7 @@ class subtitle_extractor_test extends \advanced_testcase {
     }
 
     /**
-     * Named HTML5 entities (&apos;, &nbsp;) are decoded.
+     * The &apos; entity is decoded.
      *
      */
     public function test_parse_xml_html5_entities(): void {
@@ -160,10 +144,6 @@ class subtitle_extractor_test extends \advanced_testcase {
 
         $this->assertStringContainsString("It's fine", $result);
     }
-
-    // =========================================================================
-    // Edge cases: empty and whitespace-only nodes
-    // =========================================================================
 
     /**
      * Nodes with empty text content are silently skipped.
@@ -178,14 +158,11 @@ class subtitle_extractor_test extends \advanced_testcase {
         $extractor = $this->make_extractor();
         $result = $extractor->parse_xml($xml);
 
-        // Only the non-empty node contributes text.
         $this->assertStringContainsString('Real text', $result);
 
-        // Whitespace-only nodes must not appear as blank lines between content.
-        // The output should contain "Real text" without preceding empty lines
-        // other than the timestamp.
+        // Empty and whitespace-only nodes add no lines: only the timestamp and "Real text" remain.
         $lines = array_filter(explode("\n", $result), fn($l) => trim($l) !== '');
-        $this->assertCount(2, array_values($lines)); // timestamp + "Real text".
+        $this->assertCount(2, array_values($lines));
     }
 
     /**
@@ -199,10 +176,6 @@ class subtitle_extractor_test extends \advanced_testcase {
 
         $this->assertSame('', $result);
     }
-
-    // =========================================================================
-    // Malformed / invalid XML
-    // =========================================================================
 
     /**
      * Totally invalid XML returns an empty string (libxml error suppressed).
@@ -232,12 +205,8 @@ class subtitle_extractor_test extends \advanced_testcase {
         $this->assertSame('', $result);
     }
 
-    // =========================================================================
-    // Output format / ordering
-    // =========================================================================
-
     /**
-     * Lines are in chronological order and timestamps precede their content.
+     * Each minute's timestamp line precedes its text; cues keep their input order (parse_xml() does not sort).
      *
      */
     public function test_parse_xml_chronological_order(): void {
@@ -268,7 +237,6 @@ class subtitle_extractor_test extends \advanced_testcase {
         $extractor = $this->make_extractor();
         $result = $extractor->parse_xml($xml);
 
-        // implode("\n", $lines) does not add a trailing newline.
         $this->assertStringNotContainsString("\n\n", $result);
         $this->assertFalse(str_ends_with($result, "\n"), 'Output should not have a trailing newline.');
     }

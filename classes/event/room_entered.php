@@ -17,9 +17,10 @@
 namespace mod_googlemeet\event;
 
 /**
- * A user clicked "Join" to enter the live Google Meet room (ANA-02).
+ * A user clicked "Join" to enter the live Google Meet room.
  *
- * It records the intention to join, not real attendance (see ANA-03 for that).
+ * It records the intention to join, not real attendance, which is read from the Meet REST API
+ * into googlemeet_attendance.
  *
  * @property-read array $other {
  *      - int sessionid: googlemeet_events id of the live/imminent session, 0 when none.
@@ -76,6 +77,7 @@ class room_entered extends \core\event\base {
      * Validate the custom data.
      *
      * @return void
+     * @throws \coding_exception When other['sessionid'] is not set
      */
     protected function validate_data() {
         parent::validate_data();

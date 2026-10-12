@@ -23,7 +23,9 @@ use core_external\external_value;
 use mod_googlemeet\local\ai_review;
 
 /**
- * IA-04: publish (mark as reviewed) the AI summary of one recording, or of every recording of the activity.
+ * Publish (mark as reviewed) the AI summary of one recording, or of every recording of the activity.
+ *
+ * The review rule lives in {@see \mod_googlemeet\local\ai_review}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

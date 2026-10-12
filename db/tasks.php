@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Definition of Google Meet task.
+ * Definition of Google Meet scheduled tasks.
  *
  * @package     mod_googlemeet
  * @copyright   2020 Rone Santos <ronefel@hotmail.com>
@@ -62,7 +62,6 @@ $tasks = [
         'month' => '*'
     ],
     [
-        // OPS-03: purge recordings that stayed in the trash longer than googlemeet/trashretentiondays.
         'classname' => 'mod_googlemeet\task\purge_trash',
         'blocking' => 0,
         'minute' => 'R',
@@ -71,7 +70,7 @@ $tasks = [
         'dayofweek' => '*',
         'month' => '*'
     ],
-    // track: w2-completion (ANA-03). No-op unless googlemeet/attendanceenabled is on.
+    // No-op unless googlemeet/attendanceenabled is on.
     [
         'classname' => 'mod_googlemeet\task\fetch_attendance',
         'blocking' => 0,

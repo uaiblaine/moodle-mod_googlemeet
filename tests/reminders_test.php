@@ -26,8 +26,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * Pre-session reminders: cron-gap tolerant window (NOT-02), second reminder deduplicated
- * separately (NOT-04), push data and localised content (NOT-03, QA-03).
+ * Pre-session reminders: cron-gap tolerant window, second reminder deduplicated separately,
+ * push data and localised content.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -79,7 +79,7 @@ final class reminders_test extends \advanced_testcase {
     }
 
     /**
-     * Map of "eventid:kind" for the due reminders.
+     * Sorted "eventid:kind" keys of the due reminders.
      *
      * @param int $now Reference time.
      * @return string[]
@@ -92,6 +92,9 @@ final class reminders_test extends \advanced_testcase {
         return $keys;
     }
 
+    /**
+     * Reset the database after each test and fix the reference time.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
@@ -99,7 +102,7 @@ final class reminders_test extends \advanced_testcase {
     }
 
     /**
-     * NOT-02: a run that comes back after a cron gap still sends the reminder while the session
+     * A run that comes back after a cron gap still sends the reminder while the session
      * has not started; started sessions and sessions outside the window are not due.
      */
     public function test_minutes_window_tolerates_cron_gap(): void {
@@ -120,7 +123,7 @@ final class reminders_test extends \advanced_testcase {
     }
 
     /**
-     * NOT-04: the hours reminder is due inside its window, and gives way to the minutes reminder
+     * The hours reminder is due inside its window, and gives way to the minutes reminder
      * once that one is due (a late run never sends both at once).
      */
     public function test_hours_window_and_handover(): void {

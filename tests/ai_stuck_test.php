@@ -26,7 +26,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * F-8: analyses stuck in 'processing' are visible to teachers, retryable and cleaned up by cron.
+ * Analyses stuck in 'processing' are visible to teachers, retryable and cleaned up by cron.
  *
  * @package     mod_googlemeet
  * @category    test

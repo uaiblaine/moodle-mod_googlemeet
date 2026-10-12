@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * "Add to my calendar": iCalendar (.ics) export of an activity's upcoming sessions (NOT-04).
+ * "Add to my calendar": iCalendar (.ics) export of an activity's upcoming sessions.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

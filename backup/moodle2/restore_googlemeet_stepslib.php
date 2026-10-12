@@ -49,8 +49,8 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $paths[] = new restore_path_element('googlemeet_recording',
             '/activity/googlemeet/recordings/recording');
 
-        // AI analysis (summary, key points, topics, chapters) is course content and is always
-        // restored; its transcript is stripped in process_googlemeet_aianalysis() without user info.
+        // AI analysis (summary, key points, topics, chapters) is course content, restored with or
+        // without user info; process_googlemeet_aianalysis() decides what a copy without user info keeps.
         $paths[] = new restore_path_element('googlemeet_aianalysis',
             '/activity/googlemeet/recordings/recording/aianalysis');
         if ($userinfo) {
@@ -92,16 +92,14 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $data->eventenddate = $this->apply_date_offset($data->eventenddate);
         $data->timemodified = $this->apply_date_offset($data->timemodified);
 
-        // DAT-03: the copy must never act on the source activity's Google Calendar event. The
-        // eventid is the original's event (a future Calendar patch/delete would hit it), so drop it;
-        // the Meet URL is kept so the copy keeps using the same room. lastsync describes the
-        // original's Drive sync, not the copy's.
-        // creatoremail is intentionally kept: it identifies the Google account that owns the Meet
-        // room and its Drive recordings, which the copy still uses; clearing it would make
-        // autosync close every event of the copy as "no identity" (permanent failure).
+        // The copy must never act on the source activity's Google Calendar event: eventid is the
+        // original's event (a later Calendar update or delete would hit it), so drop it. The Meet URL
+        // is kept so the copy uses the same room; lastsync describes the original's Drive sync.
+        // Keep creatoremail: it identifies the Google account that owns the Meet room and its Drive
+        // recordings, and without it autosync closes every event of the copy as a permanent failure.
         $data->eventid = null;
         $data->lastsync = null;
-        // ANA-03: a copy without user data (new course edition, duplicate) shares the Meet room of the
+        // A copy without user data (new course edition, duplicate) shares the Meet room of the
         // original; reading attendance must be switched on again deliberately by its teacher.
         if (!$this->userinfo) {
             $data->attendanceenabled = 0;
@@ -129,7 +127,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $data->eventdate = $this->apply_date_offset($data->eventdate);
         $data->timemodified = $this->apply_date_offset($data->timemodified);
 
-        // DAT-03: auto-sync bookkeeping. Sessions already over keep the backed-up state, so a
+        // Auto-sync bookkeeping. Sessions already over keep the backed-up state, so a
         // restore does not re-trigger auto-sync against old sessions. Sessions that (after the date
         // offset of a course restore) are still to come have never been synced for this copy: reset
         // them, otherwise an "autosynced" flag copied from the original would block their sync.
@@ -158,12 +156,12 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
 
         $data->googlemeetid = $this->get_new_parentid('googlemeet');
         $data->timemodified = $this->apply_date_offset($data->timemodified);
-        // DAT-05: derived from the text duration (also for backups made before the column existed).
+        // Not backed up: recompute durationseconds from the text duration (NULL when it cannot be parsed).
         require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
         $data->durationseconds = googlemeet_recording_duration_to_seconds($data->duration ?? '') ?: null;
 
-        // Strip participant-derived transcript data from legacy backups when restoring without
-        // user information (current backups already omit these fields when userinfo is off).
+        // Without user information, drop the participant-derived transcript and notes, also when the
+        // backup carries them (made with user data, or by a version that always included them).
         if (!$this->userinfo) {
             unset($data->transcripttext);
             unset($data->transcriptfileid);
@@ -194,7 +192,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         }
         $data->timecreated = $this->apply_date_offset($data->timecreated);
         $data->timemodified = $this->apply_date_offset($data->timemodified);
-        // IA-04: backups made before the review existed hold content students could already see.
+        // Backups made before the AI review state existed hold content students could already see.
         if (!isset($data->reviewed)) {
             $data->reviewed = 1;
             $data->timereviewed = 0;
@@ -268,7 +266,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
     }
 
     /**
-     * Process a practice attempt restore (ANA-05).
+     * Process a practice attempt restore.
      *
      * Questions are created by the root task before any activity, so their mapping exists here.
      * Attempts whose user, recording (e.g. trashed, not backed up) or question cannot be mapped
@@ -294,7 +292,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
     }
 
     /**
-     * Process an attendance restore (ANA-03).
+     * Process an attendance restore.
      *
      * Unmatched participants (userid 0) keep userid 0; rows of users that cannot be mapped are
      * skipped. The session is marked as fetched so the copy does not query Google again.
@@ -384,7 +382,7 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
     }
 
     /**
-     * Re-bind the restored practice questions to the new activity and recordings (DAT-02).
+     * Re-bind the restored practice questions to the new activity and recordings.
      *
      * Runs after the whole restore plan, i.e. once core has created the question categories and
      * moved them (with their tag instances) into this activity's new module context.

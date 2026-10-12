@@ -107,7 +107,7 @@ $capabilities = [
         ]
     ],
 
-    // track: analytics. ANA-04 teacher viewing/practice report.
+    // Viewing and practice report (report.php) and attendance report (attendance.php).
     'mod/googlemeet:viewreports' => [
         'riskbitmask' => RISK_PERSONAL,
         'captype' => 'read',

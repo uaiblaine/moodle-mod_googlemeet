@@ -36,7 +36,6 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
     protected function define_structure() {
         $userinfo = $this->get_setting_value('userinfo');
 
-        // Replace with the attributes and final elements that the element will handle.
         $googlemeet = new backup_nested_element('googlemeet', ['id'], [
             'name',
             'originalname',
@@ -82,8 +81,8 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'nextsyncattempt'
         ]);
 
-        // The recording transcript is participant-derived personal data, so it is only included
-        // when the backup carries user information. Non-personal fields are always included.
+        // The recording transcript and Gemini meeting notes are participant-derived personal data, so
+        // they are only included when the backup carries user information.
         $recordingfields = [
             'recordingid',
             'name',
@@ -118,7 +117,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'timemodified'
         ]);
 
-        // ANA-05: practice attempts (user data). Recording and question ids are remapped on restore.
+        // Practice attempts (user data). Recording and question ids are remapped on restore.
         $practiceattempts = new backup_nested_element('practiceattempts');
         $practiceattempt = new backup_nested_element('practiceattempt', ['id'], [
             'recordingid',
@@ -144,7 +143,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
             'nextretry',
             'timecreated',
             'timemodified',
-            // IA-04 review state. It travels without user data too, so pending
+            // Teacher review state. It travels without user data too, so pending
             // content stays pending in the copy; reviewedby is only annotated with user data.
             'reviewed',
             'timereviewed',
@@ -158,7 +157,7 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
         }
         $aianalysis = new backup_nested_element('aianalysis', ['id'], $aifields);
 
-        // ANA-03: attendance read from Google Meet (user data), nested in its session.
+        // Attendance read from Google Meet (user data), nested in its session.
         $attendances = new backup_nested_element('attendances');
         $attendance = new backup_nested_element('attendance', ['id'], [
             'userid',

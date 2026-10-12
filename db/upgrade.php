@@ -309,8 +309,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026053000) {
-        // Auto-sync retry bookkeeping used by the process_autosync task. These columns were
-        // referenced by the task code before the schema existed, which made the task crash.
+        // Auto-sync retry bookkeeping used by the process_autosync task.
         $table = new xmldb_table('googlemeet_events');
 
         $field = new xmldb_field('syncattempts', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'autosynced');
@@ -327,9 +326,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026060100) {
-        // The originalname column is NOT NULL but had no default, so creating an activity
-        // without a Google login (the only path that sets originalname) failed the insert
-        // on strict DBs. Give it an empty-string default so inserts always succeed.
+        // The originalname column is NOT NULL and was only set from a created Google Calendar event:
+        // an empty-string default lets the other inserts succeed on strict DBs.
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('originalname', XMLDB_TYPE_CHAR, '255', null, XMLDB_NOTNULL, null, '', 'name');
         if ($dbman->field_exists($table, $field)) {
@@ -412,8 +410,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026070201) {
-        // Soft-delete support for recordings. Sync now moves missing Drive files to
-        // a teacher trash instead of physically deleting the recording and its AI analysis.
+        // Soft-delete support for recordings: the sync moves recordings missing from Drive to
+        // the teacher trash instead of deleting them and their AI analysis.
         $table = new xmldb_table('googlemeet_recordings');
 
         $field = new xmldb_field('deleted', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'visible');
@@ -435,7 +433,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026070501) {
-        // Per-user recording viewing progress for the redesigned classroom.
+        // Per-user recording viewing progress.
         $table = new xmldb_table('googlemeet_recording_progress');
 
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
@@ -485,7 +483,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026101001) {
-        // ANA-05: persist student practice attempts.
+        // Persist student practice attempts.
         $table = new xmldb_table('googlemeet_practice_attempts');
 
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
@@ -511,9 +509,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101001, 'googlemeet');
     }
 
-    // Track w2-data.
     if ($oldversion < 2026101100) {
-        // DAT-05: numeric duration of recordings, parsed from the "h:mm:ss" text.
+        // Numeric duration of recordings, parsed from the "h:mm:ss" text.
         $table = new xmldb_table('googlemeet_recordings');
         $field = new xmldb_field('durationseconds', XMLDB_TYPE_INTEGER, '10', null, null, null, null, 'duration');
         if (!$dbman->field_exists($table, $field)) {
@@ -546,7 +543,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026101101) {
-        // DAT-06: stale recurrence alert state moves from config_plugins (stalealert_<id>) to a column.
+        // Stale recurrence alert state moves from config_plugins (stalealert_<id>) to a column.
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('stalealerttime', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, '0', 'autosynchours');
         if (!$dbman->field_exists($table, $field)) {
@@ -567,9 +564,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101101, 'googlemeet');
     }
 
-    // track: w2-notify (savepoints 2026101110-2026101119).
     if ($oldversion < 2026101110) {
-        // NOT-04: optional second reminder N hours before each session (0 = off).
+        // Optional second reminder N hours before each session (0 = off).
         $table = new xmldb_table('googlemeet');
         $field = new xmldb_field('notifyhoursbefore', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0', 'stalealerttime');
         if (!$dbman->field_exists($table, $field)) {
@@ -580,7 +576,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026101111) {
-        // NOT-04: dedupe each reminder kind separately (minutes-before = 0, hours-before = 1).
+        // Dedupe each reminder kind separately (reminders::KIND_MINUTES = 0, KIND_HOURS = 1).
         $table = new xmldb_table('googlemeet_notify_done');
 
         $oldindex = new xmldb_index('eventid_userid', XMLDB_INDEX_UNIQUE, ['eventid', 'userid']);
@@ -601,9 +597,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101111, 'googlemeet');
     }
 
-    // track: w2-aireview.
     if ($oldversion < 2026101120) {
-        // IA-04: teacher review of AI content before students see it.
+        // Teacher review of AI content before students see it.
         $table = new xmldb_table('googlemeet_ai_analysis');
         $fields = [
             new xmldb_field('reviewed', XMLDB_TYPE_INTEGER, '1', null, XMLDB_NOTNULL, null, '0', 'timemodified'),
@@ -615,8 +610,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
                 $dbman->add_field($table, $field);
             }
         }
-        // Everything that exists today is already visible to students: keep it that way. Only
-        // analyses generated (or regenerated) from now on wait for a teacher review. reviewedby 0 = system.
+        // Analyses that exist at upgrade time are already visible to students, so mark them reviewed
+        // (reviewedby 0 = system); only those (re)generated afterwards wait for a teacher review.
         $DB->execute("UPDATE {googlemeet_ai_analysis} SET reviewed = 1, timereviewed = :now WHERE reviewed = 0",
             ['now' => time()]);
         if (get_config('googlemeet', 'requireaireview') === false) {
@@ -626,9 +621,9 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101120, 'googlemeet');
     }
 
-    // track: w2-calsync.
     if ($oldversion < 2026101130) {
-        // PERF-02 / DAT-04 / OPS-04: operational sync log.
+        // Operational log of Google sync runs (manual and automatic Drive syncs, Calendar updates and deletes);
+        // see \mod_googlemeet\local\sync_log.
         $table = new xmldb_table('googlemeet_sync_log');
 
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
@@ -653,9 +648,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101130, 'googlemeet');
     }
 
-    // track: w2-completion.
     if ($oldversion < 2026101140) {
-        // ANA-01 custom completion rules + ANA-03 per-activity attendance opt-in.
+        // Custom completion rules and the per-activity attendance opt-in.
         $table = new xmldb_table('googlemeet');
         $fields = [
             new xmldb_field('completionrecordings', XMLDB_TYPE_INTEGER, '4', null, XMLDB_NOTNULL, null, '0'),
@@ -673,7 +667,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026101141) {
-        // ANA-03: attendance read from the Google Meet REST API.
+        // Attendance read from the Google Meet REST API.
         $table = new xmldb_table('googlemeet_attendance');
         $table->add_field('id', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, XMLDB_SEQUENCE, null);
         $table->add_field('googlemeetid', XMLDB_TYPE_INTEGER, '10', null, XMLDB_NOTNULL, null, null);
@@ -722,9 +716,8 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
 
-    // Integration of wave 2 (2.30.0).
     if ($oldversion < 2026101190) {
-        // OPS-03 safety: only recordings a teacher moved to the trash by hand are purged automatically.
+        // Only recordings a teacher moved to the trash by hand are purged automatically.
         // Rows the Drive sync trashed (file missing from the listing) are never purged.
         $table = new xmldb_table('googlemeet_recordings');
         $field = new xmldb_field('trashreason', XMLDB_TYPE_CHAR, '10', null, XMLDB_NOTNULL, null, null, 'timedeleted');
@@ -742,7 +735,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
     }
 
     if ($oldversion < 2026101191) {
-        // NOT-03: db/messages.php defaults only apply to new providers. Permit and enable the
+        // The db/messages.php defaults only apply to new providers. Permit and enable the
         // Moodle app push (airnotifier) for the class reminder and new recording providers that
         // already exist, so the push actually reaches students' devices.
         if ($DB->record_exists('message_processors', ['name' => 'airnotifier'])) {

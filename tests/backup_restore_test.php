@@ -47,7 +47,7 @@ class backup_restore_testable_client extends client {
 }
 
 /**
- * Backup/restore and duplication of the AI practice questions (DAT-02) and restore coherence (DAT-03).
+ * Backup/restore and duplication of the AI practice questions, and the Google state a copy must not inherit.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -185,7 +185,7 @@ final class backup_restore_test extends \advanced_testcase {
         $this->assertFalse($DB->record_exists('googlemeet_recordings',
             ['googlemeetid' => $newgooglemeet->id, 'recordingid' => 'drive-C']));
 
-        // Questions travel with their status and are bound to the NEW recording ids.
+        // Questions travel with their status and are bound to the new recording ids.
         $questionsa = $service->get_questions($newgooglemeet, $newcm, $newcontext, $newa);
         $this->assertCount(2, $questionsa);
         $this->assertCount(1, $service->get_questions($newgooglemeet, $newcm, $newcontext, $newa, true));
@@ -201,7 +201,7 @@ final class backup_restore_test extends \advanced_testcase {
             [$newcontext->id, question_service::ORPHAN_TAG_PREFIX . '%']);
         $this->assertEquals(1, $orphans);
 
-        // DAT-03: the copy never points at the original's Google Calendar event nor its sync state.
+        // The copy never points at the original's Google Calendar event nor its sync state.
         $this->assertNull($newgooglemeet->eventid);
         $this->assertNull($newgooglemeet->lastsync);
         $this->assertEquals('teacher@example.com', $newgooglemeet->creatoremail);

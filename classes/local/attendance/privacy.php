@@ -23,7 +23,7 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
 /**
- * Privacy API parts of real attendance (ANA-03), called from \mod_googlemeet\privacy\provider.
+ * Privacy API parts of the attendance read from Google Meet, called from {@see \mod_googlemeet\privacy\provider}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

@@ -25,7 +25,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * "Add to my calendar" (NOT-04): iCalendar export and Google Calendar link.
+ * "Add to my calendar": iCalendar export and Google Calendar link.
  *
  * @package     mod_googlemeet
  * @category    test

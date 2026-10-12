@@ -116,7 +116,7 @@ final class backup_ai_analysis_test extends \advanced_testcase {
         // A queued analysis is not copied (the copy would run its own paid AI job).
         $this->assertFalse($this->copied_analysis((int)$newcm->instance, 'queued'));
 
-        // Recording-level personal data stays out too; the numeric duration is derived (DAT-05).
+        // Recording-level personal data stays out too; restore derives the numeric duration from the text.
         $recording = $DB->get_record('googlemeet_recordings', ['googlemeetid' => $newcm->instance, 'recordingid' => 'done']);
         $this->assertEmpty($recording->transcripttext);
         $this->assertEmpty($recording->notestext);

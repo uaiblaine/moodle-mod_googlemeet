@@ -31,7 +31,7 @@ require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 
 /**
- * IA-04: AI content is hidden from students until a teacher reviews (publishes) it.
+ * AI content is hidden from students until a teacher reviews (publishes) it.
  *
  * @package     mod_googlemeet
  * @category    test

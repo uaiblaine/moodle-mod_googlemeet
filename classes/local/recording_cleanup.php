@@ -24,8 +24,8 @@ global $CFG;
 require_once($CFG->libdir . '/questionlib.php');
 
 /**
- * Central cascade delete of recordings and everything that hangs off them (DAT-01), the trash
- * retention purge (OPS-03), orphan detection for cli/cleanup_orphans.php and course reset.
+ * Central cascade delete of recordings and everything that hangs off them, the trash retention
+ * purge, orphan detection for cli/cleanup_orphans.php and course reset.
  *
  * Every place that permanently removes recordings must go through purge_recordings() so no
  * dependent row (AI analysis, progress, practice attempts, material files, per-recording user
@@ -77,8 +77,8 @@ class recording_cleanup {
      * Permanently delete recordings and all their dependents.
      *
      * The caller is responsible for checking that the recordings belong to the activity of
-     * $context. With a null context (the activity is already gone) material files and questions
-     * are looked up site-wide by recording id.
+     * $context. With a null context (the activity is already gone) material files are looked up
+     * site-wide by recording id and the tagged questions are left alone.
      *
      * @param int[] $recordingids Recording ids.
      * @param \context_module|null $context Module context of the activity that owns them.
@@ -288,8 +288,8 @@ class recording_cleanup {
         }
         question_delete_question($questionid);
         if (!$DB->record_exists('question', ['id' => $questionid])) {
-            // Core leaves the tag instances of a deleted question behind (the tag API skips areas it
-            // considers disabled): drop them directly.
+            // Core's qbank_tagquestion observer of question_deleted removes only the tag instances in
+            // the question's own context (questions allow tags in several contexts): drop any left.
             $DB->delete_records('tag_instance', ['component' => 'core_question', 'itemtype' => 'question',
                 'itemid' => $questionid]);
             return [1, 0];
@@ -324,7 +324,8 @@ class recording_cleanup {
      * Delete the user data of the given activity instances (course reset).
      *
      * Recordings, AI content and questions are kept; viewing progress, practice attempts,
-     * recording subscriptions, notification bookkeeping and per-recording preferences go.
+     * recording subscriptions, notification bookkeeping, per-recording preferences and Meet
+     * attendance go.
      *
      * @param int[] $googlemeetids Activity instance ids.
      * @return array Counters keyed by kind.
@@ -357,8 +358,8 @@ class recording_cleanup {
         $stats['notifications'] = $DB->count_records_select('googlemeet_notify_done', $eventselect, $params);
         $DB->delete_records_select('googlemeet_notify_done', $eventselect, $params);
 
-        // ANA-03: attendance read from Google Meet is student data too (names, Google ids). The fetch
-        // state is kept but marked done and emptied, so the task does not read those sessions again.
+        // Attendance read from Google Meet is student data too (names, Google ids). The fetch state
+        // is kept but marked done and emptied, so the task does not read those sessions again.
         $stats['attendance'] = $DB->count_records_select('googlemeet_attendance', "googlemeetid $insql", $params);
         $DB->delete_records_select('googlemeet_attendance', "googlemeetid $insql", $params);
         $DB->execute("UPDATE {googlemeet_attendance_sync}

@@ -26,7 +26,7 @@ use mod_googlemeet\privacy\provider;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
- * Privacy API coverage of googlemeet_practice_attempts (ANA-05).
+ * Privacy API coverage of googlemeet_practice_attempts.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -39,7 +39,7 @@ final class privacy_practice_attempts_test extends \core_privacy\tests\provider_
     /**
      * Two activities, two students with attempts.
      *
-     * @return array
+     * @return array [context1, context2, user1, user2, googlemeet1, googlemeet2, recording id by activity id]
      */
     private function fixture(): array {
         global $DB;

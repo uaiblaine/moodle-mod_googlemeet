@@ -25,6 +25,11 @@ use moodle_exception;
  * Handles the business logic for AI-powered video analysis,
  * including creating, updating, and retrieving analysis records.
  *
+ * A googlemeet_ai_analysis row moves pending -> processing -> completed or failed. A transient
+ * failure stays 'failed' with retrycount 1 to MAX_TRANSIENT_RETRIES - 1 and a nextretry, and is
+ * claimed again once that is due; retrycount MAX_TRANSIENT_RETRIES or PERMANENT_RETRYCOUNT ends
+ * the automatic retries.
+ *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
@@ -40,10 +45,10 @@ class ai_service {
     /** @var int[] Back-off schedule in seconds, indexed by (retrycount - 1): 2h, 4h, 8h, 24h. */
     const TRANSIENT_BACKOFF = [7200, 14400, 28800, 86400];
 
-    /** @var int Default minutes after which a 'processing' analysis counts as stuck (F-8). */
+    /** @var int Default minutes after which a 'processing' analysis counts as stuck. */
     const DEFAULT_STUCK_MINUTES = 60;
 
-    /** @var int Lower bound for aistuckminutes: a tier-3 (video) analysis can legitimately take over 15 min. */
+    /** @var int Lower bound for googlemeet/aistuckminutes, so a healthy tier-3 (video download) run is not marked stuck. */
     const MIN_STUCK_MINUTES = 45;
 
     /** @var gemini_client The Gemini API client */
@@ -92,12 +97,12 @@ class ai_service {
      * @param int $recordingid The recording ID
      * @param bool $regenerate Whether to regenerate if analysis exists
      * @param bool $forcedownload Whether to allow falling back to full-video download (tier 3)
-     * @param bool $alreadyclaimed True when the caller (the cron) has already atomically
-     *                             flipped this row pending->processing via claim_pending();
-     *                             in that case we must not re-evaluate/skip on status and
-     *                             we just (re)enqueue the adhoc task for the claimed row.
-     * @return stdClass The analysis record with status 'processing'
-     * @throws moodle_exception If queueing fails
+     * @param bool $alreadyclaimed True when the caller (process_pending()) has already flipped this
+     *                             row to 'processing' through claim_pending(): the status checks are
+     *                             skipped and the adhoc task is only (re)queued for the claimed row.
+     * @return stdClass The completed analysis when one exists and $regenerate is false; otherwise the
+     *                  row in 'processing' (keypoints and topics empty)
+     * @throws moodle_exception If the recording is missing or deleted, or queueing fails
      */
     public function generate_analysis(int $recordingid, bool $regenerate = false, bool $forcedownload = false,
             bool $alreadyclaimed = false): stdClass {
@@ -125,14 +130,9 @@ class ai_service {
             return $existing;
         }
 
-        // If already processing, return current status without re-enqueuing.
-        //
-        // This guard now also covers the regenerate path: if another cron run (or a
-        // user-triggered call) already owns this row as 'processing', we must NOT
-        // re-update it and re-queue a second adhoc task, even when regenerate=true
-        // (C2 - race condition). The only legitimate way to act on a 'processing'
-        // row is to have just claimed it ourselves, signalled by $alreadyclaimed.
-        // F-8: a row stuck in 'processing' (its worker died) may be retried by hand.
+        // A row already 'processing' belongs to another cron run or request: return it without
+        // queueing a second adhoc task, even when $regenerate is true. Only its claimer
+        // ($alreadyclaimed) may act on it, or anyone once it is stuck (its worker died).
         if ($existing && $existing->status === 'processing' && !$alreadyclaimed && !self::is_stuck($existing)) {
             $existing->keypoints = [];
             $existing->topics = [];
@@ -145,9 +145,8 @@ class ai_service {
         $analysis->status = 'processing';
         $analysis->error = null;
         $analysis->timemodified = time();
-        // A fresh (re)generation request (not an automatic claimed retry) resets the retry
-        // budget so the row gets the full transient-retry allowance again. The claimed-retry
-        // path below must NOT reset it, so it can keep counting across automatic retries.
+        // A fresh (re)generation request resets the transient-retry budget; an automatic claimed
+        // retry keeps counting.
         if (!$alreadyclaimed) {
             $analysis->retrycount = 0;
             $analysis->nextretry = 0;
@@ -191,8 +190,10 @@ class ai_service {
     }
 
     /**
-     * Generate AI analysis synchronously (for simple text-based analysis).
-     * This is a fallback method that doesn't use the File API.
+     * Generate AI analysis synchronously from the recording's name, duration and Drive link only.
+     *
+     * Unlike the adhoc pipeline it sends no transcript and no video (no Gemini File API upload), so
+     * Gemini never sees the content of the recording.
      *
      * @param int $recordingid The recording ID
      * @param bool $regenerate Whether to regenerate if analysis exists
@@ -252,7 +253,7 @@ class ai_service {
             $analysis->error = null;
             $analysis->aimodel = $this->client->get_last_used_model() ?? $this->client->get_model();
             $analysis->timemodified = time();
-            // IA-04: new AI text waits for a teacher review.
+            // New AI text waits for a teacher review.
             foreach (\mod_googlemeet\local\ai_review::unreviewed_fields() as $key => $value) {
                 $analysis->$key = $value;
             }
@@ -393,7 +394,7 @@ class ai_service {
             throw new moodle_exception('ai_invalid_analysis', 'googlemeet', '', 'Chapters field is not available');
         }
 
-        // IA-04: chapter-only (re)generation keeps the review state of the analysis. Resetting it here
+        // Chapter-only (re)generation keeps the review state of the analysis. Resetting it here
         // would hide every published summary again when cli/backfill_chapters.php runs over a course.
         $DB->update_record('googlemeet_ai_analysis', (object) [
             'id' => $analysis->id,
@@ -406,7 +407,7 @@ class ai_service {
     }
 
     /**
-     * Whether the F3 chapters column is available in the active database.
+     * Whether googlemeet_ai_analysis has the chapters column (memoised for the PHP process).
      *
      * @return bool
      */
@@ -442,27 +443,22 @@ class ai_service {
     }
 
     /**
-     * Atomically claim a pending analysis for processing.
+     * Atomically claim a due analysis for processing.
      *
-     * Flips a single row from 'pending' to 'processing' with a conditional UPDATE
-     * (WHERE id = :id AND status = 'pending'). This is the concurrency guard that
-     * ensures only one cron run can own a given row: if another run already claimed
-     * it (status is no longer 'pending'), the UPDATE matches zero rows and this
-     * method returns false so the caller skips it (C2 - race condition).
+     * Flips one row that is 'pending', or 'failed' with a due transient retry (the conditions of
+     * get_due_analyses()), to 'processing' with an UPDATE guarded on the status just read, so only
+     * one cron run can own it: when another run claimed it first, the UPDATE matches no row.
      *
      * @param int $analysisid The analysis record ID to claim
-     * @return bool True if THIS call won the claim, false if it was already taken
+     * @return bool True if this call won the claim, false if the row was not claimable or already taken
      */
     public function claim_pending(int $analysisid): bool {
         global $DB;
 
         $now = time();
 
-        // Only a 'pending' row, or a transient-failure row whose back-off has elapsed (status
-        // 'failed', 0 < retrycount < MAX, nextretry due), is claimable. Read the current state
-        // first and bail out if it is not claimable (e.g. already 'processing' or 'completed').
-        // This makes re-claiming a non-claimable row reliably return false regardless of the
-        // 1-second timestamp granularity used by the ownership check below.
+        // Check claimability first: a second claim of a row already 'processing' must return false
+        // even within the same second, which the timestamp ownership check below cannot tell apart.
         $row = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid],
             'id, status, retrycount, nextretry');
         if (!$row) {
@@ -584,12 +580,10 @@ class ai_service {
     }
 
     /**
-     * Reset analyses that have been stuck in 'processing' for too long.
+     * Revert analyses stuck in 'processing' for longer than $maxage back to 'pending'.
      *
-     * If a cron run or its adhoc task dies mid-flight, a row can be left in
-     * 'processing' forever and would never be retried (the cron only picks up
-     * 'pending' rows). This reverts any 'processing' row older than $maxage back
-     * to 'pending' so it is reconsidered on the next run.
+     * The scheduled task does not use this: it calls fail_stale_processing(), which marks the stuck
+     * row failed and so keeps counting its retry budget.
      *
      * @param int $maxage Maximum allowed age in 'processing' state, in seconds
      * @return int Number of rows reset
@@ -624,9 +618,9 @@ class ai_service {
     }
 
     /**
-     * Minutes after which a 'processing' analysis is considered stuck (F-8).
+     * Time after which a 'processing' analysis is considered stuck.
      *
-     * Config googlemeet/aistuckminutes; never below 45 so a healthy tier-3 (video) run is not cut short.
+     * Read from googlemeet/aistuckminutes (DEFAULT_STUCK_MINUTES when unset), never below MIN_STUCK_MINUTES.
      *
      * @return int Seconds.
      */
@@ -639,7 +633,7 @@ class ai_service {
     }
 
     /**
-     * Whether an analysis has been in 'processing' for longer than the stuck threshold (F-8).
+     * Whether an analysis has been in 'processing' for longer than the stuck threshold.
      *
      * @param stdClass|null|false $analysis Analysis row (status, timemodified).
      * @param int|null $now Reference time.
@@ -654,7 +648,7 @@ class ai_service {
     }
 
     /**
-     * Scheduled cleanup (F-8): mark analyses stuck in 'processing' as failed.
+     * Scheduled cleanup: mark analyses stuck in 'processing' as failed.
      *
      * Uses the transient-failure bookkeeping, so a stuck row is retried automatically with
      * back-off while the retry budget lasts, and then stays failed (no endless loop when the
@@ -687,7 +681,8 @@ class ai_service {
      * Queue a recording for analysis.
      *
      * @param int $recordingid The recording ID
-     * @return stdClass The created analysis record
+     * @return stdClass The existing analysis record, or the new one in 'pending'
+     * @throws moodle_exception If the recording is missing or deleted
      */
     public function queue_for_analysis(int $recordingid): stdClass {
         global $DB;
@@ -746,10 +741,10 @@ class ai_service {
     }
 
     /**
-     * Process a batch of pending analyses.
+     * Queue the adhoc analysis task for a batch of due analyses (see get_due_analyses()).
      *
-     * @param int $limit Maximum number to process
-     * @return int Number of analyses processed
+     * @param int $limit Maximum number to queue
+     * @return int Number of analyses queued
      */
     public function process_pending(int $limit = 5): int {
         global $DB;
@@ -758,9 +753,8 @@ class ai_service {
         $processed = 0;
 
         foreach ($pending as $analysis) {
-            // Atomically claim this row (pending -> processing). If another concurrent
-            // run already took it, claim_pending() returns false and we skip it so we
-            // never process / enqueue the same recording twice (C2 - race condition).
+            // Claim the row first: when another run already took it, claim_pending() returns
+            // false and the recording is not queued twice.
             if (!$this->claim_pending($analysis->id)) {
                 continue;
             }
@@ -771,11 +765,9 @@ class ai_service {
                 $this->generate_analysis($analysis->recordingid, true, false, true);
                 $processed++;
             } catch (\Exception $e) {
-                // Make sure a row we claimed never gets stuck in 'processing'. Enqueuing failed,
-                // which is not a transient API condition, so record it as a permanent failure
-                // (retrycount=99, nextretry=0). Using record_permanent_failure() — rather than only
-                // flipping status — is important: a row that was a due transient retry would
-                // otherwise keep retrycount>0 and a due nextretry, and get reselected every tick.
+                // Queueing failed, which is not a transient API condition: record a permanent failure
+                // so the claimed row does not stay 'processing'. Flipping only the status would leave
+                // a due transient retry with its retrycount and nextretry, reselected on every run.
                 $this->record_permanent_failure($analysis->id, $e->getMessage());
                 continue;
             }

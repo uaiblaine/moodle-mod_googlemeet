@@ -21,13 +21,12 @@ use mod_googlemeet\task\sync_recordings_task;
 use stdClass;
 
 /**
- * Manual "Sync with Google Drive" run in the background (PERF-02).
+ * Manual "Sync with Google Drive" run in the background.
  *
- * The button only queues an adhoc task (one per activity at a time) and the page polls
- * get_status() through a web service. The task runs the same Drive sync as before, as the
- * teacher who asked for it, under the existing per-activity lock `sync_<id>` shared with autosync.
- *
- * Adhoc tasks depend on cron frequency: run cron at least every minute for a snappy UI.
+ * The button only queues an adhoc task ({@see sync_recordings_task}, one per activity at a time) and
+ * the page polls get_status() through a web service. The task runs the Drive sync as the teacher who
+ * asked for it, under the per-activity lock `sync_<id>` shared with autosync and recording enrichment.
+ * The task starts on the next cron run, so the UI may wait up to one cron interval.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -78,7 +77,8 @@ class sync_manager {
      *
      * @param stdClass $googlemeet Activity record.
      * @param int $userid Teacher whose Google token is used.
-     * @return bool True when a new task was queued, false when one was already pending.
+     * @return bool True when a new task was queued, false when one was already pending or the queue
+     *     lock was not obtained within 5 seconds.
      */
     public static function request(stdClass $googlemeet, int $userid): bool {
         // Serialise concurrent clicks (two tabs, double click) on the check-then-insert.
@@ -212,7 +212,10 @@ class sync_manager {
     }
 
     /**
-     * User-facing result text (same wording as the former synchronous sync).
+     * User-facing result text.
+     *
+     * Uses the strings of {@see client::build_sync_message()} and adds the enrichment notice when
+     * recordings were inserted or restored.
      *
      * @param array $stats
      * @return string
@@ -242,8 +245,10 @@ class sync_manager {
     /**
      * Status for the polling UI / web service.
      *
+     * A queued or running row older than STALE_SECONDS is reported as an error.
+     *
      * @param stdClass $googlemeet Activity record.
-     * @return array
+     * @return array Shape of {@see \mod_googlemeet\external\get_sync_status::execute_returns()}.
      */
     public static function get_status(stdClass $googlemeet): array {
         global $DB;

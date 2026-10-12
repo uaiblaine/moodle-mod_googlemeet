@@ -21,19 +21,14 @@ use PHPUnit\Framework\Attributes\CoversFunction;
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
-// locallib.php holds global functions that are not autoloaded; load it (and lib.php)
-// explicitly so the tested functions are available.
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * Unit tests for locallib.php / lib.php pure functions.
+ * Unit tests for the helper functions of lib.php and locallib.php.
  *
- * Covers:
- *   - googlemeet_is_holiday()  (lib.php)
- *   - googlemeet_is_cancelled() (lib.php)
- *   - googlemeet_clear_url()   (locallib.php)
- *   - googlemeet_construct_events_data_for_add() (locallib.php) — requires DB fixtures
+ * Holidays, cancelled dates, Meet URLs and event construction, plus the recording list helpers
+ * (titles, summaries, timestamps, filters, topics).
  *
  * @package     mod_googlemeet
  * @category    test
@@ -470,21 +465,15 @@ class locallib_test extends \advanced_testcase {
      *
      */
     public function test_clear_url_wrong_code_format_returns_null(): void {
-        // googlemeet_clear_url() extracts the first 3-4-3 code found anywhere in the
-        // string, so a "wrong format" case must contain no valid 3-4-3 code at all.
-        // (A longer tail like abc-defg-hijklm would still yield the valid abc-defg-hij
-        // prefix — that is intended extraction behaviour, not a rejection case.)
+        // The function extracts the first "meet.google.com/" followed by a 3-4-3 code anywhere
+        // in the string, so a rejection case must contain no such code at all. A longer tail
+        // like abc-defg-hijklm still yields abc-defg-hij, by design.
         $this->assertNull(googlemeet_clear_url('https://meet.google.com/ab-cdef-ghi'));   // 2-4-3.
         $this->assertNull(googlemeet_clear_url('https://meet.google.com/abcd-ef-ghij'));  // 4-2-4.
     }
 
     // =========================================================================
-    // googlemeet_construct_events_data_for_add() — DB-backed
-    //
-    // These tests require a real Moodle database schema (googlemeet_holidays,
-    // googlemeet tables) and Moodle global functions (usergetdate, make_timestamp,
-    // HOURSECS, MINSECS, DAYSECS, WEEKSECS). They are skipped gracefully when
-    // the constants/tables are absent (e.g. plain CLI lint run without bootstrap).
+    // DB-backed: googlemeet_construct_events_data_for_add() reads googlemeet_holidays.
     // =========================================================================
 
     /**
@@ -499,7 +488,7 @@ class locallib_test extends \advanced_testcase {
         }
         $this->resetAfterTest();
 
-        // Insert a minimal googlemeet row so get_holidays() can query it.
+        // A real instance id for googlemeet_get_holidays() to query.
         $googlemeetid = $DB->insert_record('googlemeet', (object)[
             'course'        => 1,
             'name'          => 'Test Meet',
@@ -653,9 +642,8 @@ class locallib_test extends \advanced_testcase {
 
         $events = googlemeet_construct_events_data_for_add($googlemeet);
 
-        // First event = Mon Jun 01 (initial). Then biweekly Mondays from Jun 02 onwards:
-        // Jun 01 (first), Jun 08 skipped (week 2), Jun 15 (week 3), Jun 22 skipped (week 4).
-        // So: Jun 01 + Jun 15 = 2 events.
+        // Jun 01 is the first event; the recurrence then visits every other week:
+        // Jun 08 skipped (week 2), Jun 15 added (week 3), Jun 22 skipped (week 4). 2 events.
         $this->assertCount(2, $events, 'Expected 2 events with period=2 over 4 weeks.');
     }
 
@@ -714,10 +702,16 @@ class locallib_test extends \advanced_testcase {
     // googlemeet_truncate_summary()
     // =========================================================================
 
+    /**
+     * Text within the limit is returned unchanged.
+     */
     public function test_truncate_summary_short_text_unchanged(): void {
         $this->assertSame('hola', googlemeet_truncate_summary('hola', 200));
     }
 
+    /**
+     * Text over the limit is cut to the limit and gets an ellipsis.
+     */
     public function test_truncate_summary_adds_ellipsis_when_cut(): void {
         $text = str_repeat('a', 250);
         $out = googlemeet_truncate_summary($text, 200);
@@ -725,8 +719,11 @@ class locallib_test extends \advanced_testcase {
         $this->assertStringEndsWith('…', $out);
     }
 
+    /**
+     * The limit counts characters, not bytes.
+     */
     public function test_truncate_summary_does_not_split_multibyte(): void {
-        // 201 'é' (2 bytes each in UTF-8). A byte-based substr(0,200) would split the 100th char.
+        // 201 'é' (2 bytes each in UTF-8). A byte-based substr(0, 200) would keep only 100 characters.
         $text = str_repeat('é', 201);
         $out = googlemeet_truncate_summary($text, 200);
         $this->assertSame(201, \core_text::strlen($out));
@@ -738,6 +735,9 @@ class locallib_test extends \advanced_testcase {
     // googlemeet_ai_status_flags()
     // =========================================================================
 
+    /**
+     * A completed status sets the row and completed flags, not the failed one.
+     */
     public function test_ai_status_flags_completed(): void {
         $f = googlemeet_ai_status_flags('completed');
         $this->assertSame('completed', $f['aistatus']);
@@ -746,18 +746,27 @@ class locallib_test extends \advanced_testcase {
         $this->assertFalse($f['aistatusisfailed']);
     }
 
+    /**
+     * A failed status sets the failed flag and not the completed one.
+     */
     public function test_ai_status_flags_failed(): void {
         $f = googlemeet_ai_status_flags('failed');
         $this->assertTrue($f['aistatusisfailed']);
         $this->assertFalse($f['aistatusiscompleted']);
     }
 
+    /**
+     * A null status means there is no analysis row.
+     */
     public function test_ai_status_flags_null_means_no_row(): void {
         $f = googlemeet_ai_status_flags(null);
         $this->assertFalse($f['hasanalysisrow']);
         $this->assertSame('', $f['aistatus']);
     }
 
+    /**
+     * An unknown status is treated as no analysis row.
+     */
     public function test_ai_status_flags_unknown_treated_as_no_row(): void {
         $f = googlemeet_ai_status_flags('banana');
         $this->assertFalse($f['hasanalysisrow']);
@@ -767,16 +776,25 @@ class locallib_test extends \advanced_testcase {
     // googlemeet_recording_is_new()
     // =========================================================================
 
+    /**
+     * A recording younger than the threshold counts as new.
+     */
     public function test_recording_is_new_within_threshold(): void {
         $now = mktime(12, 0, 0, 6, 10, 2026);
         $created = mktime(12, 0, 0, 6, 8, 2026); // 2 days earlier.
         $this->assertTrue(googlemeet_recording_is_new($created, $now, 7));
     }
+    /**
+     * A recording older than the threshold is not new.
+     */
     public function test_recording_is_new_outside_threshold(): void {
         $now = mktime(12, 0, 0, 6, 10, 2026);
         $created = mktime(12, 0, 0, 5, 20, 2026); // ~21 days earlier.
         $this->assertFalse(googlemeet_recording_is_new($created, $now, 7));
     }
+    /**
+     * The date group heading is a month and year label.
+     */
     public function test_recording_date_group_is_month_year(): void {
         $ts = mktime(12, 0, 0, 5, 27, 2026);
         $out = googlemeet_recording_date_group($ts);
@@ -791,6 +809,12 @@ class locallib_test extends \advanced_testcase {
 
     /**
      * Build a minimal recording stdClass for filter tests.
+     *
+     * @param string $name Recording name.
+     * @param bool $hasai Whether the recording has an AI analysis.
+     * @param array $topics AI topics.
+     * @param string $summary AI summary.
+     * @return \stdClass
      */
     private function rec(string $name, bool $hasai = false, array $topics = [], string $summary = ''): \stdClass {
         $r = new \stdClass();
@@ -798,6 +822,9 @@ class locallib_test extends \advanced_testcase {
         return $r;
     }
 
+    /**
+     * The query matches the recording name case-insensitively.
+     */
     public function test_filter_by_query_matches_name_case_insensitive(): void {
         $recs = [$this->rec('Clase de Contratos'), $this->rec('Clase de Personal')];
         $out = googlemeet_filter_recordings_by_query($recs, 'contratos');
@@ -805,17 +832,26 @@ class locallib_test extends \advanced_testcase {
         $this->assertSame('Clase de Contratos', $out[0]->name);
     }
 
+    /**
+     * The query matches the AI topics.
+     */
     public function test_filter_by_query_matches_ai_topic(): void {
         $recs = [$this->rec('Sesión 1', true, ['Silencio administrativo'])];
         $out = googlemeet_filter_recordings_by_query($recs, 'silencio');
         $this->assertCount(1, $out);
     }
 
+    /**
+     * A blank query returns every recording.
+     */
     public function test_filter_by_query_empty_returns_all(): void {
         $recs = [$this->rec('a'), $this->rec('b')];
         $this->assertCount(2, googlemeet_filter_recordings_by_query($recs, '  '));
     }
 
+    /**
+     * The topic filter keeps only the recordings tagged with that topic.
+     */
     public function test_filter_by_topic_exact(): void {
         $recs = [$this->rec('a', true, ['LPAC']), $this->rec('b', true, ['LCSP'])];
         $out = googlemeet_filter_recordings_by_topic($recs, 'LPAC');
@@ -823,6 +859,9 @@ class locallib_test extends \advanced_testcase {
         $this->assertSame('a', $out[0]->name);
     }
 
+    /**
+     * Topics are collected once each and sorted.
+     */
     public function test_collect_topics_unique_sorted(): void {
         $recs = [$this->rec('a', true, ['LCSP', 'LPAC']), $this->rec('b', true, ['LPAC'])];
         $this->assertSame(['LCSP', 'LPAC'], googlemeet_collect_topics($recs));
@@ -832,11 +871,17 @@ class locallib_test extends \advanced_testcase {
     // googlemeet_topic_preview()
     // =========================================================================
 
+    /**
+     * The preview keeps the first $max topics and counts the rest as overflow.
+     */
     public function test_topic_preview_caps_and_counts_overflow(): void {
         $p = googlemeet_topic_preview(['a', 'b', 'c', 'd', 'e'], 3);
         $this->assertSame(['a', 'b', 'c'], $p['visible']);
         $this->assertSame(2, $p['overflow']);
     }
+    /**
+     * A list within the cap has no overflow.
+     */
     public function test_topic_preview_no_overflow(): void {
         $p = googlemeet_topic_preview(['a', 'b'], 3);
         $this->assertSame(['a', 'b'], $p['visible']);

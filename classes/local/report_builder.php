@@ -24,10 +24,11 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Data builder for the teacher viewing report (ANA-04): students x recordings.
+ * Data builder for the teacher viewing report: students x recordings.
  *
- * Percentages use exactly the same rule as the student UI (googlemeet_recording_progress_state()):
- * 100 when completed, otherwise watchedseconds / completion threshold capped at 99.
+ * Percentages mirror the student UI, {@see googlemeet_recording_progress_state()}; keep in step:
+ * 100 when completed, 0 when nothing was watched, otherwise watchedseconds / completion threshold
+ * clamped to 1-99.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

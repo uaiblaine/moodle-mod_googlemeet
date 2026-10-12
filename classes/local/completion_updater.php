@@ -22,7 +22,7 @@ global $CFG;
 require_once($CFG->libdir . '/completionlib.php');
 
 /**
- * Recalculates the custom completion state (ANA-01) when progress or practice data changes.
+ * Recalculates the custom completion state when progress or practice data changes.
  *
  * Cheap no-op unless completion is automatic for the activity and one of the rules that depend on
  * the changed data is enabled.

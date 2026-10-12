@@ -21,11 +21,12 @@ use mod_googlemeet\local\attendance\service;
 use mod_googlemeet\local\attendance\source;
 
 /**
- * Read real attendance of finished sessions from the Google Meet REST API (ANA-03).
+ * Read real attendance of finished sessions from the Google Meet REST API.
  *
  * Does nothing unless the site setting googlemeet/attendanceenabled is on; only activities that
- * opted in are processed. Calls run with the Google token of the room organiser (creatoremail),
- * because the API only lists conferences organised by the authenticated account.
+ * opted in (googlemeet.attendanceenabled) are processed. Calls run with the Google token of the
+ * room organiser (creatoremail), because the API only lists conferences organised by the
+ * authenticated account.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

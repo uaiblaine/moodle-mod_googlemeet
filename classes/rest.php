@@ -56,7 +56,8 @@ class rest extends \core\oauth2\rest {
                 ],
                 'response' => 'json'
             ],
-            // DAT-04: keep the Calendar event in step with the activity (adhoc tasks).
+            // Used by the calendar_update_event / calendar_delete_event adhoc tasks to keep the Calendar
+            // event in step with the activity.
             'updateevent' => [
                 'endpoint' => 'https://www.googleapis.com/calendar/v3/calendars/{calendarid}/events/{eventid}',
                 'method' => 'patch',

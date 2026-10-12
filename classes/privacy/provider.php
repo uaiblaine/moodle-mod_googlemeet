@@ -32,7 +32,7 @@ use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
 
 /**
- * The mod_googlemeet module does not store any data.
+ * Privacy provider for mod_googlemeet.
  */
 class provider implements
         // This plugin does store personal user data.
@@ -44,7 +44,7 @@ class provider implements
         // This plugin is capable of determining which users have data within it.
         \core_privacy\local\request\core_userlist_provider,
 
-        // This plugin stores user preferences (last chapter/timestamp jumped to per recording).
+        // This plugin stores per-recording user preferences (last position jumped to, key points checklist).
         \core_privacy\local\request\user_preference_provider {
 
     /** @var string Prefix of the per-recording "last jump" user preference. */
@@ -95,7 +95,7 @@ class provider implements
             'privacy:metadata:googlemeet_recording_progress'
         );
 
-        // ANA-05: one row per student practice answer.
+        // One row per student practice answer.
         $collection->add_database_table(
             'googlemeet_practice_attempts',
             [
@@ -131,11 +131,10 @@ class provider implements
         );
 
         // The googlemeet_ai_analysis table stores AI-generated material derived from the
-        // recordings (summary, key points, topics and a transcript). The transcript may
-        // incidentally contain the names or voices of session participants. The table has no
-        // userid column (it is keyed only to a recording), so this data is not associated with
-        // an individual Moodle user and cannot be exported or deleted per user; it is declared
-        // here for transparency.
+        // recordings (summary, key points, topics, chapters and a transcript). The transcript may
+        // incidentally contain the names or voices of session participants. That content is keyed
+        // only to a recording, so it cannot be exported or deleted per user; it is declared here
+        // for transparency. Only reviewedby links a row to a Moodle user.
         $collection->add_database_table(
             'googlemeet_ai_analysis',
             [
@@ -144,16 +143,16 @@ class provider implements
                 'topics' => 'privacy:metadata:googlemeet_ai_analysis:topics',
                 'chapters' => 'privacy:metadata:googlemeet_ai_analysis:chapters',
                 'transcript' => 'privacy:metadata:googlemeet_ai_analysis:transcript',
-                // IA-04: the teacher who published the AI content to students (exported/anonymised per user).
+                // The teacher who published the AI content to students (exported and anonymised per user).
                 'reviewedby' => 'privacy:metadata:googlemeet_ai_analysis:reviewedby',
                 'timereviewed' => 'privacy:metadata:googlemeet_ai_analysis:timereviewed',
             ],
             'privacy:metadata:googlemeet_ai_analysis'
         );
 
-        // The googlemeet_recordings table stores, per recording, the Drive file/link identifiers
-        // and the original Google Meet transcript text. The transcript may contain the names and
-        // speech of session participants. The table is keyed only to a recording (no userid
+        // The googlemeet_recordings table stores, per recording, the Drive file/link identifiers,
+        // the original Google Meet transcript text and the Gemini meeting notes. Both may contain the
+        // names and speech of session participants. The table is keyed only to a recording (no userid
         // column), so this data is not associated with an individual Moodle user and cannot be
         // exported or deleted per user; it is declared here for transparency.
         $collection->add_database_table(
@@ -181,8 +180,9 @@ class provider implements
             'privacy:metadata:google_gemini'
         );
 
-        // The plugin reads recordings from Google Drive and creates/reads calendar events
-        // (including the Meet room) in Google Calendar on behalf of the authenticated user.
+        // On behalf of the authenticated user, the plugin reads recordings, transcripts and notes from
+        // Google Drive (sharing recordings by link when makerecordingspublic is on) and creates, updates
+        // and deletes the Google Calendar events that carry the Meet room.
         $collection->add_external_location_link(
             'google_drive',
             [
@@ -204,7 +204,7 @@ class provider implements
         $collection->add_user_preference(self::KEYPOINTS_PREFIX . '<recordingid>',
             'privacy:metadata:preference:keypoints');
 
-        // ANA-03 (track: w2-completion): real attendance read from Google Meet.
+        // Attendance read from the Google Meet REST API.
         \mod_googlemeet\local\attendance\privacy::add_metadata($collection);
 
         return $collection;
@@ -339,7 +339,7 @@ class provider implements
 
         $userlist->add_from_sql('userid', $sql, $params);
 
-        // IA-04: teachers who published AI content.
+        // Teachers who published AI content.
         $sql = "SELECT gaa.reviewedby
                   FROM {course_modules} cm
                   JOIN {modules} m ON m.id = cm.module AND m.name = :modulename
@@ -469,7 +469,7 @@ class provider implements
 
         $progressrecords->close();
 
-        // ANA-05: practice attempts, one export file per recording.
+        // Practice attempts, one export file per recording.
         $sql = "SELECT gpa.id,
                        cm.id AS cmid,
                        gpa.recordingid,
@@ -519,7 +519,7 @@ class provider implements
             );
         }
 
-        // IA-04: AI summaries this user (a teacher) published to students.
+        // AI summaries this user (a teacher) published to students.
         $sql = "SELECT gaa.id,
                        cm.id AS cmid,
                        gr.id AS recordingid,
@@ -648,7 +648,7 @@ class provider implements
     }
 
     /**
-     * IA-04: forget who published the AI content (the content and its reviewed state stay).
+     * Forget who published the AI content (the content and its reviewed state stay).
      *
      * @param int $googlemeetid Instance id.
      * @param int[] $userids Users.

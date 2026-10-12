@@ -29,7 +29,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 require_once($CFG->dirroot . '/course/lib.php');
 
 /**
- * Central cascade delete (DAT-01), trash retention (OPS-03), orphan cleanup and course reset.
+ * Recording cascade delete, trash retention, orphan cleanup and course reset.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -252,7 +252,7 @@ final class delete_cascade_test extends \advanced_testcase {
         $alive = $this->create_recording($googlemeet->id);
         [$free, $used] = $this->add_dependents($googlemeet, $cm, $context, $gone, $student->id);
         $this->add_dependents($googlemeet, $cm, $context, $alive, $student->id);
-        // Legacy bug: the recording row went away without its dependents.
+        // Delete the recording row alone, leaving its dependents behind.
         $DB->delete_records('googlemeet_recordings', ['id' => $gone]);
         // Rows of an activity that no longer exists.
         $DB->insert_record('googlemeet_recording_subs', (object)['googlemeetid' => 987654, 'userid' => $student->id,
@@ -366,7 +366,7 @@ final class delete_cascade_test extends \advanced_testcase {
         $this->add_dependents($googlemeet, $cm, $context, $a, $student->id);
         $DB->insert_record('googlemeet_recording_subs', (object)['googlemeetid' => $googlemeet->id,
             'userid' => $student->id, 'timecreated' => time()]);
-        // ANA-03 attendance of a past session.
+        // Attendance of a past session.
         $eventid = $DB->insert_record('googlemeet_events', (object)['googlemeetid' => $googlemeet->id,
             'eventdate' => time() - DAYSECS, 'duration' => 3600, 'timemodified' => time()]);
         $DB->insert_record('googlemeet_attendance', (object)['googlemeetid' => $googlemeet->id, 'eventid' => $eventid,

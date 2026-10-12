@@ -39,7 +39,7 @@ class question_service_test extends \advanced_testcase {
     /**
      * Create a course, googlemeet module and module context.
      *
-     * @return array
+     * @return array [course, googlemeet, cm, context]
      */
     private function create_googlemeet_fixture(): array {
         $this->setAdminUser();

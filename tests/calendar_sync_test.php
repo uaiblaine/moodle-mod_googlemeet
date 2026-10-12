@@ -56,7 +56,7 @@ class calendar_sync_test_fake_rest {
 }
 
 /**
- * DAT-04: Google Calendar event follows activity edits and deletion.
+ * The Google Calendar event follows activity edits and deletion.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -74,6 +74,9 @@ final class calendar_sync_test extends \advanced_testcase {
     /** @var array Users the fake factory was asked for. */
     private array $factoryusers = [];
 
+    /**
+     * Route every Google call through the fake REST service and record which user it was built for.
+     */
     protected function setUp(): void {
         parent::setUp();
         $this->resetAfterTest();
@@ -85,6 +88,9 @@ final class calendar_sync_test extends \advanced_testcase {
         });
     }
 
+    /**
+     * Restore the default service factory (it is static state shared by every test).
+     */
     protected function tearDown(): void {
         calendar_sync::set_service_factory(null);
         parent::tearDown();
@@ -105,6 +111,7 @@ final class calendar_sync_test extends \advanced_testcase {
      *
      * @param \stdClass $creator
      * @param string $eventid
+     * @param string $url Meet room URL; '' gives the activity a room of its own.
      * @return array [googlemeet record, cm]
      */
     private function make_linked_activity(\stdClass $creator, string $eventid = 'evt0123abc', string $url = ''): array {
@@ -148,6 +155,9 @@ final class calendar_sync_test extends \advanced_testcase {
         return $data;
     }
 
+    /**
+     * The stored htmlLink "eid" decodes to the Google event id, and an instance id to its series id.
+     */
     public function test_decode_event_id(): void {
         $this->assertSame('evt0123abc', calendar_sync::decode_event_id(self::eid('evt0123abc')));
         $this->assertSame('rawid_123', calendar_sync::decode_event_id('rawid_123'));
@@ -188,6 +198,10 @@ final class calendar_sync_test extends \advanced_testcase {
         $this->assertSame([], calendar_sync::build_event_body($gm, 'Europe/Madrid')['recurrence']);
     }
 
+    /**
+     * Only fields mirrored in the Google event need a patch; the description and an equivalent
+     * encoding of the same weekdays do not.
+     */
     public function test_needs_patch(): void {
         $old = (object)['name' => 'A', 'eventdate' => 100, 'eventenddate' => 200, 'starthour' => 10, 'startminute' => 0,
             'endhour' => 11, 'endminute' => 0, 'addmultiply' => 1, 'days' => '{"Mon":"1"}', 'period' => 1, 'intro' => 'x'];

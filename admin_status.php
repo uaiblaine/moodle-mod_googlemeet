@@ -15,10 +15,11 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Admin page: Google Meet sync status (OPS-04).
+ * Admin page: Google Meet sync status.
  *
  * Failed/exhausted autosync in the last week, stuck AI analyses, failed Calendar updates and
- * the last sync of every activity, so admins do not need to read cron logs.
+ * the last sync of each activity (up to ops_status::LAST_SYNC_LIMIT rows), so admins do not
+ * need to read cron logs.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

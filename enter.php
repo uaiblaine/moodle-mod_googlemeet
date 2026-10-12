@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Lightweight "Join the live class" endpoint (ANA-02): logs room_entered and redirects to Meet.
+ * Lightweight "Join the live class" endpoint: logs room_entered and redirects to Meet.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

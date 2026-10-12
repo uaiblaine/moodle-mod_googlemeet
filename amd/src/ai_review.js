@@ -14,7 +14,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * IA-04 / F-8 teacher actions: publish reviewed AI summaries and retry a stuck analysis.
+ * Teacher actions: publish reviewed AI summaries and retry a stuck analysis.
  *
  * @module     mod_googlemeet/ai_review
  * @copyright  2026 PreparaOposiciones
@@ -44,7 +44,8 @@ const setBusy = (button, busy) => {
  * @param {HTMLButtonElement} button Trigger.
  * @param {number} cmid Course module id.
  * @param {number} recordingid Recording id or 0.
- * @param {number} seen Version of the content on screen (see the web service), 0 = no check.
+ * @param {number} seen One recording: timemodified of the content on screen; all: time the page was loaded;
+ *     0 = no check. See mod_googlemeet\external\review_ai_analysis.
  * @returns {Promise}
  */
 const publish = (button, cmid, recordingid, seen) => {
@@ -73,7 +74,7 @@ const publish = (button, cmid, recordingid, seen) => {
 };
 
 /**
- * F-8: re-queue a stuck analysis (the server accepts regeneration of a row stuck in "processing").
+ * Re-queue a stuck analysis (the server accepts regeneration of a row stuck in "processing").
  *
  * @param {HTMLButtonElement} button Trigger.
  * @param {number} cmid Course module id.

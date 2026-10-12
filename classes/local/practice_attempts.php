@@ -26,7 +26,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Persisted practice attempts (ANA-05) and the activity-wide practice modes built on them.
+ * Persisted practice attempts and the activity-wide practice modes built on them.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -72,7 +72,7 @@ class practice_attempts {
     }
 
     /**
-     * Questions whose LATEST attempt by the user was wrong, newest failure first.
+     * Questions whose latest attempt by the user was wrong, newest failure first.
      *
      * @param int $googlemeetid Activity instance id.
      * @param int $userid User id.

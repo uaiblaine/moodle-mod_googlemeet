@@ -40,11 +40,10 @@ class process_ai_analysis extends \core\task\scheduled_task {
      * Execute the task.
      */
     public function execute() {
-        // Acquire a cron lock so that two overlapping runs of this scheduled task
-        // (or a run that outlives the 10-minute interval) cannot both drain the
-        // same pending rows and enqueue duplicate adhoc tasks (C2 - race condition).
-        // A timeout of 0 means: if another run already holds the lock, give up
-        // immediately rather than waiting.
+        // Defensive guard: cron and admin/cli/scheduled_task.php already lock a scheduled task by class
+        // name, but a direct execute() call is not covered. Two concurrent runs could both drain the same
+        // pending rows and queue duplicate adhoc tasks. If another run holds the lock, skip this tick
+        // rather than wait.
         $lockfactory = \core\lock\lock_config::get_lock_factory('mod_googlemeet_ai_analysis');
         $lock = $lockfactory->get_lock('process_ai_analysis', 0);
 
@@ -56,11 +55,9 @@ class process_ai_analysis extends \core\task\scheduled_task {
         try {
             $aiservice = new ai_service();
 
-            // F-8: rows stuck in 'processing' (a previous run or its adhoc task died mid-flight) are
-            // marked failed with a clear message once they exceed the stuck threshold (setting
-            // googlemeet/aistuckminutes, default 60 min, which comfortably exceeds the worst-case tier-3
-            // video pipeline). The transient-retry bookkeeping retries them automatically while the
-            // retry budget lasts. This runs even when AI is disabled so nothing stays "processing" forever.
+            // Rows stuck in 'processing' (a previous run or its adhoc task died) are marked failed once
+            // they exceed googlemeet/aistuckminutes; see ai_service::fail_stale_processing(). This runs
+            // even when AI is disabled so nothing stays "processing" forever.
             $failed = $aiservice->fail_stale_processing();
             if ($failed > 0) {
                 mtrace("Google Meet AI: Marked {$failed} stuck 'processing' analyses as failed.");

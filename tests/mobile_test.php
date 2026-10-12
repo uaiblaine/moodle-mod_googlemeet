@@ -25,7 +25,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Tests for the Moodle App views (UX-05).
+ * Tests for the Moodle App views.
  *
  * @package     mod_googlemeet
  * @category    test
@@ -44,6 +44,9 @@ final class mobile_test extends \advanced_testcase {
     /** @var \stdClass */
     private $student;
 
+    /**
+     * A course with one activity (intro with an embedded image, a Meet URL) and one enrolled student.
+     */
     protected function setUp(): void {
         global $DB;
         parent::setUp();
@@ -93,6 +96,9 @@ final class mobile_test extends \advanced_testcase {
         return ['cmid' => $this->cm->id, 'courseid' => $this->course->id] + $extra;
     }
 
+    /**
+     * The activity view renders the intro with real file URLs, loads nothing per class and pages the visible classes.
+     */
     public function test_course_view_intro_and_pagination(): void {
         global $DB;
         $ids = [];
@@ -142,6 +148,9 @@ final class mobile_test extends \advanced_testcase {
         $this->assertStringContainsString('page: 2', $result['templates'][0]['html']);
     }
 
+    /**
+     * The class view shows the published AI content, chapter seek URLs and the materials as app files.
+     */
     public function test_recording_view(): void {
         global $DB;
         $recordingid = $this->create_recording(1);
@@ -152,7 +161,7 @@ final class mobile_test extends \advanced_testcase {
             'topics' => json_encode(['Acto administrativo']),
             'chapters' => json_encode([['title' => 'Introducción', 'start' => '00:00'], ['title' => 'Eficacia', 'start' => '12:30']]),
             'status' => 'completed',
-            // Published by a teacher (IA-04): students see it.
+            // Published by a teacher: students see it.
             'reviewed' => 1,
             'timecreated' => time(),
             'timemodified' => time(),
@@ -178,6 +187,9 @@ final class mobile_test extends \advanced_testcase {
         $this->assertStringContainsString('webservice/pluginfile.php', $result['files'][0]['fileurl']);
     }
 
+    /**
+     * A student cannot open a hidden class.
+     */
     public function test_hidden_recording_is_not_available(): void {
         $recordingid = $this->create_recording(1, 0);
         $this->setUser($this->student);
@@ -185,6 +197,9 @@ final class mobile_test extends \advanced_testcase {
         mobile::mobile_recording_view($this->args(['recordingid' => $recordingid]));
     }
 
+    /**
+     * The app applies the same AI review rule as the web pages.
+     */
     public function test_ai_review_flag(): void {
         global $DB;
         $context = \context_module::instance($this->cm->id);

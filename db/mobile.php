@@ -53,7 +53,6 @@ $addons = [
             ['practice_next', 'googlemeet'],
             ['practice_retry', 'googlemeet'],
             ['practice_title', 'googlemeet'],
-            // track: w2-completion (UX-05).
             ['ai_summary', 'googlemeet'],
             ['recording_progress_completed', 'googlemeet'],
             ['mobile_prev', 'googlemeet'],

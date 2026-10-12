@@ -19,7 +19,9 @@ namespace mod_googlemeet\task;
 use mod_googlemeet\local\recording_cleanup;
 
 /**
- * Daily purge of recordings that stayed in the teacher trash longer than googlemeet/trashretentiondays (OPS-03).
+ * Daily purge of recordings that stayed in the teacher trash longer than googlemeet/trashretentiondays.
+ *
+ * Only recordings a teacher trashed by hand qualify; see {@see recording_cleanup::purge_expired_trash()}.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

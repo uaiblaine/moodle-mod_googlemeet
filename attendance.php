@@ -15,7 +15,7 @@
 // along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
 
 /**
- * Teacher view of the real attendance read from Google Meet (ANA-03), with CSV export.
+ * Teacher view of the real attendance read from Google Meet, with dataformat export.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones

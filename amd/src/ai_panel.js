@@ -584,7 +584,7 @@ const checkAnalysisStatus = (recordingid, callback) => {
             generateButton.prop('disabled', false).text(strings.ai_generate);
             showAiError(recordingid, response.error || strings.ai_error_unknown);
         } else if (response.found && response.status === 'processing' && response.stuck) {
-            // F-8: the worker died; stop polling and let the teacher retry (regenerate re-queues a stuck row).
+            // The worker died: stop polling and let the teacher retry (regenerate re-queues a stuck row).
             content.find('.googlemeet-ai-processing').hide();
             generateButton.prop('disabled', false).text(strings.ai_regenerate);
             showAiError(recordingid, strings.ai_status_stuck_panel);

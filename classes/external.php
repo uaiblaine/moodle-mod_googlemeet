@@ -25,7 +25,6 @@
 
 defined('MOODLE_INTERNAL') || die();
 
-// Support both Moodle 4.2+ (namespaced) and older versions.
 use core_external\external_api;
 use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
@@ -71,7 +70,6 @@ class mod_googlemeet_external extends external_api {
         global $DB;
 
         // Parameter validation.
-        // REQUIRED.
         $params = self::validate_parameters(
             self::recording_edit_name_parameters(),
             [
@@ -143,7 +141,6 @@ class mod_googlemeet_external extends external_api {
         global $DB;
 
         // Parameter validation.
-        // REQUIRED.
         $params = self::validate_parameters(
             self::showhide_recording_parameters(),
             [
@@ -209,7 +206,7 @@ class mod_googlemeet_external extends external_api {
     /**
      * Moves every active recording of the activity to the teacher trash (manual).
      *
-     * @param int $googlemeetid the googlemeet ID
+     * @param int $googlemeetid Ignored: the instance of the validated course module is used
      * @param int $coursemoduleid the course module ID
      * @return array empty
      */
@@ -217,7 +214,6 @@ class mod_googlemeet_external extends external_api {
         global $DB;
 
         // Parameter validation.
-        // REQUIRED.
         $params = self::validate_parameters(
             self::delete_all_recordings_parameters(),
             [
@@ -245,7 +241,6 @@ class mod_googlemeet_external extends external_api {
             ['now' => $now, 'now2' => $now, 'reason' => \mod_googlemeet\local\recording_cleanup::TRASH_MANUAL,
                 'googlemeetid' => $googlemeetid]);
 
-        // Use set_field instead of get_record + update_record.
         $DB->set_field('googlemeet', 'lastsync', time(), ['id' => $googlemeetid]);
 
         return [];
@@ -434,7 +429,7 @@ class mod_googlemeet_external extends external_api {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
-        // DAT-01: one cascade for every dependent (AI, progress, attempts, files, preferences, questions).
+        // One cascade for every dependent (AI, progress, attempts, files, preferences, questions).
         \mod_googlemeet\local\recording_cleanup::purge_recordings([(int)$recording->id], $context);
 
         return ['success' => true];
@@ -606,16 +601,15 @@ class mod_googlemeet_external extends external_api {
         $cantranscript = has_capability('mod/googlemeet:editrecording', $context);
 
         // Verify the recording belongs to this googlemeet instance before delegating (prevent IDOR).
-        // Also pull the recording's own transcript so we can fall back to it when the analysis row
-        // has no transcript stored (tier-1 analyses generated from an existing recording transcript
-        // never copied it into the analysis row, leaving the UI stuck on "loading transcript").
+        // Its own transcript is the fallback when the analysis row stores none, as happens for an
+        // analysis built from the recording's existing transcript.
         $recording = $DB->get_record('googlemeet_recordings',
             ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0], 'id, transcripttext', MUST_EXIST);
 
         $aiservice = new \mod_googlemeet\ai_service();
         $analysis = $aiservice->get_analysis($recordingid);
 
-        // IA-04: unreviewed content is not served to students (it looks as if there was no analysis yet).
+        // Unreviewed content is not served to students (it looks as if there was no analysis yet).
         $canreview = has_capability(\mod_googlemeet\local\ai_review::CAPABILITY, $context);
         if ($analysis && $analysis->status === 'completed'
                 && !\mod_googlemeet\local\ai_review::is_visible_to_user($analysis, $context)) {
@@ -674,7 +668,7 @@ class mod_googlemeet_external extends external_api {
             'timemodified' => $analysis->timemodified,
             'reviewed' => !empty($analysis->reviewed),
             'pendingreview' => \mod_googlemeet\local\ai_review::is_pending_review($analysis),
-            // F-8: only teachers act on a stuck analysis.
+            // Only users who can (re)generate analyses act on a stuck one.
             'stuck' => has_capability('mod/googlemeet:generateai', $context)
                 && \mod_googlemeet\ai_service::is_stuck($analysis),
         ];
@@ -816,7 +810,7 @@ class mod_googlemeet_external extends external_api {
             $analysis->error = null;
             $analysis->aimodel = 'manual';
             $analysis->timemodified = $now;
-            // IA-04: content written by the teacher counts as reviewed.
+            // Content written by the teacher counts as reviewed.
             foreach (\mod_googlemeet\local\ai_review::reviewed_fields((int)$USER->id) as $key => $value) {
                 $analysis->$key = $value;
             }
@@ -957,7 +951,7 @@ class mod_googlemeet_external extends external_api {
             $analysis->error = null;
             $analysis->aimodel = $client->get_last_used_model() ?? $client->get_model();
             $analysis->timemodified = $now;
-            // IA-04: new AI text waits for a teacher review before students see it.
+            // New AI text waits for a teacher review before students see it.
             foreach (\mod_googlemeet\local\ai_review::unreviewed_fields() as $key => $value) {
                 $analysis->$key = $value;
             }
@@ -979,8 +973,7 @@ class mod_googlemeet_external extends external_api {
 
         } catch (\Exception $e) {
             // Log the real error server-side; return a generic message so internal API
-            // details are never leaked to the client. IA-03: a safety block has its own, clear,
-            // non-technical message.
+            // details are never leaked to the client. A safety block has its own non-technical message.
             debugging('mod_googlemeet analyze_transcript failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
             return [
                 'success' => false,
@@ -1563,7 +1556,7 @@ class mod_googlemeet_external extends external_api {
         ];
         $DB->update_record('googlemeet_recording_progress', $update);
 
-        // ANA-01: a newly watched class may complete the activity without a page reload.
+        // A newly watched class may complete the activity without a page reload.
         if ($iscompleted && empty($progress->completed)) {
             \mod_googlemeet\local\completion_updater::progress_changed($cm, (int)$USER->id);
         }
@@ -1710,11 +1703,11 @@ class mod_googlemeet_external extends external_api {
             $params['answerid']
         );
 
-        // ANA-05: persist the attempt (only reached for a valid, published question of this recording).
+        // Persist the attempt (only reached for a valid, published question of this recording).
         global $USER;
         \mod_googlemeet\local\practice_attempts::record((int)$googlemeet->id, (int)$params['recordingid'],
             (int)$params['questionid'], (int)$USER->id, !empty($result['correct']));
-        // ANA-01: answered-questions completion rule.
+        // The answered-questions completion rule may now be met.
         \mod_googlemeet\local\completion_updater::practice_changed($cm, (int)$USER->id);
 
         return $result;

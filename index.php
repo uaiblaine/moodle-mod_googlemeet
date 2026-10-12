@@ -72,7 +72,7 @@ echo $OUTPUT->heading($modulenameplural);
 $usesections = course_format_uses_sections($course->format);
 $googlemeets = $DB->get_records_list('googlemeet', 'id', array_keys($cms));
 
-// UX-07: next session, number of recordings and, for students, their own progress.
+// Columns: next session, number of recordings and, for students, their own progress.
 $showprogress = false;
 $rows = [];
 foreach ($cms as $instanceid => $cm) {

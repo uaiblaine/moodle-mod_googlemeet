@@ -17,7 +17,7 @@
 namespace mod_googlemeet\local;
 
 /**
- * "Join the live class" entry point (ANA-02): logs the intention to join and resolves the Meet URL.
+ * "Join the live class" entry point: logs the intention to join and resolves the Meet URL.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -67,7 +67,7 @@ class room_entry {
      * @param \stdClass|\cm_info $cm Course module.
      * @param \context_module $context Module context.
      * @param string $via "web" or "mobile".
-     * @return int Session id logged (0 when no session is live).
+     * @return int Session id logged (0 when no session is live and none starts within EARLY_WINDOW).
      */
     public static function log(\stdClass $googlemeet, $cm, \context_module $context, string $via = 'web'): int {
         $session = self::current_session((int)$googlemeet->id);

@@ -21,13 +21,13 @@ namespace mod_googlemeet\completion;
 use core_completion\activity_custom_completion;
 
 /**
- * Custom completion rules of mod_googlemeet (ANA-01).
+ * Custom completion rules of mod_googlemeet.
  *
  * - completionrecordings: the student has watched at least N classes.
  * - completionwatchpercent: the student has watched at least X % of the visible classes.
  * - completionpractice: the student has answered at least N distinct practice questions.
  *
- * "Watched" is the existing per-recording progress flag (googlemeet_recording_progress.completed),
+ * "Watched" is the per-recording progress flag (googlemeet_recording_progress.completed),
  * which with the Google Drive player is an approximation (visible-page heartbeats or "mark as
  * watched"), not real playback time. Only visible recordings that are not in the trash count.
  *

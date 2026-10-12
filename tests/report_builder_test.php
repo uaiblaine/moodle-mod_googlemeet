@@ -26,7 +26,7 @@ global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 
 /**
- * Tests for the teacher viewing report data builder (ANA-04) and its capability.
+ * Tests for the teacher viewing report data builder and its capability.
  *
  * @package     mod_googlemeet
  * @category    test

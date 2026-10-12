@@ -21,7 +21,7 @@ use moodle_exception;
 use stdClass;
 
 /**
- * Utility class for all instance (module) routines helper.
+ * Google API request wrapper (with retry on transient errors) and the session calendar event.
  *
  * @package     mod_googlemeet
  * @copyright   2023 Rone Santos <ronefel@hotmail.com>
@@ -29,19 +29,22 @@ use stdClass;
  */
 class helper {
 
-    /** @var string The googlemeet meeting_start event */
+    /** @var string Calendar eventtype of the event that mirrors one session (googlemeet_events row). */
     public const GOOGLEMEET_EVENT_START = 'googlemeet_event';
 
     /** @var int Number of retry attempts after the initial Google API request. */
     private const GOOGLE_REQUEST_RETRIES = 2;
 
     /**
-     * Wrapper function to perform an API call and also catch and handle potential exceptions.
+     * Perform a Google API call, retrying transient errors up to GOOGLE_REQUEST_RETRIES times.
+     *
+     * A disabled Drive or Calendar API becomes moodle_exception('servicenotenabled'); any other
+     * failure is rethrown as is.
      *
      * @param rest $service The rest API object
-     * @param string $api The name of the API call
+     * @param string $api The name of the API call, e.g. 'insertevent'
      * @param array $params The parameters required by the API call
-     * @param string $rawpost Optional param to include in the body of a post.
+     * @param string|false $rawpost Raw request body for a POST, or false for none.
      *
      * @return \stdClass|string|null The response object, or a raw string body for
      *         endpoints declared with a non-JSON ('raw') response (e.g. Drive get/export).
@@ -95,7 +98,7 @@ class helper {
     }
 
     /**
-     * Detect Google API-disabled errors that should keep the existing user-facing exception.
+     * Detect the 403 "Access Not Configured" error of a Google API not enabled for the project.
      *
      * @param \Exception $e The exception thrown by core\oauth2\rest.
      * @return bool
@@ -108,11 +111,11 @@ class helper {
     /**
      * Decide whether a failed Google API request is worth retrying.
      *
-     * Moodle's core\oauth2\rest currently throws core\oauth2\rest_exception with
-     * JSON API failures encoded only as "HTTPSTATUS: message" in the exception
-     * text, and transport failures in the exception code. There is no structured
-     * response/status accessor to use here, so this parser deliberately accepts
-     * only the small Google transient set we need.
+     * The core\oauth2\rest class throws core\oauth2\rest_exception with JSON API failures
+     * encoded only as "HTTPSTATUS: message" in the exception text, and transport failures
+     * as the curl errno in the exception code. With no structured status accessor, this
+     * accepts only Google's transient set: 429/500/502/503, and a 403 or status-less error
+     * whose text names rateLimitExceeded, userRateLimitExceeded or backendError.
      *
      * @param \Exception $e The exception thrown by core\oauth2\rest.
      * @return bool
@@ -166,8 +169,8 @@ class helper {
     private static function retry_delay_seconds(\Exception $e, int $attempt): int {
         $retryafter = self::extract_retry_after($e->getMessage());
         if ($retryafter !== null) {
-            // Cap it: this can run inside a web request (manual sync), where an
-            // upstream Retry-After of minutes must not stall the whole page.
+            // Cap it: this can run inside a web request (e.g. creating the Meet room on
+            // activity save), where an upstream Retry-After of minutes must not stall the page.
             return min(10, max(0, $retryafter));
         }
 
@@ -201,10 +204,10 @@ class helper {
     }
 
     /**
-     * Generates an event in calendar after a googlemeet insert/update.
+     * Create the course calendar event that mirrors one session.
      *
-     * @param stdClass $googlemeet moodleform
-     * @param stdClass $event The event
+     * @param stdClass $googlemeet Activity record, with coursemodule set
+     * @param stdClass $event The googlemeet_events row (eventdate, duration)
      *
      * @return void
      **/
@@ -213,7 +216,6 @@ class helper {
 
         require_once($CFG->dirroot . '/calendar/lib.php');
 
-        // Add event to the calendar as openingtime is set.
         $calendarevent = (object) [
             'eventtype' => self::GOOGLEMEET_EVENT_START,
             'type' => CALENDAR_EVENT_TYPE_ACTION,

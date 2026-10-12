@@ -17,7 +17,9 @@
 {{!
     @template mod_googlemeet/ai_review_bulk
 
-    IA-04: activity-level notice for teachers with unreviewed AI summaries.
+    Activity-level notice for teachers with unreviewed AI summaries, with a "publish all" button.
+    seen is the page-load time: publishing all skips content rewritten after it
+    ({@see \mod_googlemeet\local\ai_review::mark_all_reviewed()}).
 
     Example context (json):
     {

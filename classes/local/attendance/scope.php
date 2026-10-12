@@ -17,7 +17,7 @@
 namespace mod_googlemeet\local\attendance;
 
 /**
- * Site switch and Google OAuth scope management for Meet attendance (ANA-03).
+ * Site switch and Google OAuth scope management for Meet attendance.
  *
  * The Meet REST API scope is only requested while the site setting is on. Turning it on does not
  * upgrade the tokens teachers already granted: Moodle keeps refreshing the old refresh token, so
