@@ -1,0 +1,178 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_googlemeet/admin_status_page
+
+    Admin page of the Google Meet background work (admin_status.php, below the page header): autosync
+    problems, stuck AI analyses, failed Google Calendar updates and the last sync of each activity.
+    Each of the first three sections shows nonehtml (a core notification) when it has no rows; the
+    last one always shows its table. Every value but nonehtml is plain text.
+
+    Example context (json):
+    {
+        "windowdays": 7,
+        "nonehtml": "<div class=\"alert alert-success\">Nothing to report.</div>",
+        "hasautosync": true,
+        "autosync": [{"course": "Course 1", "activity": {"name": "Sala 1", "url": "#"}, "creator": "teacher@example.com",
+            "failedruns": 2, "exhausted": 1, "retrying": 0, "haslastfailure": true, "lastfailure": "9/10/25, 16:53",
+            "laststatus": "Error", "haslastmessage": true, "lastmessage": "Token expired", "lastsync": "Never",
+            "last": true}],
+        "hasstuckai": true,
+        "stuckai": [{"course": "Course 1", "activity": {"name": "Sala 1", "url": "#"}, "recording": "Lesson 1",
+            "status": "processing", "since": "9/10/25, 16:53", "retries": 1, "error": "", "last": true}],
+        "hascalendar": true,
+        "calendar": [{"activity": {"name": "Deleted activity", "url": ""}, "googlemeetid": 12,
+            "operation": "Update event", "date": "9/10/25, 16:53", "message": "403: Forbidden", "last": true}],
+        "haslastsyncs": true,
+        "lastsyncs": [{"course": "Course 1", "activity": {"name": "Sala 1", "url": "#"}, "lastsync": "Never",
+            "autosynchours": "No", "manual": "-", "auto": "9/10/25, 16:53 · Success", "last": true}],
+        "truncated": true,
+        "lastsynclimit": 300
+    }
+}}
+<p>{{#str}} adminstatus_intro, mod_googlemeet, {{windowdays}} {{/str}}</p>
+<h3>{{#str}} adminstatus_autosync, mod_googlemeet, {{windowdays}} {{/str}}</h3>
+{{^hasautosync}}
+{{{nonehtml}}}
+{{/hasautosync}}
+{{#hasautosync}}
+<div class="table-responsive">
+    <table class="generaltable googlemeet-admin-status">
+        <thead>
+            <tr>
+                <th class="header c0" scope="col">{{#str}} course {{/str}}</th>
+                <th class="header c1" scope="col">{{#str}} adminstatus_col_activity, mod_googlemeet {{/str}}</th>
+                <th class="header c2" scope="col">{{#str}} adminstatus_col_creator, mod_googlemeet {{/str}}</th>
+                <th class="header c3" scope="col">{{#str}} adminstatus_failedruns, mod_googlemeet {{/str}}</th>
+                <th class="header c4" scope="col">{{#str}} adminstatus_exhausted, mod_googlemeet {{/str}}</th>
+                <th class="header c5" scope="col">{{#str}} adminstatus_retrying, mod_googlemeet {{/str}}</th>
+                <th class="header c6" scope="col">{{#str}} adminstatus_lastfailure, mod_googlemeet {{/str}}</th>
+                <th class="header c7 lastcol" scope="col">{{#str}} adminstatus_col_lastsync, mod_googlemeet {{/str}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#autosync}}
+            <tr{{#last}} class="lastrow"{{/last}}>
+                <td class="cell c0">{{course}}</td>
+                <td class="cell c1">{{#activity}}{{> mod_googlemeet/admin_status_activity }}{{/activity}}</td>
+                <td class="cell c2">{{creator}}</td>
+                <td class="cell c3">{{failedruns}}</td>
+                <td class="cell c4">{{exhausted}}</td>
+                <td class="cell c5">{{retrying}}</td>
+                <td class="cell c6">{{#haslastfailure}}{{lastfailure}} · {{laststatus}}{{#haslastmessage}}<div class="small text-muted">{{lastmessage}}</div>{{/haslastmessage}}{{/haslastfailure}}{{^haslastfailure}}-{{/haslastfailure}}</td>
+                <td class="cell c7 lastcol">{{lastsync}}</td>
+            </tr>
+            {{/autosync}}
+        </tbody>
+    </table>
+</div>
+{{/hasautosync}}
+<h3>{{#str}} adminstatus_stuckai, mod_googlemeet {{/str}}</h3>
+{{^hasstuckai}}
+{{{nonehtml}}}
+{{/hasstuckai}}
+{{#hasstuckai}}
+<div class="table-responsive">
+    <table class="generaltable googlemeet-admin-status">
+        <thead>
+            <tr>
+                <th class="header c0" scope="col">{{#str}} course {{/str}}</th>
+                <th class="header c1" scope="col">{{#str}} adminstatus_col_activity, mod_googlemeet {{/str}}</th>
+                <th class="header c2" scope="col">{{#str}} adminstatus_recording, mod_googlemeet {{/str}}</th>
+                <th class="header c3" scope="col">{{#str}} status {{/str}}</th>
+                <th class="header c4" scope="col">{{#str}} adminstatus_since, mod_googlemeet {{/str}}</th>
+                <th class="header c5" scope="col">{{#str}} adminstatus_retries, mod_googlemeet {{/str}}</th>
+                <th class="header c6 lastcol" scope="col">{{#str}} error {{/str}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#stuckai}}
+            <tr{{#last}} class="lastrow"{{/last}}>
+                <td class="cell c0">{{course}}</td>
+                <td class="cell c1">{{#activity}}{{> mod_googlemeet/admin_status_activity }}{{/activity}}</td>
+                <td class="cell c2">{{recording}}</td>
+                <td class="cell c3">{{status}}</td>
+                <td class="cell c4">{{since}}</td>
+                <td class="cell c5">{{retries}}</td>
+                <td class="cell c6 lastcol">{{error}}</td>
+            </tr>
+            {{/stuckai}}
+        </tbody>
+    </table>
+</div>
+{{/hasstuckai}}
+<h3>{{#str}} adminstatus_calendar, mod_googlemeet, {{windowdays}} {{/str}}</h3>
+{{^hascalendar}}
+{{{nonehtml}}}
+{{/hascalendar}}
+{{#hascalendar}}
+<div class="table-responsive">
+    <table class="generaltable googlemeet-admin-status">
+        <thead>
+            <tr>
+                <th class="header c0" scope="col">{{#str}} adminstatus_col_activity, mod_googlemeet {{/str}}</th>
+                <th class="header c1" scope="col">{{#str}} adminstatus_operation, mod_googlemeet {{/str}}</th>
+                <th class="header c2" scope="col">{{#str}} date {{/str}}</th>
+                <th class="header c3 lastcol" scope="col">{{#str}} error {{/str}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#calendar}}
+            <tr{{#last}} class="lastrow"{{/last}}>
+                <td class="cell c0">{{#activity}}{{> mod_googlemeet/admin_status_activity }}{{/activity}} (#{{googlemeetid}})</td>
+                <td class="cell c1">{{operation}}</td>
+                <td class="cell c2">{{date}}</td>
+                <td class="cell c3 lastcol">{{message}}</td>
+            </tr>
+            {{/calendar}}
+        </tbody>
+    </table>
+</div>
+{{/hascalendar}}
+<h3>{{#str}} adminstatus_lastsyncs, mod_googlemeet {{/str}}</h3>
+<div class="table-responsive">
+    <table class="generaltable googlemeet-admin-status">
+        <thead>
+            <tr>
+                <th class="header c0" scope="col">{{#str}} course {{/str}}</th>
+                <th class="header c1" scope="col">{{#str}} adminstatus_col_activity, mod_googlemeet {{/str}}</th>
+                <th class="header c2" scope="col">{{#str}} adminstatus_col_lastsync, mod_googlemeet {{/str}}</th>
+                <th class="header c3" scope="col">{{#str}} adminstatus_autosynchours, mod_googlemeet {{/str}}</th>
+                <th class="header c4" scope="col">{{#str}} adminstatus_lastmanual, mod_googlemeet {{/str}}</th>
+                <th class="header c5 lastcol" scope="col">{{#str}} adminstatus_lastauto, mod_googlemeet {{/str}}</th>
+            </tr>
+        </thead>
+        <tbody{{^haslastsyncs}} class="empty"{{/haslastsyncs}}>
+            {{#lastsyncs}}
+            <tr{{#last}} class="lastrow"{{/last}}>
+                <td class="cell c0">{{course}}</td>
+                <td class="cell c1">{{#activity}}{{> mod_googlemeet/admin_status_activity }}{{/activity}}</td>
+                <td class="cell c2">{{lastsync}}</td>
+                <td class="cell c3">{{autosynchours}}</td>
+                <td class="cell c4">{{manual}}</td>
+                <td class="cell c5 lastcol">{{auto}}</td>
+            </tr>
+            {{/lastsyncs}}
+            {{^haslastsyncs}}
+            <tr><td colspan="6"></td></tr>
+            {{/haslastsyncs}}
+        </tbody>
+    </table>
+</div>
+{{#truncated}}
+<p class="small">{{#str}} adminstatus_truncated, mod_googlemeet, {{lastsynclimit}} {{/str}}</p>
+{{/truncated}}

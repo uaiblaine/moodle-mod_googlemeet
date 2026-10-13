@@ -1,0 +1,84 @@
+{{!
+  This file is part of Moodle - http://moodle.org/
+
+  Moodle is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  Moodle is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+  @template mod_googlemeet/index_table
+
+  The course's activity index (index.php): one row per activity the user can see.
+
+  The cell classes (c0, c1, ..., lastcol) keep the markup html_table used to print, so a
+  theme rule written for it still applies; index.php computes them because the section and
+  progress columns are optional.
+
+  Context variables required for this template:
+  * usesections - whether the course format has sections (adds the first column)
+  * showprogress - whether the "My progress" column is shown
+  * sectionheader - the course format's name for a section
+  * cols - the column classes: section, name, next, recordings, progress
+  * rows - one per activity, each with:
+    * lastrow - true on the last row
+    * sectionname - the section name, already run through format_string() (trusted HTML)
+    * url - the activity URL
+    * name - plain activity name
+    * dimmed - true when the activity is hidden from students
+    * nextsession - the next session, plain text
+    * recordings - number of recordings
+    * progress - the student's progress, plain text
+
+  Example context (json):
+  {
+    "usesections": true,
+    "showprogress": true,
+    "sectionheader": "Section",
+    "cols": {"section": "c0", "name": "c1", "next": "c2", "recordings": "c3", "progress": "c4 lastcol"},
+    "rows": [
+      {
+        "lastrow": true,
+        "sectionname": "General",
+        "url": "https://example.com/mod/googlemeet/view.php?id=2",
+        "name": "Live class",
+        "dimmed": false,
+        "nextsession": "Tue. 17 Nov. 2026 09:00",
+        "recordings": 3,
+        "progress": "1 of 3 watched (33%)"
+      }
+    ]
+  }
+}}
+<div class="table-responsive">
+    <table class="generaltable mod_index">
+        <thead>
+            <tr>
+                {{#usesections}}<th class="header {{cols.section}}" scope="col">{{sectionheader}}</th>{{/usesections}}
+                <th class="header {{cols.name}}" scope="col">{{#str}} name {{/str}}</th>
+                <th class="header {{cols.next}}" scope="col">{{#str}} index_nextsession, mod_googlemeet {{/str}}</th>
+                <th class="header {{cols.recordings}}" scope="col">{{#str}} index_recordings, mod_googlemeet {{/str}}</th>
+                {{#showprogress}}<th class="header {{cols.progress}}" scope="col">{{#str}} index_myprogress, mod_googlemeet {{/str}}</th>{{/showprogress}}
+            </tr>
+        </thead>
+        <tbody>
+            {{#rows}}
+            <tr{{#lastrow}} class="lastrow"{{/lastrow}}>
+                {{#usesections}}<td class="cell {{cols.section}}">{{{sectionname}}}</td>{{/usesections}}
+                <td class="cell {{cols.name}}"><a{{#dimmed}} class="dimmed"{{/dimmed}} href="{{url}}">{{name}}</a></td>
+                <td class="cell {{cols.next}}">{{nextsession}}</td>
+                <td class="cell {{cols.recordings}}">{{recordings}}</td>
+                {{#showprogress}}<td class="cell {{cols.progress}}">{{progress}}</td>{{/showprogress}}
+            </tr>
+            {{/rows}}
+        </tbody>
+    </table>
+</div>

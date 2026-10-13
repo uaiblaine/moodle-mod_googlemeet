@@ -3,6 +3,26 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.7 (unreleased)
+- The per-user progress summary is cached in a request cache instead of a PHP static, so unit tests
+  (which reuse ids after each reset) never read another test's counts.
+- The Google account UI (login button, linked-account box, the login notices of the activity form
+  and the sync status link in the settings) renders through Mustache templates
+  (`mod_googlemeet/google_*`) instead of `html_writer`, with the same markup. The login popup is
+  opened by the new `mod_googlemeet/google_login` AMD module instead of inline jQuery, and the
+  Google account name and e-mail are now escaped as text.
+- The teacher attachment list, the activity index table, the "Event details" button and the
+  "Back" link of the materials page render through Mustache templates
+  (`mod_googlemeet/attachments`, `index_table`, `event_details_link`, `material_back_link`)
+  instead of `html_writer`, with the same markup; `locallib.php`, `index.php`, `view.php` and
+  `material.php` no longer use `html_writer`.
+- The attendance page and the admin status page render through Mustache templates
+  (`mod_googlemeet/attendance_page`, `attendance_session`, `admin_status_page`,
+  `admin_status_activity`) fed by the new `attendance_page` and `admin_status_page` renderables,
+  instead of `html_writer`, with the same markup; `attendance.php` and `admin_status.php` no longer
+  use `html_writer`. The unlink button's title no longer escapes the Meet display name twice, and
+  the participant and admin tables sit in one `table-responsive` wrapper instead of two.
+
 ## 2.30.1+uai.6 (unreleased)
 - Queueing AI question generation (`mod_googlemeet_queue_generate_questions`) needs
   `mod/googlemeet:generateai` as well as `managequestions`, like every other paid Gemini call, and the

@@ -1,0 +1,48 @@
+{{!
+  This file is part of Moodle - http://moodle.org/
+
+  Moodle is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  Moodle is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+  @template mod_googlemeet/attachments
+
+  The teacher-provided attachment files, as a download list on the activity page.
+
+  Context variables required for this template:
+  * files - list of files, each with:
+    * url - forced-download pluginfile URL (moodle_url::out(false))
+    * icon - the file-type icon, rendered by the core renderer (trusted HTML)
+    * filename - plain file name
+    * size - human-readable size (display_size())
+
+  Example context (json):
+  {
+    "files": [
+      {
+        "url": "https://example.com/pluginfile.php/13/mod_googlemeet/attachment/0/report.pdf?forcedownload=1",
+        "icon": "<img class=\"icon me-2\" alt=\"\" aria-hidden=\"true\" src=\"https://example.com/theme/image.php/boost/core/1/f/pdf\">",
+        "filename": "report.pdf",
+        "size": "2.0 KB"
+      }
+    ]
+  }
+}}
+<div class="googlemeet-attachments mt-4">
+    <h4>{{#str}} attachmentsheader, mod_googlemeet {{/str}}</h4>
+    <ul class="list-unstyled mb-0">
+        {{#files}}
+        <li class="mb-1"><a href="{{url}}">{{{icon}}}{{filename}}<span class="text-muted small"> ({{size}})</span></a></li>
+        {{/files}}
+    </ul>
+</div>

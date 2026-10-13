@@ -1,0 +1,44 @@
+{{!
+  This file is part of Moodle - http://moodle.org/
+
+  Moodle is free software: you can redistribute it and/or modify
+  it under the terms of the GNU General Public License as published by
+  the Free Software Foundation, either version 3 of the License, or
+  (at your option) any later version.
+
+  Moodle is distributed in the hope that it will be useful,
+  but WITHOUT ANY WARRANTY; without even the implied warranty of
+  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+  GNU General Public License for more details.
+
+  You should have received a copy of the GNU General Public License
+  along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+  @template mod_googlemeet/google_user_info
+
+  The linked Google account: picture (linking to Google Calendar or Drive), name, e-mail and a logout link.
+
+  Context variables required for this template:
+  * userurl - Plain URL the picture links to (Google Calendar, Google Drive or #).
+  * picture - Base64-encoded JPEG of the Google profile picture (may be empty).
+  * name - Plain-text name of the Google account.
+  * username - Plain-text e-mail of the Google account.
+  * logouturl - Plain URL of the current page with logout=1 and sesskey.
+  * logouticon - Trusted HTML of the logout icon (pix_icon).
+
+  Example context (json):
+  {
+    "userurl": "https://calendar.google.com/",
+    "picture": "SlBFR0RBVEE=",
+    "name": "Ana Docente",
+    "username": "teacher@example.com",
+    "logouturl": "https://example.com/course/modedit.php?update=5&logout=1&sesskey=abc",
+    "logouticon": "<i class=\"icon fa fa-sign-out fa-fw m-0\" aria-hidden=\"true\"></i>"
+  }
+}}
+<div id="googlemeet_auth-info">
+    <a id="googlemeet_picture-user" target="_blank" title="{{#cleanstr}} manage, mod_googlemeet {{/cleanstr}}" href="{{userurl}}"><img src="data:image/jpeg;base64,{{picture}}" alt=""></a>
+    <div id="googlemeet_user-name"><span>{{#str}} loggedinaccount, mod_googlemeet {{/str}}</span><span>{{name}}</span><span>{{username}}</span></div>
+    <a class="btn btn-secondary btn-sm" title="{{#cleanstr}} logout, mod_googlemeet {{/cleanstr}}" href="{{logouturl}}">{{{logouticon}}}</a>
+</div>

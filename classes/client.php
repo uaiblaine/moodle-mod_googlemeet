@@ -17,7 +17,6 @@
 namespace mod_googlemeet;
 
 use DateTime;
-use html_writer;
 use moodle_url;
 use dml_missing_record_exception;
 use moodle_exception;
@@ -252,29 +251,16 @@ class client {
         $client = $this->get_user_oauth_client();
         $loginurl = $client->get_login_url();
 
-        // No inline onclick: the URL travels in a data-* attribute (escaped by html_writer) and an
-        // AMD inline listener opens it, so no URL value is interpolated into executable inline JS.
+        // No inline onclick: the URL travels in a data-* attribute (escaped by Mustache) and the
+        // mod_googlemeet/google_login module opens it, so no URL value is interpolated into inline JS.
         // It must stay a window.open() popup: callback.php reloads the opener and closes the popup.
-        $buttonid = html_writer::random_id('googlemeet_login_');
-        $button = html_writer::tag('button', get_string('logintoaccount', 'googlemeet'), [
-            'type' => 'button',
-            'class' => 'btn btn-primary',
-            'id' => $buttonid,
-            'data-loginurl' => $loginurl->out(false),
+        $buttonid = 'googlemeet_login_' . random_string(12);
+        $PAGE->requires->js_call_amd('mod_googlemeet/google_login', 'init', [$buttonid]);
+
+        return $OUTPUT->render_from_template('mod_googlemeet/google_login_button', [
+            'buttonid' => $buttonid,
+            'loginurl' => $loginurl->out(false),
         ]);
-
-        $PAGE->requires->js_amd_inline("
-            require(['jquery'], function(\$) {
-                \$('#" . $buttonid . "').on('click', function(e) {
-                    e.preventDefault();
-                    var url = \$(this).attr('data-loginurl');
-                    window.open(url, 'Login',
-                        'height=600,width=599,top=0,left=0,menubar=0,location=0,directories=0,fullscreen=0');
-                });
-            });
-        ");
-
-        return html_writer::div($button, 'mt-2');
     }
 
     /**
@@ -302,37 +288,24 @@ class client {
 
         $userurl = '#';
         if ($scope == 'calendar') {
-            $userurl = new moodle_url('https://calendar.google.com/');
+            $userurl = 'https://calendar.google.com/';
         }
         if ($scope == 'drive') {
-            $userurl = new moodle_url('https://drive.google.com/');
+            $userurl = 'https://drive.google.com/';
         }
 
         $logouturl = new moodle_url($PAGE->url);
         $logouturl->param('logout', true);
         $logouturl->param('sesskey', sesskey());
 
-        $img = html_writer::img('data:image/jpeg;base64,' . $userpicture, '');
-        $out = html_writer::start_div('', ['id' => 'googlemeet_auth-info']);
-        $out .= html_writer::link(
-            $userurl,
-            $img,
-            ['id' => 'googlemeet_picture-user', 'target' => '_blank', 'title' => get_string('manage', 'googlemeet')]
-        );
-        $out .= html_writer::start_div('', ['id' => 'googlemeet_user-name']);
-        $out .= html_writer::span(get_string('loggedinaccount', 'googlemeet'), '');
-        $out .= html_writer::span($name);
-        $out .= html_writer::span($username);
-        $out .= html_writer::end_div();
-        $out .= html_writer::link(
-            $logouturl,
-            $OUTPUT->pix_icon('logout', '', 'googlemeet', ['class' => 'm-0']),
-            ['class' => 'btn btn-secondary btn-sm', 'title' => get_string('logout', 'googlemeet')]
-        );
-
-        $out .= html_writer::end_div();
-
-        return $out;
+        return $OUTPUT->render_from_template('mod_googlemeet/google_user_info', [
+            'userurl' => $userurl,
+            'picture' => $userpicture,
+            'name' => $name,
+            'username' => $username,
+            'logouturl' => $logouturl->out(false),
+            'logouticon' => $OUTPUT->pix_icon('logout', '', 'googlemeet', ['class' => 'm-0']),
+        ]);
     }
 
     /**

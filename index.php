@@ -83,9 +83,6 @@ foreach ($cms as $instanceid => $cm) {
     $context = context_module::instance($cm->id);
     $isteacher = has_capability('mod/googlemeet:editrecording', $context);
 
-    $attrs = $cm->visible ? [] : ['class' => 'dimmed'];
-    $link = html_writer::link($cm->url, $cm->get_formatted_name(), $attrs);
-
     // Next session: the first upcoming (or live) session that is not cancelled.
     $nextsession = get_string('index_nextsession_none', 'mod_googlemeet');
     $upcoming = googlemeet_get_upcoming_events($googlemeet->id, 10);
@@ -117,37 +114,34 @@ foreach ($cms as $instanceid => $cm) {
         ]);
     }
 
-    $row = [];
-    if ($usesections) {
-        $row[] = get_section_name($course, $cm->sectionnum);
-    }
-    $row[] = $link;
-    $row[] = $nextsession;
-    $row[] = $recordingcount;
-    $row['progress'] = $progress;
-    $rows[] = $row;
+    $rows[] = [
+        'lastrow' => false,
+        // Trusted HTML: the course format runs the section name through format_string().
+        'sectionname' => $usesections ? get_section_name($course, $cm->sectionnum) : '',
+        'url' => $cm->url->out(false),
+        'name' => $cm->get_formatted_name(['escape' => false]),
+        'dimmed' => !$cm->visible,
+        'nextsession' => $nextsession,
+        'recordings' => $recordingcount,
+        'progress' => $progress,
+    ];
+}
+if ($rows) {
+    $rows[array_key_last($rows)]['lastrow'] = true;
 }
 
-$table = new html_table();
-$table->attributes['class'] = 'generaltable mod_index';
-$table->head = [];
-if ($usesections) {
-    $table->head[] = get_string('sectionname', 'format_' . $course->format);
-}
-$table->head[] = get_string('name');
-$table->head[] = get_string('index_nextsession', 'mod_googlemeet');
-$table->head[] = get_string('index_recordings', 'mod_googlemeet');
-if ($showprogress) {
-    $table->head[] = get_string('index_myprogress', 'mod_googlemeet');
-}
-foreach ($rows as $row) {
-    $progress = $row['progress'];
-    unset($row['progress']);
-    if ($showprogress) {
-        $row[] = $progress;
-    }
-    $table->data[] = array_values($row);
+// The cN / lastcol classes html_table printed; the section and progress columns are optional.
+$colnames = array_merge($usesections ? ['section'] : [], ['name', 'next', 'recordings'], $showprogress ? ['progress'] : []);
+$cols = [];
+foreach ($colnames as $index => $colname) {
+    $cols[$colname] = 'c' . $index . ($index === count($colnames) - 1 ? ' lastcol' : '');
 }
 
-echo html_writer::table($table);
+echo $OUTPUT->render_from_template('mod_googlemeet/index_table', [
+    'usesections' => $usesections,
+    'showprogress' => $showprogress,
+    'sectionheader' => $usesections ? get_string('sectionname', 'format_' . $course->format) : '',
+    'cols' => $cols,
+    'rows' => $rows,
+]);
 echo $OUTPUT->footer();

@@ -40,7 +40,9 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_heading(
         'googlemeet/adminstatus_heading',
         '',
-        html_writer::link(new moodle_url('/mod/googlemeet/admin_status.php'), get_string('adminstatus_link', 'googlemeet'))
+        $OUTPUT->render_from_template('mod_googlemeet/google_admin_status_link', [
+            'url' => (new moodle_url('/mod/googlemeet/admin_status.php'))->out(false),
+        ])
     ));
 
 

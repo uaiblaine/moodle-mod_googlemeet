@@ -1,0 +1,100 @@
+{{!
+    This file is part of Moodle - http://moodle.org/
+
+    Moodle is free software: you can redistribute it and/or modify
+    it under the terms of the GNU General Public License as published by
+    the Free Software Foundation, either version 3 of the License, or
+    (at your option) any later version.
+
+    Moodle is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with Moodle.  If not, see <http://www.gnu.org/licenses/>.
+}}
+{{!
+    @template mod_googlemeet/attendance_session
+
+    One session of attendance.php: fetch status, refetch button, export selector and the participants.
+    A row carries a link form (unmatched participant) or an unlink form (matched one) only when the
+    viewer may manage attendance; both post action=link with the sesskey, the unlink one with userid 0.
+
+    refetchhtml and downloadselector are core renderer output; every other value is plain text. The
+    unlink form stays on one line: any whitespace before its button would render as a space after the
+    student's name.
+
+    Example context (json):
+    {
+        "heading": "Session of 9 October 2025, 4:53 PM", "statuslabel": "Error reading attendance",
+        "haserror": true, "errormessage": "Quota exceeded", "hasrefetch": true,
+        "refetchhtml": "<button type=\"submit\" class=\"btn btn-secondary\">Read attendance again</button>",
+        "hasrows": true, "downloadselector": "", "formaction": "#", "cmid": 3, "sessionid": 7,
+        "sesskey": "abc123",
+        "options": [{"value": 0, "label": "Choose a student", "selected": true},
+                    {"value": 12, "label": "Ana Pérez", "selected": false}],
+        "rows": [
+            {"name": "Bruno Silva", "canlink": false, "canunlink": true, "attendanceid": 41,
+             "selectid": "googlemeet-attendance-link-41", "linklabel": "",
+             "unlinktitle": "Undo the match of \"Bruno\" with this student", "kindlabel": "Attended",
+             "hasmatchedby": true, "matchedby": "by e-mail", "meetname": "Bruno", "joined": "4:53 PM",
+             "left": "5:23 PM", "minutes": "31", "last": false},
+            {"name": "Visitor", "canlink": true, "canunlink": false, "attendanceid": 42,
+             "selectid": "googlemeet-attendance-link-42", "linklabel": "Student for participant Visitor",
+             "unlinktitle": "", "kindlabel": "Not matched", "hasmatchedby": false, "matchedby": "",
+             "meetname": "Visitor", "joined": "4:55 PM", "left": "5:20 PM", "minutes": "25", "last": true}
+        ]
+    }
+}}
+<h3>{{heading}}</h3>
+<p>{{statuslabel}}{{#haserror}} · {{errormessage}}{{/haserror}}</p>
+{{#hasrefetch}}
+<div class="mb-3">{{{refetchhtml}}}</div>
+{{/hasrefetch}}
+{{#hasrows}}
+{{{downloadselector}}}
+<div class="table-responsive">
+    <table class="generaltable googlemeet-attendance-table">
+        <thead>
+            <tr>
+                <th class="header c0" scope="col">{{#str}} attendance_col_student, mod_googlemeet {{/str}}</th>
+                <th class="header c1" scope="col">{{#str}} attendance_col_status, mod_googlemeet {{/str}}</th>
+                <th class="header c2" scope="col">{{#str}} attendance_col_meetname, mod_googlemeet {{/str}}</th>
+                <th class="header c3" scope="col">{{#str}} attendance_col_joined, mod_googlemeet {{/str}}</th>
+                <th class="header c4" scope="col">{{#str}} attendance_col_left, mod_googlemeet {{/str}}</th>
+                <th class="header c5 lastcol" scope="col">{{#str}} attendance_col_minutes, mod_googlemeet {{/str}}</th>
+            </tr>
+        </thead>
+        <tbody>
+            {{#rows}}
+            <tr{{#last}} class="lastrow"{{/last}}>
+                <td class="cell c0">{{name}}{{#canunlink}}<form method="post" action="{{formaction}}" class="d-inline googlemeet-attendance-unlink"><input type="hidden" name="id" value="{{cmid}}"><input type="hidden" name="session" value="{{sessionid}}"><input type="hidden" name="action" value="link"><input type="hidden" name="sesskey" value="{{sesskey}}"><input type="hidden" name="attendanceid" value="{{attendanceid}}"><input type="hidden" name="userid" value="0"><button type="submit" class="btn btn-link btn-sm p-0 ms-2" title="{{unlinktitle}}">{{#str}} attendance_unlink, mod_googlemeet {{/str}}</button></form>{{/canunlink}}
+                    {{#canlink}}
+                    <form method="post" action="{{formaction}}" class="d-flex flex-wrap gap-1 mt-1 googlemeet-attendance-link">
+                        <input type="hidden" name="id" value="{{cmid}}">
+                        <input type="hidden" name="session" value="{{sessionid}}">
+                        <input type="hidden" name="action" value="link">
+                        <input type="hidden" name="sesskey" value="{{sesskey}}">
+                        <input type="hidden" name="attendanceid" value="{{attendanceid}}">
+                        <label class="visually-hidden" for="{{selectid}}">{{linklabel}}</label>
+                        <select id="{{selectid}}" class="select form-select form-select-sm w-auto" name="userid">
+                            {{#options}}
+                            <option value="{{value}}"{{#selected}} selected{{/selected}}>{{label}}</option>
+                            {{/options}}
+                        </select>
+                        <button type="submit" class="btn btn-sm btn-outline-primary">{{#str}} attendance_link, mod_googlemeet {{/str}}</button>
+                    </form>
+                    {{/canlink}}
+                </td>
+                <td class="cell c1">{{kindlabel}}{{#hasmatchedby}}<small class="text-muted"> ({{matchedby}})</small>{{/hasmatchedby}}</td>
+                <td class="cell c2">{{meetname}}</td>
+                <td class="cell c3">{{joined}}</td>
+                <td class="cell c4">{{left}}</td>
+                <td class="cell c5 lastcol">{{minutes}}</td>
+            </tr>
+            {{/rows}}
+        </tbody>
+    </table>
+</div>
+{{/hasrows}}
