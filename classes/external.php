@@ -98,6 +98,11 @@ class mod_googlemeet_external extends external_api {
         $recording->timemodified = time();
 
         $DB->update_record('googlemeet_recordings', $recording);
+        \mod_googlemeet\event\recording_updated::create([
+            'context' => $context,
+            'objectid' => $recording->id,
+            'other' => ['field' => 'name'],
+        ])->trigger();
 
         return (object)[
             'name' => $recording->name,
@@ -177,6 +182,11 @@ class mod_googlemeet_external extends external_api {
         $recording->timemodified = time();
 
         $DB->update_record('googlemeet_recordings', $recording);
+        \mod_googlemeet\event\recording_updated::create([
+            'context' => $context,
+            'objectid' => $recording->id,
+            'other' => ['field' => 'visible'],
+        ])->trigger();
 
         return (object)[
             'visible' => $recording->visible,
@@ -241,16 +251,33 @@ class mod_googlemeet_external extends external_api {
         // teacher can restore them, a later sync restores in place those still in Drive (keeping
         // their AI analysis and questions), and the retention task purges the rest. Practice
         // questions are never deleted here.
+        // The ids are read first so each trashed recording gets its own event.
         $now = time();
-        $DB->execute(
-            "UPDATE {googlemeet_recordings}
-                         SET deleted = 1, timedeleted = :now, trashreason = :reason, timemodified = :now2
-                       WHERE googlemeetid = :googlemeetid AND deleted = 0",
-            ['now' => $now, 'now2' => $now, 'reason' => \mod_googlemeet\local\recording_cleanup::TRASH_MANUAL,
-            'googlemeetid' => $googlemeetid]
-        );
+        $ids = array_map('intval', $DB->get_fieldset_select(
+            'googlemeet_recordings',
+            'id',
+            'googlemeetid = :googlemeetid AND deleted = 0',
+            ['googlemeetid' => $googlemeetid]
+        ));
+        foreach (array_chunk($ids, 1000) as $chunk) {
+            [$insql, $inparams] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED);
+            $DB->execute(
+                "UPDATE {googlemeet_recordings}
+                    SET deleted = 1, timedeleted = :now, trashreason = :reason, timemodified = :now2
+                  WHERE id {$insql} AND deleted = 0",
+                $inparams + ['now' => $now, 'now2' => $now,
+                'reason' => \mod_googlemeet\local\recording_cleanup::TRASH_MANUAL]
+            );
+        }
 
         $DB->set_field('googlemeet', 'lastsync', time(), ['id' => $googlemeetid]);
+        foreach ($ids as $id) {
+            \mod_googlemeet\event\recording_trashed::create([
+                'context' => $context,
+                'objectid' => $id,
+                'other' => ['bulk' => true],
+            ])->trigger();
+        }
 
         return [];
     }
@@ -316,6 +343,10 @@ class mod_googlemeet_external extends external_api {
             'trashreason' => '',
             'timemodified' => time(),
         ]);
+        \mod_googlemeet\event\recording_restored::create([
+            'context' => $context,
+            'objectid' => $recording->id,
+        ])->trigger();
 
         return ['success' => true];
     }
@@ -384,6 +415,11 @@ class mod_googlemeet_external extends external_api {
             'trashreason' => \mod_googlemeet\local\recording_cleanup::TRASH_MANUAL,
             'timemodified' => $now,
         ]);
+        \mod_googlemeet\event\recording_trashed::create([
+            'context' => $context,
+            'objectid' => $recording->id,
+            'other' => ['bulk' => false],
+        ])->trigger();
 
         return ['success' => true];
     }
@@ -446,6 +482,12 @@ class mod_googlemeet_external extends external_api {
 
         // One cascade for every dependent (AI, progress, attempts, files, preferences, questions).
         \mod_googlemeet\local\recording_cleanup::purge_recordings([(int)$recording->id], $context);
+        $event = \mod_googlemeet\event\recording_deleted::create([
+            'context' => $context,
+            'objectid' => $recording->id,
+        ]);
+        $event->add_record_snapshot('googlemeet_recordings', $recording);
+        $event->trigger();
 
         return ['success' => true];
     }
@@ -526,29 +568,61 @@ class mod_googlemeet_external extends external_api {
             throw new \moodle_exception('ai_not_configured', 'googlemeet');
         }
 
+        $before = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $params['recordingid']]);
         try {
             $analysis = $aiservice->generate_analysis($params['recordingid'], $params['regenerate'], $params['forcedownload']);
-
-            return [
-                'id' => $analysis->id,
-                'recordingid' => $analysis->recordingid,
-                'summary' => $analysis->summary ?? '',
-                'keypoints' => is_array($analysis->keypoints) ? $analysis->keypoints : [],
-                'topics' => is_array($analysis->topics) ? $analysis->topics : [],
-                'transcript' => $analysis->transcript ?? '',
-                'language' => $analysis->language ?? 'es',
-                'status' => $analysis->status,
-                'error' => $analysis->error ?? '',
-                'aimodel' => $analysis->aimodel ?? '',
-                'timecreated' => $analysis->timecreated,
-                'timemodified' => $analysis->timemodified,
-            ];
         } catch (\Exception $e) {
             // Log the full error server-side, but return a generic message to avoid leaking
             // internal details such as API keys or endpoint URLs to the client.
             debugging('mod_googlemeet generate_ai_analysis failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
             throw new \moodle_exception('ai_error_generic', 'googlemeet');
         }
+
+        // The service returns a completed or still-processing row untouched: log only a request it wrote.
+        $after = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysis->id]);
+        if (self::analysis_row_changed($before, $after)) {
+            \mod_googlemeet\event\ai_analysis_updated::create([
+                'context' => $context,
+                'objectid' => $analysis->id,
+                'other' => [
+                    'action' => $params['regenerate'] ? 'regenerated' : 'requested',
+                    'recordingid' => (int)$params['recordingid'],
+                ],
+            ])->trigger();
+        }
+
+        return [
+            'id' => $analysis->id,
+            'recordingid' => $analysis->recordingid,
+            'summary' => $analysis->summary ?? '',
+            'keypoints' => is_array($analysis->keypoints) ? $analysis->keypoints : [],
+            'topics' => is_array($analysis->topics) ? $analysis->topics : [],
+            'transcript' => $analysis->transcript ?? '',
+            'language' => $analysis->language ?? 'es',
+            'status' => $analysis->status,
+            'error' => $analysis->error ?? '',
+            'aimodel' => $analysis->aimodel ?? '',
+            // A regenerated row comes back without timecreated: read it from the stored row.
+            'timecreated' => (int)($analysis->timecreated ?? ($after ? $after->timecreated : 0)),
+            'timemodified' => $analysis->timemodified,
+        ];
+    }
+
+    /**
+     * Whether a (re)generation request wrote the analysis row, from the row before and after it.
+     *
+     * Every write of {@see \mod_googlemeet\ai_service::generate_analysis()} sets status 'processing'
+     * and timemodified; its early returns write nothing.
+     *
+     * @param \stdClass|false $before Row before the request (false when there was none).
+     * @param \stdClass|false $after Row after the request.
+     * @return bool
+     */
+    private static function analysis_row_changed($before, $after): bool {
+        if (!$after) {
+            return false;
+        }
+        return !$before || $before->status !== $after->status || (int)$before->timemodified !== (int)$after->timemodified;
     }
 
     /**
@@ -891,6 +965,11 @@ class mod_googlemeet_external extends external_api {
 
             $analysis->id = $DB->insert_record('googlemeet_ai_analysis', $analysis);
         }
+        \mod_googlemeet\event\ai_analysis_updated::create([
+            'context' => $context,
+            'objectid' => $analysis->id,
+            'other' => ['action' => 'saved', 'recordingid' => (int)$recording->id],
+        ])->trigger();
 
         return [
             'success' => true,
@@ -1020,13 +1099,6 @@ class mod_googlemeet_external extends external_api {
                 $analysis->timecreated = $now;
                 $analysis->id = $DB->insert_record('googlemeet_ai_analysis', $analysis);
             }
-
-            return [
-                'success' => true,
-                'summary' => $result->summary ?? '',
-                'keypoints' => $result->keypoints ?? [],
-                'topics' => $result->topics ?? [],
-            ];
         } catch (\Exception $e) {
             // Log the real error server-side; return a generic message so internal API
             // details are never leaked to the client. A safety block has its own non-technical message.
@@ -1040,6 +1112,19 @@ class mod_googlemeet_external extends external_api {
                     ? $e->getMessage() : get_string('ai_error_generic', 'googlemeet'),
             ];
         }
+
+        \mod_googlemeet\event\ai_analysis_updated::create([
+            'context' => $context,
+            'objectid' => $analysis->id,
+            'other' => ['action' => 'analysed', 'recordingid' => (int)$recording->id],
+        ])->trigger();
+
+        return [
+            'success' => true,
+            'summary' => $result->summary ?? '',
+            'keypoints' => $result->keypoints ?? [],
+            'topics' => $result->topics ?? [],
+        ];
     }
 
     /**
@@ -1153,11 +1238,10 @@ class mod_googlemeet_external extends external_api {
             'questionids' => $questionids,
             'sesskey' => $sesskey,
         ]);
-        [, , , $rows, $service] = self::validate_question_action($params);
-        return ['success' => true, 'count' => $service->set_status(
-            $rows,
-            \core_question\local\bank\question_version_status::QUESTION_STATUS_READY
-        )];
+        [, , $context, $rows, $service] = self::validate_question_action($params);
+        $count = $service->set_status($rows, \core_question\local\bank\question_version_status::QUESTION_STATUS_READY);
+        \mod_googlemeet\event\questions_changed::trigger_for($context, (int)$params['recordingid'], 'published', $count);
+        return ['success' => true, 'count' => $count];
     }
 
     /**
@@ -1176,11 +1260,10 @@ class mod_googlemeet_external extends external_api {
             'questionids' => $questionids,
             'sesskey' => $sesskey,
         ]);
-        [, , , $rows, $service] = self::validate_question_action($params);
-        return ['success' => true, 'count' => $service->set_status(
-            $rows,
-            \core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT
-        )];
+        [, , $context, $rows, $service] = self::validate_question_action($params);
+        $count = $service->set_status($rows, \core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT);
+        \mod_googlemeet\event\questions_changed::trigger_for($context, (int)$params['recordingid'], 'unpublished', $count);
+        return ['success' => true, 'count' => $count];
     }
 
     /**
@@ -1199,8 +1282,10 @@ class mod_googlemeet_external extends external_api {
             'questionids' => $questionids,
             'sesskey' => $sesskey,
         ]);
-        [, , , $rows, $service] = self::validate_question_action($params);
-        return ['success' => true, 'count' => $service->discard_drafts($rows)];
+        [, , $context, $rows, $service] = self::validate_question_action($params);
+        $count = $service->discard_drafts($rows);
+        \mod_googlemeet\event\questions_changed::trigger_for($context, (int)$params['recordingid'], 'discarded', $count);
+        return ['success' => true, 'count' => $count];
     }
 
     /**
@@ -1366,7 +1451,7 @@ class mod_googlemeet_external extends external_api {
             'questionids' => [$params['questionid']],
             'sesskey' => $params['sesskey'],
         ];
-        [, , , $rows, $service] = self::validate_question_action($actionparams);
+        [, , $context, $rows, $service] = self::validate_question_action($actionparams);
         $service->update_question(
             $rows,
             $params['stem'],
@@ -1375,6 +1460,7 @@ class mod_googlemeet_external extends external_api {
             $params['explanation'],
             $params['citation']
         );
+        \mod_googlemeet\event\questions_changed::trigger_for($context, (int)$params['recordingid'], 'updated', 1);
         return ['success' => true, 'count' => 1];
     }
 
@@ -1441,6 +1527,13 @@ class mod_googlemeet_external extends external_api {
             throw new \moodle_exception('ai_not_configured', 'googlemeet');
         }
         $service->queue_question_generation($params['recordingid'], $cm->id, $params['count'], $USER->id);
+        // The count the task was queued with: the same clamp as ai_service::queue_question_generation().
+        \mod_googlemeet\event\questions_changed::trigger_for(
+            $context,
+            (int)$params['recordingid'],
+            'queued',
+            max(1, min(20, (int)$params['count']))
+        );
 
         return ['success' => true, 'count' => 0];
     }

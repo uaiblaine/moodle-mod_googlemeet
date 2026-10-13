@@ -803,6 +803,14 @@ class question_service {
                     ? $e->getMessage()
                     : get_string('question_publish_error', 'googlemeet');
             }
+            if ($result['success']) {
+                \mod_googlemeet\event\questions_changed::trigger_for(
+                    $context,
+                    (int)$recordingid,
+                    'published',
+                    $result['published']
+                );
+            }
             $results[] = $result;
         }
 
