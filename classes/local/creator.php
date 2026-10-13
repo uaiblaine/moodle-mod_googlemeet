@@ -40,8 +40,8 @@ final class creator {
      * never another user found by e-mail. Only while no id is recorded (0) is the organiser e-mail
      * matched, under {@see self::find_by_email()}'s single-match rule. That answer is never stored:
      * resolve() runs on read paths (attendance pages) and an e-mail can change hands, so only the
-     * editor saving the activity (googlemeet_add_instance(), googlemeet_update_instance()) and the
-     * upgrade backfill record an id.
+     * editor saving the activity (googlemeet_add_instance(), googlemeet_update_instance()) and a
+     * restore by an allowed user record an id.
      *
      * @param stdClass $googlemeet Activity record or task data (id, creatoremail, creatoruserid).
      * @return stdClass|null Full user record.
@@ -146,8 +146,7 @@ final class creator {
      * The only active user with this e-mail, ignoring case and surrounding spaces.
      *
      * Deleted and suspended users do not count. Two or more matches give null: the e-mail does not
-     * say which of them owns the Google account. Mirrors mod_googlemeet_backfill_creatoruserid()
-     * in db/upgradelib.php (keep the two in step).
+     * say which of them owns the Google account.
      *
      * @param string $email Organiser e-mail.
      * @return stdClass|null Full user record.

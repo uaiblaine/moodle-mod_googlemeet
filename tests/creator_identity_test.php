@@ -31,7 +31,6 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/db/upgradelib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/calendar_sync_test_fake_rest.php');
 require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/attendance_source_double.php');
 require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
@@ -53,7 +52,6 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversClass(\mod_googlemeet\privacy\provider::class)]
 #[CoversFunction('googlemeet_add_instance')]
 #[CoversFunction('googlemeet_update_instance')]
-#[CoversFunction('mod_googlemeet_backfill_creatoruserid')]
 final class creator_identity_test extends \advanced_testcase {
     /** @var array Users the fake Calendar service was built for. */
     private array $factoryusers = [];
@@ -487,41 +485,6 @@ final class creator_identity_test extends \advanced_testcase {
             $data->$key = $value;
         }
         return $data;
-    }
-
-    /**
-     * The upgrade backfill fills only activities whose e-mail names exactly one active user.
-     */
-    public function test_upgrade_backfill(): void {
-        global $DB;
-        $single = $this->getDataGenerator()->create_user(['email' => 'Single@example.com']);
-        $this->getDataGenerator()->create_user(['email' => 'twin@example.com']);
-        $this->getDataGenerator()->create_user(['email' => 'twin@example.com']);
-        $this->getDataGenerator()->create_user(['email' => 'gone@example.com', 'suspended' => 1]);
-        $this->getDataGenerator()->create_user(['email' => 'deleted@example.com', 'deleted' => 1]);
-        $kept = $this->getDataGenerator()->create_user(['email' => 'kept@example.com']);
-
-        $expected = [];
-        $cases = [
-            'single@example.com' => (int)$single->id,
-            'twin@example.com' => 0,
-            'gone@example.com' => 0,
-            'deleted@example.com' => 0,
-            'nobody@example.com' => 0,
-            '' => 0,
-        ];
-        foreach ($cases as $email => $userid) {
-            $expected[$this->make_activity(['creatoremail' => $email, 'creatoruserid' => 0])->id] = $userid;
-        }
-        // An id already recorded is never overwritten, even when the e-mail names someone else.
-        $expected[$this->make_activity(['creatoremail' => 'single@example.com', 'creatoruserid' => $kept->id])->id] =
-            (int)$kept->id;
-
-        $this->assertSame(1, mod_googlemeet_backfill_creatoruserid());
-        foreach ($expected as $gmid => $userid) {
-            $this->assertEquals($userid, $DB->get_field('googlemeet', 'creatoruserid', ['id' => $gmid]), "activity $gmid");
-        }
-        $this->assertSame(0, mod_googlemeet_backfill_creatoruserid());
     }
 
     /**

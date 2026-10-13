@@ -64,7 +64,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
         $recordingids = array_values(array_filter(array_map('intval', (array)($data->recordingids ?? []))));
         $queuedat = (int)($data->queuedat ?? 0) ?: time();
 
-        if (!$googlemeetid || !$newcount) {
+        if (!$googlemeetid || !$newcount || empty($recordingids)) {
             return;
         }
 
@@ -74,19 +74,16 @@ class notify_new_recordings extends \core\task\adhoc_task {
             return;
         }
 
-        $lessons = [];
-        if (!empty($recordingids)) {
-            if ($this->should_wait_for_ai($recordingids, $queuedat)) {
-                $this->postpone($googlemeetid, $newcount, $recordingids, $queuedat);
-                return;
-            }
-            $lessons = self::get_lessons($googlemeet, (int)$cm->id, $recordingids);
-            if (empty($lessons)) {
-                // Removed or hidden in the meantime: nothing to announce.
-                return;
-            }
-            $newcount = count($lessons);
+        if ($this->should_wait_for_ai($recordingids, $queuedat)) {
+            $this->postpone($googlemeetid, $newcount, $recordingids, $queuedat);
+            return;
         }
+        $lessons = self::get_lessons($googlemeet, (int)$cm->id, $recordingids);
+        if (empty($lessons)) {
+            // Removed or hidden in the meantime: nothing to announce.
+            return;
+        }
+        $newcount = count($lessons);
 
         $context = \context_module::instance($cm->id);
         $subscribers = $DB->get_records('googlemeet_recording_subs', ['googlemeetid' => $googlemeetid]);
@@ -288,7 +285,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
      * @param \stdClass $googlemeet Activity record.
      * @param \stdClass|\cm_info $cm Course module.
      * @param int $newcount Number of new recordings.
-     * @param array[] $lessons Lessons from get_lessons() (may be empty for legacy notices).
+     * @param array[] $lessons Lessons from get_lessons().
      * @return \core\message\message
      */
     public static function build_message(

@@ -29,8 +29,7 @@ $messageproviders = [
         'defaults' => [
             'popup' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
             'email' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
-            // Push to the Moodle app (requires airnotifier configured on the site). Defaults only
-            // reach new providers: the 2026101191 upgrade step enables it on existing sites.
+            // Push to the Moodle app (requires airnotifier configured on the site).
             'airnotifier' => MESSAGE_PERMITTED + MESSAGE_DEFAULT_ENABLED,
         ],
     ],

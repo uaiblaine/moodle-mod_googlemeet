@@ -395,7 +395,7 @@ class recording_cleanup {
     /**
      * When a recording moved to the trash at $timedeleted will be purged automatically.
      *
-     * @param int $timedeleted Trash timestamp (0 = unknown, the clock starts at the next task run).
+     * @param int $timedeleted Trash timestamp (0 = unknown: counted from now).
      * @param int|null $retentiondays Retention, defaults to the site setting.
      * @return int Timestamp, or 0 when automatic purge is disabled.
      */
@@ -447,8 +447,6 @@ class recording_cleanup {
      * Only recordings a teacher trashed by hand (trashreason = manual) are purged: the Drive sync
      * also trashes recordings that are missing from a listing (filter change, permissions, partial
      * listing) and those must never disappear for good without a human decision.
-     * Manual trash rows without a timestamp get "now" as their trash time, so they are purged one
-     * full retention period later instead of immediately.
      *
      * @param int|null $now Current time (tests).
      * @param int|null $retentiondays Retention, defaults to the site setting.
@@ -463,14 +461,6 @@ class recording_cleanup {
         if ($retentiondays <= 0) {
             return $stats;
         }
-
-        $DB->set_field_select(
-            'googlemeet_recordings',
-            'timedeleted',
-            $now,
-            'deleted = 1 AND timedeleted = 0 AND trashreason = ?',
-            [self::TRASH_MANUAL]
-        );
 
         $cutoff = $now - $retentiondays * DAYSECS;
         $rows = $DB->get_records_select(
