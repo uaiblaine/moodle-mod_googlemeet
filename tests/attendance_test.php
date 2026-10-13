@@ -22,6 +22,7 @@ use mod_googlemeet\local\attendance\meet_api_source;
 use mod_googlemeet\local\attendance\report;
 use mod_googlemeet\local\attendance\scope;
 use mod_googlemeet\local\attendance\service;
+use mod_googlemeet\local\schedule;
 use mod_googlemeet\tests\attendance_source_double;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -365,7 +366,7 @@ final class attendance_test extends \advanced_testcase {
         // The new schedule generates none of the old dates (e.g. the start time moved).
         $form = clone $this->googlemeet;
         $form->coursemodule = $this->cm->id;
-        googlemeet_merge_events($form, []);
+        schedule::merge_events($form, []);
 
         $this->assertTrue($DB->record_exists('googlemeet_events', ['id' => $this->eventid]));
         $this->assertTrue($DB->record_exists('googlemeet_attendance', ['eventid' => $this->eventid]));

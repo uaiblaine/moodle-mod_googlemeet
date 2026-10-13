@@ -25,6 +25,7 @@
 use mod_googlemeet\client;
 use mod_googlemeet\local\creator;
 use mod_googlemeet\local\file_serving;
+use mod_googlemeet\local\schedule;
 
 /**
  * Return if the plugin supports $feature.
@@ -218,14 +219,14 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
     }
 
     // Save holiday periods.
-    googlemeet_save_holidays($googlemeet);
+    schedule::save_holidays($googlemeet);
 
     // Save cancelled dates.
-    googlemeet_save_cancelled($googlemeet);
+    schedule::save_cancelled($googlemeet);
 
-    $events = googlemeet_construct_events_data_for_add($googlemeet);
+    $events = schedule::construct_events_data_for_add($googlemeet);
 
-    googlemeet_set_events($googlemeet, $events);
+    schedule::set_events($googlemeet, $events);
 
     // Save teacher attachments (files for students to download).
     googlemeet_save_attachments($googlemeet);
@@ -304,18 +305,18 @@ function googlemeet_update_instance($googlemeet, $mform = null) {
     }
 
     // Save holiday periods.
-    googlemeet_save_holidays($googlemeet);
+    schedule::save_holidays($googlemeet);
 
     // Save cancelled dates.
-    googlemeet_save_cancelled($googlemeet);
+    schedule::save_cancelled($googlemeet);
 
     if (isset($googlemeet->days)) {
         $googlemeet->days = json_decode($googlemeet->days);
     }
-    $events = googlemeet_construct_events_data_for_add($googlemeet);
+    $events = schedule::construct_events_data_for_add($googlemeet);
 
-    // Merge instead of wipe-and-recreate, see googlemeet_merge_events().
-    googlemeet_merge_events($googlemeet, $events);
+    // Merge instead of wipe-and-recreate, see schedule::merge_events().
+    schedule::merge_events($googlemeet, $events);
 
     // Save teacher attachments (files for students to download).
     googlemeet_save_attachments($googlemeet);
@@ -347,7 +348,7 @@ function googlemeet_delete_instance($id) {
     }
     $DB->delete_records('googlemeet_sync_log', ['googlemeetid' => $id]);
 
-    googlemeet_delete_events($id);
+    schedule::delete_events($id);
 
     // Recordings and every dependent (AI, progress, attempts, files, preferences). Core deletes the
     // module question bank right after this callback, so questions are left to it.
@@ -530,177 +531,6 @@ function mod_googlemeet_get_fontawesome_icon_map() {
         'mod_googlemeet:logout' => 'fa-sign-out',
         'mod_googlemeet:play' => 'fa-play',
     ];
-}
-
-/**
- * Save holiday/exclusion periods for a googlemeet instance.
- *
- * @param object $googlemeet The googlemeet instance data from the form.
- * @return void
- */
-function googlemeet_save_holidays($googlemeet) {
-    global $DB;
-
-    // Delete all existing holiday periods for this instance.
-    $DB->delete_records('googlemeet_holidays', ['googlemeetid' => $googlemeet->id]);
-
-    // Only save holidays if recurrence is enabled.
-    if (empty($googlemeet->addmultiply) || empty($googlemeet->holiday_repeats)) {
-        return;
-    }
-
-    // Save new holiday periods.
-    for ($i = 0; $i < $googlemeet->holiday_repeats; $i++) {
-        $startkeyarr = "holidaystartdate";
-        $endkeyarr = "holidayenddate";
-        $namekeyarr = "holidayname";
-
-        // Get data from the repeat elements (they come as arrays).
-        $startdate = $googlemeet->{$startkeyarr}[$i] ?? null;
-        $enddate = $googlemeet->{$endkeyarr}[$i] ?? null;
-        $name = $googlemeet->{$namekeyarr}[$i] ?? '';
-
-        // Only save if both dates are set and valid.
-        if ($startdate && $enddate && $enddate >= $startdate) {
-            $holiday = new stdClass();
-            $holiday->googlemeetid = $googlemeet->id;
-            $holiday->name = $name;
-            $holiday->startdate = $startdate;
-            $holiday->enddate = $enddate;
-            $holiday->timemodified = time();
-
-            $DB->insert_record('googlemeet_holidays', $holiday);
-        }
-    }
-}
-
-/**
- * Get holiday/exclusion periods for a googlemeet instance.
- *
- * @param int $googlemeetid The googlemeet instance ID.
- * @return array Array of holiday period objects.
- */
-function googlemeet_get_holidays($googlemeetid) {
-    global $DB;
-    return $DB->get_records('googlemeet_holidays', ['googlemeetid' => $googlemeetid], 'startdate ASC');
-}
-
-/**
- * Calendar day of a session timestamp, in the site's default timezone.
- *
- * Every session-day decision (cancelled dates, holidays, the "today" flag) goes through this, so
- * a viewer in another timezone and cron, which runs as a user in the site timezone, agree on the
- * day of a session near midnight. The viewer's own timezone is only for displaying times.
- *
- * @param int $timestamp Unix timestamp.
- * @return string Day as Y-m-d; such keys compare in calendar order.
- */
-function googlemeet_session_day(int $timestamp): string {
-    $date = new DateTime('@' . $timestamp);
-    $date->setTimezone(core_date::get_server_timezone_object());
-    return $date->format('Y-m-d');
-}
-
-/**
- * Check if a given date falls within any holiday period.
- *
- * Days are site days ({@see googlemeet_session_day()}).
- *
- * @param int $timestamp The timestamp to check.
- * @param array $holidays Array of holiday period objects.
- * @return bool True if the date is within a holiday period.
- */
-function googlemeet_is_holiday($timestamp, $holidays) {
-    $datestart = googlemeet_session_day((int)$timestamp);
-
-    foreach ($holidays as $holiday) {
-        $holidaystart = googlemeet_session_day((int)$holiday->startdate);
-        $holidayend = googlemeet_session_day((int)$holiday->enddate);
-
-        if ($datestart >= $holidaystart && $datestart <= $holidayend) {
-            return true;
-        }
-    }
-
-    return false;
-}
-
-/**
- * Save cancelled dates for a googlemeet instance.
- *
- * @param object $googlemeet The googlemeet instance data from the form.
- * @return void
- */
-function googlemeet_save_cancelled($googlemeet) {
-    global $DB;
-
-    // Delete all existing cancelled dates for this instance.
-    $DB->delete_records('googlemeet_cancelled', ['googlemeetid' => $googlemeet->id]);
-
-    if (empty($googlemeet->cancelled_repeats)) {
-        return;
-    }
-
-    $cancelledbydate = [];
-    for ($i = 0; $i < $googlemeet->cancelled_repeats; $i++) {
-        $cancelleddate = $googlemeet->cancelleddate[$i] ?? null;
-        $reason = trim((string)($googlemeet->cancelledreason[$i] ?? ''));
-
-        if (empty($cancelleddate)) {
-            continue;
-        }
-
-        $datekey = googlemeet_session_day((int)$cancelleddate);
-        if (isset($cancelledbydate[$datekey]) && $cancelledbydate[$datekey]->reason !== '' && $reason === '') {
-            continue;
-        }
-
-        $cancelled = new stdClass();
-        $cancelled->googlemeetid = $googlemeet->id;
-        $cancelled->cancelleddate = (int)$cancelleddate;
-        $cancelled->reason = $reason;
-        $cancelled->timemodified = time();
-        $cancelledbydate[$datekey] = $cancelled;
-    }
-
-    ksort($cancelledbydate);
-    foreach ($cancelledbydate as $cancelled) {
-        $DB->insert_record('googlemeet_cancelled', $cancelled);
-    }
-}
-
-/**
- * Get cancelled dates for a googlemeet instance.
- *
- * @param int $googlemeetid The googlemeet instance ID.
- * @return array Array of cancelled date objects.
- */
-function googlemeet_get_cancelled($googlemeetid) {
-    global $DB;
-    return $DB->get_records('googlemeet_cancelled', ['googlemeetid' => $googlemeetid], 'cancelleddate ASC');
-}
-
-/**
- * Check if a given date is in the cancelled list.
- *
- * Days are site days ({@see googlemeet_session_day()}).
- *
- * @param int $timestamp The timestamp to check.
- * @param array $cancelleddates Array of cancelled date objects.
- * @return object|false The cancelled date object if found, false otherwise.
- */
-function googlemeet_is_cancelled($timestamp, $cancelleddates) {
-    $datestart = googlemeet_session_day((int)$timestamp);
-
-    foreach ($cancelleddates as $cancelled) {
-        $cancelledstart = googlemeet_session_day((int)$cancelled->cancelleddate);
-
-        if ($datestart === $cancelledstart) {
-            return $cancelled;
-        }
-    }
-
-    return false;
 }
 
 // Secondary navigation entries.

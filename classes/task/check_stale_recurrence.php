@@ -24,6 +24,8 @@
 
 namespace mod_googlemeet\task;
 
+use mod_googlemeet\local\stale_recurrence;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -68,7 +70,7 @@ class check_stale_recurrence extends \core\task\scheduled_task {
             $renotifydays = 28;
         }
 
-        $stale = googlemeet_get_stale_recurrences($weeks);
+        $stale = stale_recurrence::get_stale_recurrences($weeks);
 
         $stillstale = [];
         $sent = 0;
@@ -77,7 +79,7 @@ class check_stale_recurrence extends \core\task\scheduled_task {
             // The alert state lives in googlemeet.stalealerttime (0 = no open alert).
             $last = (int) $DB->get_field('googlemeet', 'stalealerttime', ['id' => $info->id]);
             if ($last === 0 || (time() - $last) > $renotifydays * DAYSECS) {
-                googlemeet_send_stale_alert($info);
+                stale_recurrence::send_stale_alert($info);
                 $DB->set_field('googlemeet', 'stalealerttime', time(), ['id' => $info->id]);
                 $sent++;
             }

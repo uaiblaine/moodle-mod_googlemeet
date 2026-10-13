@@ -18,6 +18,7 @@ namespace mod_googlemeet;
 
 use mod_googlemeet\local\recording_search;
 use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\schedule;
 use mod_googlemeet\task\process_recording_enrichment;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversFunction;
@@ -39,7 +40,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
  */
 #[CoversClass(recordings::class)]
 #[CoversClass(recording_search::class)]
-#[CoversFunction('googlemeet_reset_exhausted_autosync_events')]
+#[CoversClass(schedule::class)]
 #[CoversFunction('googlemeet_get_accessible_recording')]
 #[CoversClass(\mod_googlemeet_external::class)]
 #[CoversClass(process_recording_enrichment::class)]
@@ -387,7 +388,7 @@ final class soft_delete_test extends \advanced_testcase {
             'nextsyncattempt' => $now + HOURSECS,
         ]);
 
-        $this->assertSame(1, googlemeet_reset_exhausted_autosync_events((int)$googlemeet->id));
+        $this->assertSame(1, schedule::reset_exhausted_autosync_events((int)$googlemeet->id));
 
         $exhausted = $DB->get_record('googlemeet_events', ['id' => $exhaustedid], '*', MUST_EXIST);
         $this->assertSame(0, (int)$exhausted->autosynced);

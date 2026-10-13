@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\schedule;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
@@ -84,7 +85,7 @@ final class upgrade_session_days_test extends \advanced_testcase {
         $stored = (int)$DB->get_field('googlemeet_cancelled', 'cancelleddate', ['id' => $id]);
         $this->assertSame($this->midnight('2026-03-05', 'UTC'), $stored);
         $session = $this->midnight('2026-03-05', 'UTC') + 15 * HOURSECS;
-        $this->assertNotFalse(googlemeet_is_cancelled($session, $DB->get_records('googlemeet_cancelled')));
+        $this->assertNotFalse(schedule::is_cancelled($session, $DB->get_records('googlemeet_cancelled')));
     }
 
     /**

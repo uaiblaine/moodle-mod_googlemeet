@@ -50,10 +50,10 @@ class calendar_export {
             'eventdate ASC, id ASC',
             'id, eventdate, duration'
         );
-        $cancelled = \googlemeet_get_cancelled($googlemeetid);
+        $cancelled = schedule::get_cancelled($googlemeetid);
         if ($cancelled) {
             $events = array_filter($events, static function ($event) use ($cancelled) {
-                return \googlemeet_is_cancelled((int)$event->eventdate, $cancelled) === false;
+                return schedule::is_cancelled((int)$event->eventdate, $cancelled) === false;
             });
         }
         return array_values($events);

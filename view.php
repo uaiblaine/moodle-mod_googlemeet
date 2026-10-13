@@ -24,6 +24,7 @@
 
 use mod_googlemeet\client;
 use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\schedule;
 
 require(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
@@ -149,8 +150,8 @@ if ($recording) {
 }
 
 $maxevents = $googlemeet->maxupcomingevents ?? 3;
-$upcomingeventscontext = googlemeet_get_upcoming_events($googlemeet->id, $maxevents);
-$scheduleeventscontext = googlemeet_get_upcoming_events($googlemeet->id, 0, true);
+$upcomingeventscontext = schedule::get_upcoming_events($googlemeet->id, $maxevents);
+$scheduleeventscontext = schedule::get_upcoming_events($googlemeet->id, 0, true);
 $herocontext = googlemeet_get_classroom_hero_context(
     $googlemeet,
     $cm,

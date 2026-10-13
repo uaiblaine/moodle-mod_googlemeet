@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet\local;
 
+use context_module;
 use stdClass;
 
 /**
@@ -109,9 +110,9 @@ class reminders {
             foreach ($rs as $event) {
                 $gid = (int)$event->googlemeetid;
                 if (!array_key_exists($gid, $cancelled)) {
-                    $cancelled[$gid] = \googlemeet_get_cancelled($gid);
+                    $cancelled[$gid] = schedule::get_cancelled($gid);
                 }
-                if ($cancelled[$gid] && \googlemeet_is_cancelled((int)$event->eventdate, $cancelled[$gid]) !== false) {
+                if ($cancelled[$gid] && schedule::is_cancelled((int)$event->eventdate, $cancelled[$gid]) !== false) {
                     continue;
                 }
                 $event->kind = $kind;
@@ -132,7 +133,7 @@ class reminders {
         self::require_libs();
         $sent = 0;
         foreach (self::get_due_events($now) as $event) {
-            $users = \googlemeet_get_users_to_notify((int)$event->id, (int)$event->kind);
+            $users = self::get_users_to_notify((int)$event->id, (int)$event->kind);
             foreach ($users as $user) {
                 // Send first, then record: a crash between the two re-sends next run (a rare
                 // duplicate), preferable to recording first and losing the reminder.
@@ -143,7 +144,7 @@ class reminders {
                     continue;
                 }
                 try {
-                    \googlemeet_notify_done($user->id, $event->id, (int)$event->kind);
+                    self::notify_done($user->id, $event->id, (int)$event->kind);
                 } catch (\dml_write_exception $e) {
                     // Already recorded by an overlapping run: keep going with the other users.
                     mtrace('mod_googlemeet reminder already recorded for user ' . $user->id . ': ' . $e->getMessage());
@@ -188,7 +189,7 @@ class reminders {
             $subjectkey = $kind === self::KIND_HOURS ? 'reminder_subject_hours' : 'reminder_subject_minutes';
             $subject = get_string($subjectkey, 'googlemeet', $a);
             $url = new \moodle_url('/mod/googlemeet/view.php', ['id' => $event->cmid]);
-            $html = \googlemeet_get_messagehtml($user, $event);
+            $html = self::get_messagehtml($user, $event);
 
             $message = new \core\message\message();
             $message->component = 'mod_googlemeet';
@@ -239,6 +240,168 @@ class reminders {
             'courseid' => $courseid,
             'appurl' => $url->out(false),
         ];
+    }
+
+    /**
+     * Generates the list of users who should receive the reminder for an event and have not yet been notified.
+     *
+     * Reminders are for students only. Recipients are users who hold a role with the 'student'
+     * archetype in the module context or any parent context (course, category, system), have an
+     * active enrolment in the course, can view the activity (mod/googlemeet:view), are not suspended,
+     * satisfy the activity's access restrictions and do not manage activities in the course.
+     * Users already recorded in googlemeet_notify_done for the event and reminder kind are excluded.
+     *
+     * @param int $eventid the event ID
+     * @param int $kind reminder kind (self::KIND_*), deduplicated separately
+     * @return stdClass[] users keyed by id (full user records)
+     */
+    public static function get_users_to_notify($eventid, int $kind = 0) {
+        global $DB;
+
+        $event = $DB->get_record('googlemeet_events', ['id' => $eventid], 'id, googlemeetid');
+        if (!$event) {
+            return [];
+        }
+
+        $cm = get_coursemodule_from_instance('googlemeet', $event->googlemeetid, 0, false, IGNORE_MISSING);
+        if (!$cm || empty($cm->visible) || !empty($cm->deletioninprogress)) {
+            return [];
+        }
+
+        $course = $DB->get_record('course', ['id' => $cm->course], 'id, visible');
+        if (!$course || empty($course->visible)) {
+            return [];
+        }
+
+        $context = context_module::instance($cm->id, IGNORE_MISSING);
+        if (!$context) {
+            return [];
+        }
+
+        // Active enrolments only (enrolment status, enrol instance status and time window).
+        $candidates = get_enrolled_users($context, 'mod/googlemeet:view', 0, 'u.*', null, 0, 0, true);
+        if (!$candidates) {
+            return [];
+        }
+
+        // Students only: users with a 'student'-archetype role in the module context or its parents.
+        $studentroleids = array_keys(get_archetype_roles('student'));
+        if (!$studentroleids) {
+            return [];
+        }
+        [$rolesql, $roleparams] = $DB->get_in_or_equal($studentroleids, SQL_PARAMS_NAMED, 'role');
+        [$ctxsql, $ctxparams] = $DB->get_in_or_equal($context->get_parent_context_ids(true), SQL_PARAMS_NAMED, 'ctx');
+        $students = array_flip($DB->get_fieldset_sql(
+            "SELECT DISTINCT ra.userid
+               FROM {role_assignments} ra
+              WHERE ra.roleid $rolesql AND ra.contextid $ctxsql",
+            $roleparams + $ctxparams
+        ));
+
+        $notified = array_flip($DB->get_fieldset_select(
+            'googlemeet_notify_done',
+            'userid',
+            'eventid = ? AND kind = ?',
+            [$eventid, $kind]
+        ));
+
+        $users = [];
+        foreach ($candidates as $user) {
+            if (
+                !isset($students[$user->id]) || isset($notified[$user->id])
+                    || !empty($user->suspended) || !empty($user->deleted)
+            ) {
+                continue;
+            }
+            // A student who also manages activities here (e.g. also editing teacher) is not reminded.
+            if (has_capability('moodle/course:manageactivities', $context, $user)) {
+                continue;
+            }
+            // Respect visibility and access restrictions (availability conditions) for this user.
+            if (!\core_availability\info_module::is_user_visible($cm, $user->id, false)) {
+                continue;
+            }
+            $users[$user->id] = $user;
+        }
+
+        return $users;
+    }
+
+    /**
+     * Record that a reminder kind was sent to a user for a session, so it is not sent again.
+     *
+     * @param int $userid
+     * @param int $eventid
+     * @param int $kind reminder kind (self::KIND_*)
+     * @return int New googlemeet_notify_done id.
+     */
+    public static function notify_done($userid, $eventid, int $kind = 0) {
+        global $DB;
+
+        $notifydone = new stdClass();
+        $notifydone->userid = $userid;
+        $notifydone->eventid = $eventid;
+        $notifydone->kind = $kind;
+        $notifydone->timesent = time();
+
+        return $DB->insert_record('googlemeet_notify_done', $notifydone);
+    }
+
+    /**
+     * Delete the notify_done rows of sessions that have already started (no reminder is due for them).
+     */
+    public static function remove_notify_done_from_old_events() {
+        global $DB;
+
+        $now = time();
+
+        $sql = "DELETE FROM {googlemeet_notify_done}
+                 WHERE eventid IN (SELECT id FROM {googlemeet_events} WHERE eventdate < :now)";
+
+        $DB->execute($sql, ['now' => $now]);
+    }
+
+    /**
+     * Build the HTML body of a reminder from the site's emailcontent template (or the default string).
+     *
+     * @param object $user db record of user
+     * @param object $event Due reminder row (see self::get_due_events()).
+     * @return string - the content of the notification after assembly.
+     */
+    public static function get_messagehtml($user, $event) {
+        global $CFG;
+
+        $config = get_config('googlemeet');
+
+        $startdate = userdate($event->eventdate, get_string('strftimedmy', 'googlemeet'), $user->timezone);
+        $starttime = userdate($event->eventdate, get_string('strftimehm', 'googlemeet'), $user->timezone);
+        $endtime = userdate($event->eventdate + $event->duration, get_string('strftimehm', 'googlemeet'), $user->timezone);
+        $url = "<a href=\"{$CFG->wwwroot}/mod/googlemeet/view.php?id={$event->cmid}\">
+            {$CFG->wwwroot}/mod/googlemeet/view.php?id={$event->cmid}</a>";
+
+        // User- and teacher-controlled values (names, course/activity titles) are escaped with s()
+        // before being spliced into the admin's HTML email template, otherwise a crafted value
+        // injects HTML/script into the notification body. $url is built by us (cmid is an int) and is
+        // deliberately HTML; the date/time/timezone values come from Moodle formatters and are safe.
+        $templatevars = [
+            '%userfirstname%' => s($user->firstname),
+            '%userlastname%' => s($user->lastname),
+            '%coursename%' => s($event->coursename),
+            '%googlemeetname%' => s($event->googlemeetname),
+            '%eventdate%' => $startdate,
+            '%duration%' => $starttime . ' – ' . $endtime,
+            '%timezone%' => usertimezone($user->timezone),
+            '%url%' => $url,
+            '%cmid%' => (int) $event->cmid,
+        ];
+
+        // Use str_replace (literal), not preg_replace: replacement values can legitimately contain
+        // regex backreference sequences such as $0 or \1 (e.g. in a user's name), which preg_replace
+        // would interpret and corrupt.
+        $template = !empty($config->emailcontent) ? $config->emailcontent : get_string('emailcontent_default', 'googlemeet');
+        $emailcontent = str_replace(array_keys($templatevars), array_values($templatevars), $template);
+
+        return $emailcontent;
     }
 
     /**

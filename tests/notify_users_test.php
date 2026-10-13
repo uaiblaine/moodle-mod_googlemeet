@@ -16,7 +16,8 @@
 
 namespace mod_googlemeet;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\local\reminders;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -32,7 +33,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_get_users_to_notify')]
+#[CoversClass(reminders::class)]
 final class notify_users_test extends \advanced_testcase {
     /**
      * Create a course with a googlemeet activity and one future event.
@@ -83,7 +84,7 @@ final class notify_users_test extends \advanced_testcase {
         $noneditingteacher = $gen->create_user();
         $gen->enrol_user($noneditingteacher->id, $course->id, 'teacher');
 
-        $users = googlemeet_get_users_to_notify($eventid);
+        $users = reminders::get_users_to_notify($eventid);
         $ids = array_keys($users);
 
         $this->assertSame([(int)$active->id], array_map('intval', $ids));
@@ -133,7 +134,7 @@ final class notify_users_test extends \advanced_testcase {
         $student = $gen->create_user();
         $gen->enrol_user($student->id, $course->id, 'student');
 
-        $users = googlemeet_get_users_to_notify($eventid);
+        $users = reminders::get_users_to_notify($eventid);
         $this->assertArrayHasKey($student->id, $users);
         $this->assertArrayNotHasKey($intruder->id, $users);
     }
@@ -151,7 +152,7 @@ final class notify_users_test extends \advanced_testcase {
         $student = $gen->create_user();
         $gen->enrol_user($student->id, $course->id, 'student');
 
-        $this->assertArrayHasKey($student->id, googlemeet_get_users_to_notify($eventid));
+        $this->assertArrayHasKey($student->id, reminders::get_users_to_notify($eventid));
 
         // Restrict the activity until a date in the future.
         $availability = json_encode([
@@ -162,7 +163,7 @@ final class notify_users_test extends \advanced_testcase {
         $DB->set_field('course_modules', 'availability', $availability, ['id' => $googlemeet->cmid]);
         rebuild_course_cache($course->id, true);
 
-        $this->assertArrayNotHasKey($student->id, googlemeet_get_users_to_notify($eventid));
+        $this->assertArrayNotHasKey($student->id, reminders::get_users_to_notify($eventid));
     }
 
     /**
@@ -176,9 +177,9 @@ final class notify_users_test extends \advanced_testcase {
         $student = $gen->create_user();
         $gen->enrol_user($student->id, $course->id, 'student');
 
-        $this->assertArrayHasKey($student->id, googlemeet_get_users_to_notify($eventid));
-        googlemeet_notify_done($student->id, $eventid);
-        $this->assertArrayNotHasKey($student->id, googlemeet_get_users_to_notify($eventid));
+        $this->assertArrayHasKey($student->id, reminders::get_users_to_notify($eventid));
+        reminders::notify_done($student->id, $eventid);
+        $this->assertArrayNotHasKey($student->id, reminders::get_users_to_notify($eventid));
     }
 
     /**
@@ -193,6 +194,6 @@ final class notify_users_test extends \advanced_testcase {
         $gen->enrol_user($student->id, $course->id, 'student');
 
         set_coursemodule_visible($googlemeet->cmid, 0);
-        $this->assertSame([], googlemeet_get_users_to_notify($eventid));
+        $this->assertSame([], reminders::get_users_to_notify($eventid));
     }
 }

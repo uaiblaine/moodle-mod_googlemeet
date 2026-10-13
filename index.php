@@ -85,7 +85,7 @@ foreach ($cms as $instanceid => $cm) {
 
     // Next session: the first upcoming (or live) session that is not cancelled.
     $nextsession = get_string('index_nextsession_none', 'mod_googlemeet');
-    $upcoming = googlemeet_get_upcoming_events($googlemeet->id, 10);
+    $upcoming = \mod_googlemeet\local\schedule::get_upcoming_events($googlemeet->id, 10);
     foreach ($upcoming['upcomingevents'] as $event) {
         if (!empty($event->iscancelled)) {
             continue;

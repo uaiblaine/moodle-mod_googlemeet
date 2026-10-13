@@ -19,6 +19,7 @@ namespace mod_googlemeet;
 use mod_googlemeet\local\recording_format;
 use mod_googlemeet\local\recording_search;
 use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\schedule;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
@@ -39,12 +40,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_is_holiday')]
-#[CoversFunction('googlemeet_is_cancelled')]
-#[CoversFunction('googlemeet_save_cancelled')]
+#[CoversClass(schedule::class)]
 #[CoversFunction('googlemeet_clear_url')]
-#[CoversFunction('googlemeet_construct_events_data_for_add')]
-#[CoversFunction('googlemeet_set_events')]
 #[CoversClass(recordings::class)]
 #[CoversFunction('googlemeet_summary_paragraphs')]
 #[CoversFunction('googlemeet_get_recording_seek_url')]
@@ -181,14 +178,14 @@ final class locallib_test extends \advanced_testcase {
         $this->assertSame(1563, recording_format::timestamp_to_seconds(recording_format::format_seconds_timestamp(1563)));
     }
 
-    // Tests of googlemeet_is_holiday().
+    // Tests of schedule::is_holiday().
 
     /**
      * An empty holidays array means nothing is a holiday.
      *
      */
     public function test_is_holiday_empty_array(): void {
-        $this->assertFalse(googlemeet_is_holiday(mktime(10, 0, 0, 6, 15, 2026), []));
+        $this->assertFalse(schedule::is_holiday(mktime(10, 0, 0, 6, 15, 2026), []));
     }
 
     /**
@@ -200,7 +197,7 @@ final class locallib_test extends \advanced_testcase {
         $day = mktime(0, 0, 0, 6, 15, 2026);
         $holidays = [$this->make_holiday($day, $day)];
         // Timestamp in the middle of that day.
-        $this->assertTrue(googlemeet_is_holiday(mktime(14, 30, 0, 6, 15, 2026), $holidays));
+        $this->assertTrue(schedule::is_holiday(mktime(14, 30, 0, 6, 15, 2026), $holidays));
     }
 
     /**
@@ -214,7 +211,7 @@ final class locallib_test extends \advanced_testcase {
         $holidays = [$this->make_holiday($start, $end)];
 
         // End day — must be inside.
-        $this->assertTrue(googlemeet_is_holiday(mktime(9, 0, 0, 6, 20, 2026), $holidays));
+        $this->assertTrue(schedule::is_holiday(mktime(9, 0, 0, 6, 20, 2026), $holidays));
     }
 
     /**
@@ -226,7 +223,7 @@ final class locallib_test extends \advanced_testcase {
         $end   = mktime(0, 0, 0, 6, 20, 2026);
         $holidays = [$this->make_holiday($start, $end)];
 
-        $this->assertFalse(googlemeet_is_holiday(mktime(23, 59, 59, 6, 9, 2026), $holidays));
+        $this->assertFalse(schedule::is_holiday(mktime(23, 59, 59, 6, 9, 2026), $holidays));
     }
 
     /**
@@ -238,7 +235,7 @@ final class locallib_test extends \advanced_testcase {
         $end   = mktime(0, 0, 0, 6, 20, 2026);
         $holidays = [$this->make_holiday($start, $end)];
 
-        $this->assertFalse(googlemeet_is_holiday(mktime(0, 0, 0, 6, 21, 2026), $holidays));
+        $this->assertFalse(schedule::is_holiday(mktime(0, 0, 0, 6, 21, 2026), $holidays));
     }
 
     /**
@@ -250,7 +247,7 @@ final class locallib_test extends \advanced_testcase {
         $end   = mktime(0, 0, 0, 6, 20, 2026);
         $holidays = [$this->make_holiday($start, $end)];
 
-        $this->assertTrue(googlemeet_is_holiday(mktime(12, 0, 0, 6, 15, 2026), $holidays));
+        $this->assertTrue(schedule::is_holiday(mktime(12, 0, 0, 6, 15, 2026), $holidays));
     }
 
     /**
@@ -264,7 +261,7 @@ final class locallib_test extends \advanced_testcase {
         ];
 
         // Falls in the August range.
-        $this->assertTrue(googlemeet_is_holiday(mktime(10, 0, 0, 8, 10, 2026), $holidays));
+        $this->assertTrue(schedule::is_holiday(mktime(10, 0, 0, 8, 10, 2026), $holidays));
     }
 
     /**
@@ -278,17 +275,17 @@ final class locallib_test extends \advanced_testcase {
         ];
 
         // March — between both ranges.
-        $this->assertFalse(googlemeet_is_holiday(mktime(10, 0, 0, 3, 1, 2026), $holidays));
+        $this->assertFalse(schedule::is_holiday(mktime(10, 0, 0, 3, 1, 2026), $holidays));
     }
 
-    // Tests of googlemeet_is_cancelled().
+    // Tests of schedule::is_cancelled().
 
     /**
      * Empty cancelled list — nothing is cancelled.
      *
      */
     public function test_is_cancelled_empty_list(): void {
-        $this->assertFalse(googlemeet_is_cancelled(mktime(10, 0, 0, 6, 15, 2026), []));
+        $this->assertFalse(schedule::is_cancelled(mktime(10, 0, 0, 6, 15, 2026), []));
     }
 
     /**
@@ -299,7 +296,7 @@ final class locallib_test extends \advanced_testcase {
         $day = mktime(0, 0, 0, 6, 15, 2026);
         $cancelled = [$this->make_cancelled($day, 'Teacher sick')];
 
-        $result = googlemeet_is_cancelled(mktime(14, 30, 0, 6, 15, 2026), $cancelled);
+        $result = schedule::is_cancelled(mktime(14, 30, 0, 6, 15, 2026), $cancelled);
         $this->assertNotFalse($result);
         $this->assertEquals('Teacher sick', $result->reason);
     }
@@ -313,7 +310,7 @@ final class locallib_test extends \advanced_testcase {
         $cancelled = [$this->make_cancelled($day)];
 
         // One day later.
-        $this->assertFalse(googlemeet_is_cancelled(mktime(10, 0, 0, 6, 16, 2026), $cancelled));
+        $this->assertFalse(schedule::is_cancelled(mktime(10, 0, 0, 6, 16, 2026), $cancelled));
     }
 
     /**
@@ -325,7 +322,7 @@ final class locallib_test extends \advanced_testcase {
         $cancelled = [$this->make_cancelled($day)];
 
         // Different time but same calendar date.
-        $result = googlemeet_is_cancelled(mktime(22, 0, 0, 6, 15, 2026), $cancelled);
+        $result = schedule::is_cancelled(mktime(22, 0, 0, 6, 15, 2026), $cancelled);
         $this->assertNotFalse($result);
     }
 
@@ -341,12 +338,12 @@ final class locallib_test extends \advanced_testcase {
         ];
 
         // Only the May date should match.
-        $result = googlemeet_is_cancelled(mktime(10, 0, 0, 5, 20, 2026), $cancelled);
+        $result = schedule::is_cancelled(mktime(10, 0, 0, 5, 20, 2026), $cancelled);
         $this->assertNotFalse($result);
         $this->assertEquals('Reason B', $result->reason);
 
         // A date not in the list returns false.
-        $this->assertFalse(googlemeet_is_cancelled(mktime(10, 0, 0, 7, 4, 2026), $cancelled));
+        $this->assertFalse(schedule::is_cancelled(mktime(10, 0, 0, 7, 4, 2026), $cancelled));
     }
 
     /**
@@ -356,7 +353,7 @@ final class locallib_test extends \advanced_testcase {
     public function test_is_cancelled_empty_reason(): void {
         $day = mktime(0, 0, 0, 4, 1, 2026);
         $cancelled = [$this->make_cancelled($day, '')];
-        $result = googlemeet_is_cancelled(mktime(9, 0, 0, 4, 1, 2026), $cancelled);
+        $result = schedule::is_cancelled(mktime(9, 0, 0, 4, 1, 2026), $cancelled);
         $this->assertNotFalse($result);
         $this->assertSame('', $result->reason);
     }
@@ -391,7 +388,7 @@ final class locallib_test extends \advanced_testcase {
             ],
         ];
 
-        googlemeet_save_cancelled($googlemeet);
+        schedule::save_cancelled($googlemeet);
 
         $records = array_values($DB->get_records(
             'googlemeet_cancelled',
@@ -484,7 +481,7 @@ final class locallib_test extends \advanced_testcase {
         $this->assertSame('https://meet.google.com/abc-defg-hij', googlemeet_clear_url('https://MEET.google.com/abc-defg-hij'));
     }
 
-    // Tests of DB-backed code: googlemeet_construct_events_data_for_add() reads googlemeet_holidays.
+    // Tests of DB-backed code: schedule::construct_events_data_for_add() reads googlemeet_holidays.
 
     /**
      * Non-recurring event: single event returned, no holidays set.
@@ -495,7 +492,7 @@ final class locallib_test extends \advanced_testcase {
 
         $this->resetAfterTest();
 
-        // A real instance id for googlemeet_get_holidays() to query.
+        // A real instance id for schedule::get_holidays() to query.
         $googlemeetid = $DB->insert_record('googlemeet', (object)[
             'course'        => 1,
             'name'          => 'Test Meet',
@@ -514,7 +511,7 @@ final class locallib_test extends \advanced_testcase {
         // No recurrence.
         unset($googlemeet->addmultiply);
 
-        $events = googlemeet_construct_events_data_for_add($googlemeet);
+        $events = schedule::construct_events_data_for_add($googlemeet);
 
         $this->assertCount(1, $events);
         $this->assertEquals($googlemeetid, $events[0]->googlemeetid);
@@ -554,7 +551,7 @@ final class locallib_test extends \advanced_testcase {
         $googlemeet->eventdate   = mktime(0, 0, 0, 6, 1, 2026);
         unset($googlemeet->addmultiply);
 
-        $events = googlemeet_construct_events_data_for_add($googlemeet);
+        $events = schedule::construct_events_data_for_add($googlemeet);
 
         $this->assertCount(0, $events, 'Event on a holiday should be excluded.');
     }
@@ -594,7 +591,7 @@ final class locallib_test extends \advanced_testcase {
         // Mon + Wed.
         $googlemeet->days         = (object)['Mon' => 1, 'Wed' => 1];
 
-        $events = googlemeet_construct_events_data_for_add($googlemeet);
+        $events = schedule::construct_events_data_for_add($googlemeet);
 
         // Expect: Mon 01/Jun (first event), Wed 03/Jun, Mon 08/Jun, Wed 10/Jun = 4 events.
         $this->assertCount(4, $events, 'Expected 4 events for Mon+Wed over 2 weeks.');
@@ -638,7 +635,7 @@ final class locallib_test extends \advanced_testcase {
         $googlemeet->period       = 2; // Every 2 weeks.
         $googlemeet->days         = (object)['Mon' => 1];
 
-        $events = googlemeet_construct_events_data_for_add($googlemeet);
+        $events = schedule::construct_events_data_for_add($googlemeet);
 
         // Jun 01 is the first event; the recurrence then visits every other week:
         // Jun 08 skipped (week 2), Jun 15 added (week 3), Jun 22 skipped (week 4). 2 events.
@@ -683,7 +680,7 @@ final class locallib_test extends \advanced_testcase {
         $googlemeet->period       = 1;
         $googlemeet->days         = (object)['Mon' => 1, 'Wed' => 1, 'Fri' => 1];
 
-        $events = googlemeet_construct_events_data_for_add($googlemeet);
+        $events = schedule::construct_events_data_for_add($googlemeet);
 
         // Mon Jun 01 (first event), Wed Jun 03 (holiday → excluded), Fri Jun 05.
         // Total: 2 events.
@@ -903,7 +900,7 @@ final class locallib_test extends \advanced_testcase {
         $googlemeet->eventdate   = mktime(0, 0, 0, 7, 1, 2026);
         unset($googlemeet->addmultiply);
 
-        $events = googlemeet_construct_events_data_for_add($googlemeet);
+        $events = schedule::construct_events_data_for_add($googlemeet);
 
         $this->assertCount(1, $events);
         // 9:30 → 11:00 = 90 minutes = 5400 seconds.
@@ -927,7 +924,7 @@ final class locallib_test extends \advanced_testcase {
             ]),
         ];
 
-        googlemeet_set_events($googlemeet, []);
+        schedule::set_events($googlemeet, []);
 
         $this->assertFalse($DB->record_exists('googlemeet_events', ['googlemeetid' => $googlemeet->id]));
     }

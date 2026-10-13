@@ -222,7 +222,7 @@ class sync_manager {
         // only the room organiser's account may run it (the button is hidden for others, this also
         // covers the web service and stale forms).
         self::require_creator_account((string)$client->get_email(), (string)($googlemeet->creatoremail ?? ''));
-        googlemeet_reset_exhausted_autosync_events((int)$googlemeet->id);
+        schedule::reset_exhausted_autosync_events((int)$googlemeet->id);
         return $client->syncrecordings($googlemeet, true, true) ?: [];
     }
 

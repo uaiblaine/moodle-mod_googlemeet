@@ -16,7 +16,8 @@
 
 namespace mod_googlemeet;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\local\schedule;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -35,11 +36,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 Anderson Blaine
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_session_day')]
-#[CoversFunction('googlemeet_is_cancelled')]
-#[CoversFunction('googlemeet_is_holiday')]
-#[CoversFunction('googlemeet_save_cancelled')]
-#[CoversFunction('googlemeet_get_upcoming_events')]
+#[CoversClass(schedule::class)]
 final class session_day_test extends \advanced_testcase {
     /** @var int Site midnight of today. */
     private $midnight;
@@ -89,8 +86,8 @@ final class session_day_test extends \advanced_testcase {
             usergetmidnight($this->lateevening, 'Europe/London'),
             usergetmidnight($this->midnight, 'Europe/London')
         );
-        $this->assertSame(googlemeet_session_day($this->midnight), googlemeet_session_day($this->lateevening));
-        $this->assertNotSame(googlemeet_session_day($this->lateevening), googlemeet_session_day($this->lateevening + HOURSECS));
+        $this->assertSame(schedule::session_day($this->midnight), schedule::session_day($this->lateevening));
+        $this->assertNotSame(schedule::session_day($this->lateevening), schedule::session_day($this->lateevening + HOURSECS));
     }
 
     /**
@@ -99,13 +96,13 @@ final class session_day_test extends \advanced_testcase {
     public function test_cancelled_day_is_the_site_day(): void {
         $cancelled = [(object)['id' => 1, 'cancelleddate' => $this->midnight, 'reason' => 'Strike']];
 
-        [$viewer, $cron] = $this->as_viewer_and_cron(fn() => googlemeet_is_cancelled($this->lateevening, $cancelled));
+        [$viewer, $cron] = $this->as_viewer_and_cron(fn() => schedule::is_cancelled($this->lateevening, $cancelled));
         $this->assertNotFalse($viewer);
         $this->assertNotFalse($cron);
 
         // Control: the session one hour later is on the next site day, not cancelled for either.
         [$viewer, $cron] = $this->as_viewer_and_cron(
-            fn() => googlemeet_is_cancelled($this->lateevening + HOURSECS, $cancelled)
+            fn() => schedule::is_cancelled($this->lateevening + HOURSECS, $cancelled)
         );
         $this->assertFalse($viewer);
         $this->assertFalse($cron);
@@ -117,11 +114,11 @@ final class session_day_test extends \advanced_testcase {
     public function test_holiday_day_is_the_site_day(): void {
         $holidays = [(object)['startdate' => $this->midnight, 'enddate' => $this->midnight]];
 
-        [$viewer, $cron] = $this->as_viewer_and_cron(fn() => googlemeet_is_holiday($this->lateevening, $holidays));
+        [$viewer, $cron] = $this->as_viewer_and_cron(fn() => schedule::is_holiday($this->lateevening, $holidays));
         $this->assertTrue($viewer);
         $this->assertTrue($cron);
 
-        [$viewer, $cron] = $this->as_viewer_and_cron(fn() => googlemeet_is_holiday($this->lateevening + HOURSECS, $holidays));
+        [$viewer, $cron] = $this->as_viewer_and_cron(fn() => schedule::is_holiday($this->lateevening + HOURSECS, $holidays));
         $this->assertFalse($viewer);
         $this->assertFalse($cron);
     }
@@ -136,7 +133,7 @@ final class session_day_test extends \advanced_testcase {
             'url' => 'https://meet.google.com/abc-defg-hij',
         ]);
         $this->setUser($this->tokyouser);
-        googlemeet_save_cancelled((object)[
+        schedule::save_cancelled((object)[
             'id' => $googlemeet->id,
             'cancelled_repeats' => 2,
             'cancelleddate' => [$this->midnight, $this->lateevening],
@@ -172,7 +169,7 @@ final class session_day_test extends \advanced_testcase {
         ]);
 
         [$viewer, $cron] = $this->as_viewer_and_cron(function () use ($googlemeet) {
-            $events = googlemeet_get_upcoming_events($googlemeet->id, 10, true)['upcomingevents'];
+            $events = schedule::get_upcoming_events($googlemeet->id, 10, true)['upcomingevents'];
             $this->assertCount(1, $events);
             return [(bool)$events[0]->iscancelled, (bool)$events[0]->today];
         });

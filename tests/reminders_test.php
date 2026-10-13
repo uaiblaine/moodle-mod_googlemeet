@@ -204,9 +204,9 @@ final class reminders_test extends \advanced_testcase {
         [, $googlemeet, $student] = $this->create_activity();
         $eventid = $this->add_event($googlemeet->id, $this->now + HOURSECS);
 
-        googlemeet_notify_done($student->id, $eventid, reminders::KIND_HOURS);
-        $this->assertArrayNotHasKey($student->id, googlemeet_get_users_to_notify($eventid, reminders::KIND_HOURS));
-        $this->assertArrayHasKey($student->id, googlemeet_get_users_to_notify($eventid, reminders::KIND_MINUTES));
+        reminders::notify_done($student->id, $eventid, reminders::KIND_HOURS);
+        $this->assertArrayNotHasKey($student->id, reminders::get_users_to_notify($eventid, reminders::KIND_HOURS));
+        $this->assertArrayHasKey($student->id, reminders::get_users_to_notify($eventid, reminders::KIND_MINUTES));
     }
 
     /**

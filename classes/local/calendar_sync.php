@@ -127,7 +127,7 @@ class calendar_sync {
      * Build the Calendar event resource (summary, start, end, recurrence) for an activity.
      *
      * Times are the instants Moodle uses for its own sessions (eventdate + HH:MM, see
-     * googlemeet_construct_events_data_for_add()), formatted as wall-clock time in $timezone and
+     * schedule::construct_events_data_for_add()), formatted as wall-clock time in $timezone and
      * sent with that same timeZone, so Google never re-interprets them in another zone. The RRULE
      * UNTIL is the end of the last day in $timezone, expressed in UTC as RFC 5545 requires.
      *

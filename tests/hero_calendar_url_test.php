@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\schedule;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
@@ -57,8 +58,8 @@ final class hero_calendar_url_test extends \advanced_testcase {
             'timemodified' => time(),
         ]);
 
-        $upcoming = googlemeet_get_upcoming_events($googlemeet->id, 3);
-        $schedule = googlemeet_get_upcoming_events($googlemeet->id, 0, true);
+        $upcoming = schedule::get_upcoming_events($googlemeet->id, 3);
+        $schedule = schedule::get_upcoming_events($googlemeet->id, 0, true);
         $hero = googlemeet_get_classroom_hero_context($googlemeet, $cm, $context, $upcoming, true, $schedule);
         // Control: the schedule section that carries the link is rendered.
         $this->assertTrue($hero['hasscheduleevents']);

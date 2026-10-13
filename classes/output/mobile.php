@@ -25,6 +25,7 @@ namespace mod_googlemeet\output;
 
 use mod_googlemeet\local\recording_format;
 use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\schedule;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -87,7 +88,7 @@ class mobile {
             'courseid' => (int)$course->id,
             'intro' => format_module_intro('googlemeet', $googlemeet, $cm->id),
             'hasroom' => $roomurl !== null,
-            'upcomingevent' => googlemeet_get_upcoming_events($googlemeet->id, $googlemeet->maxupcomingevents ?? 3),
+            'upcomingevent' => schedule::get_upcoming_events($googlemeet->id, $googlemeet->maxupcomingevents ?? 3),
             'recording' => $list,
         ];
 

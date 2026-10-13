@@ -17,6 +17,7 @@
 namespace mod_googlemeet\local\attendance;
 
 use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\schedule;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -93,9 +94,9 @@ class service {
         foreach ($rows as $row) {
             $gid = (int)$row->googlemeetid;
             if (!array_key_exists($gid, $cancelled)) {
-                $cancelled[$gid] = googlemeet_get_cancelled($gid);
+                $cancelled[$gid] = schedule::get_cancelled($gid);
             }
-            if (googlemeet_is_cancelled((int)$row->eventdate, $cancelled[$gid]) !== false) {
+            if (schedule::is_cancelled((int)$row->eventdate, $cancelled[$gid]) !== false) {
                 continue;
             }
             $DB->insert_record('googlemeet_attendance_sync', (object)[
