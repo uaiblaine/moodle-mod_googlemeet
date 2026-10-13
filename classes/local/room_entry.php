@@ -28,9 +28,11 @@ class room_entry {
     /** @var int Seconds before the start in which a session already counts as the one being joined. */
     public const EARLY_WINDOW = 30 * MINSECS;
 
-    /** @var string Valid Google Meet room URL. */
-    public const MEET_URL_PATTERN = '/^https:\/\/meet\.google\.com\/'
-        . '[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/';
+    /** @var string A Google Meet room code (xxx-xxxx-xxx), the one rule clear_url() and room_url() share. */
+    public const MEET_CODE = '[a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3}';
+
+    /** @var string Valid Google Meet room URL: exactly https://meet.google.com/<code>, as clear_url() builds it. */
+    public const MEET_URL_PATTERN = '~^https://meet\.google\.com/' . self::MEET_CODE . '$~i';
 
     /**
      * The session (googlemeet_events row) being joined at $now: live, or starting within the early window.
@@ -111,15 +113,15 @@ class room_entry {
     /**
      * Extract the Google Meet room from a URL as https://meet.google.com/xxx-xxxx-xxx.
      *
-     * Every non-null result matches {@see self::MEET_URL_PATTERN}, which room_url() checks; that
-     * pattern is the wider one (anchored, but it also admits @:%._+~#= inside the code).
+     * Every non-null result matches {@see self::MEET_URL_PATTERN}, which room_url() checks: both read
+     * the code through {@see self::MEET_CODE}.
      *
      * @param string $url
      * @return string|null The normalised URL, or null when the text holds no Meet room code.
      */
     public static function clear_url($url) {
         // Literal dots and a URL rebuilt from the code alone: the host of the result is always meet.google.com.
-        if (preg_match('~meet\.google\.com/([a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3})~i', (string)$url, $matches)) {
+        if (preg_match('~meet\.google\.com/(' . self::MEET_CODE . ')~i', (string)$url, $matches)) {
             return 'https://meet.google.com/' . $matches[1];
         }
 

@@ -480,6 +480,34 @@ final class locallib_test extends \advanced_testcase {
         $this->assertSame('https://meet.google.com/abc-defg-hij', room_entry::clear_url('https://MEET.google.com/abc-defg-hij'));
     }
 
+    /**
+     * room_url() accepts exactly the URL clear_url() builds and nothing wider: a stored URL that never
+     * went through clear_url() (an old row, a restored backup) cannot carry other characters.
+     */
+    public function test_room_url_shares_the_clear_url_rule(): void {
+        $room = fn(string $url) => room_entry::room_url((object)['url' => $url]);
+
+        $this->assertSame('https://meet.google.com/abc-defg-hij', $room('https://meet.google.com/abc-defg-hij'));
+        $this->assertSame('https://meet.google.com/abc-defg-hij', $room('  https://meet.google.com/abc-defg-hij  '));
+        $rejected = [
+            'https://meet.google.com/a@c-defg-hij', 'https://meet.google.com/abc-de%g-hij',
+            'https://meet.google.com/abc-defg-h#j', 'https://meet.google.com/abc-defg-hij?authuser=0',
+            'http://meet.google.com/abc-defg-hij', 'https://meetXgoogle.com/abc-defg-hij',
+            'https://meet.google.com.evil.example/abc-defg-hij', '',
+        ];
+        foreach ($rejected as $url) {
+            $this->assertNull($room($url), $url);
+        }
+        // Whatever clear_url() returns, room_url() accepts.
+        $inputs = [
+            'https://meet.google.com/abc-defg-hij?pli=1', 'Join: meet.google.com/xyz-abcd-efg now',
+            'https://MEET.google.com/abc-defg-hij',
+        ];
+        foreach ($inputs as $input) {
+            $this->assertNotNull($room((string)room_entry::clear_url($input)), $input);
+        }
+    }
+
     // Tests of DB-backed code: schedule::construct_events_data_for_add() reads googlemeet_holidays.
 
     /**

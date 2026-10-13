@@ -3,6 +3,13 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.10 (unreleased)
+- The join button accepts a stored Meet URL only in the exact form the activity form saves
+  (`https://meet.google.com/xxx-xxxx-xxx`): the room code is one rule (`room_entry::MEET_CODE`)
+  shared by the form, the join button and the view page, which used a wider copy that also admitted
+  characters such as `@`, `%` and `#` in the code. A row that never went through the form (a restored
+  backup, an old activity) with any other value shows no join button, as an invalid URL already did.
+
 ## 2.30.1+uai.9 (unreleased)
 - The recording helpers moved out of `lib.php` into autoloaded classes under `classes/local/`, with
   the same behaviour: `recordings` (listing, counts, the Drive sync, display names, lesson titles and
