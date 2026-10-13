@@ -1191,6 +1191,26 @@ function googlemeet_print_recordings(
     $hasprevious = $page > 0;
     $hasnext = $page < ($totalpages - 1);
 
+    // Sort and page links are complete URLs: each carries rorder exactly once (never an appended duplicate), the
+    // filters (rq, topic, rpending) and, for the page links, rpage. Sorting returns to the first page.
+    $listurl = static function (string $linkorder, ?int $linkpage = null) use ($cm, $query, $topic, $pendingonly): string {
+        $params = ['id' => $cm->id];
+        if (trim((string)$query) !== '') {
+            $params['rq'] = $query;
+        }
+        if (trim((string)$topic) !== '') {
+            $params['topic'] = $topic;
+        }
+        if ($pendingonly) {
+            $params['rpending'] = 1;
+        }
+        $params['rorder'] = $linkorder;
+        if ($linkpage !== null) {
+            $params['rpage'] = $linkpage;
+        }
+        return (new moodle_url('/mod/googlemeet/view.php', $params))->out(false);
+    };
+
     // Build page numbers for pagination.
     $pages = [];
     for ($i = 0; $i < $totalpages; $i++) {
@@ -1200,6 +1220,7 @@ function googlemeet_print_recordings(
             'active' => ($i === $page),
             'currentorder' => $order,
             'coursemoduleid' => $cm->id,
+            'url' => $listurl($order, $i),
         ];
     }
 
@@ -1259,6 +1280,10 @@ function googlemeet_print_recordings(
         'currentpage' => $page,
         'previouspage' => $page - 1,
         'nextpage' => $page + 1,
+        'previouspageurl' => $listurl($order, max(0, $page - 1)),
+        'nextpageurl' => $listurl($order, $page + 1),
+        'sortdescurl' => $listurl('DESC'),
+        'sortascurl' => $listurl('ASC'),
         'pages' => $pages,
         'totalrecordings' => $totalrecordings,
         'start' => $start,

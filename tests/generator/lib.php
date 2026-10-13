@@ -109,4 +109,47 @@ class mod_googlemeet_generator extends testing_module_generator {
         $id = $DB->insert_record('googlemeet_ai_analysis', (object) $record);
         return $DB->get_record('googlemeet_ai_analysis', ['id' => $id], '*', MUST_EXIST);
     }
+
+    /**
+     * Create a published (ready) multiple-choice practice question for a recording.
+     *
+     * Goes through question_service::create_draft_multichoice(), the path the AI review publishes
+     * through, so the question carries the recording tag the practice session looks up.
+     *
+     * @param array|stdClass $record Needs recordingid, stem, options (four, comma-separated or an array)
+     *     and correct (index of the right option, 0-3); ready (default 1) publishes it.
+     * @return stdClass The question id as {id}.
+     */
+    public function create_practice_question($record): stdClass {
+        global $DB;
+        $record = (array) $record;
+        $recording = $DB->get_record('googlemeet_recordings', ['id' => $record['recordingid']], '*', MUST_EXIST);
+        $googlemeet = $DB->get_record('googlemeet', ['id' => $recording->googlemeetid], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('googlemeet', $googlemeet->id, $googlemeet->course, false, MUST_EXIST);
+        $context = \context_module::instance($cm->id);
+        $options = is_array($record['options']) ? $record['options'] : array_map('trim', explode(',', $record['options']));
+
+        $questionid = (new \mod_googlemeet\question_service())->create_draft_multichoice(
+            $googlemeet,
+            $cm,
+            $context,
+            (int) $recording->id,
+            [
+                'stem' => $record['stem'],
+                'options' => $options,
+                'correctindex' => (int) $record['correct'],
+                'explanation' => $record['explanation'] ?? '',
+                'citation' => '',
+            ]
+        );
+        if (!empty($record['ready'] ?? 1)) {
+            $DB->set_field(
+                'question_versions',
+                'status',
+                \core_question\local\bank\question_version_status::QUESTION_STATUS_READY,
+                ['questionid' => $questionid]
+            );
+        }
+        return (object) ['id' => $questionid];
+    }
 }

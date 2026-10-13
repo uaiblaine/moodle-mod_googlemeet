@@ -35,7 +35,14 @@
     "coursemoduleid": 1919,
     "hascapability": 1,
     "aienabled": 1,
-    "cangenerateai": 1
+    "cangenerateai": 1,
+    "sortdescurl": "https://example.com/mod/googlemeet/view.php?id=1919&rorder=DESC",
+    "sortascurl": "https://example.com/mod/googlemeet/view.php?id=1919&rorder=ASC",
+    "previouspageurl": "https://example.com/mod/googlemeet/view.php?id=1919&rorder=DESC&rpage=0",
+    "nextpageurl": "https://example.com/mod/googlemeet/view.php?id=1919&rorder=DESC&rpage=2",
+    "pages": [
+      {"number": 1, "page": 0, "active": false, "url": "https://example.com/mod/googlemeet/view.php?id=1919&rorder=DESC&rpage=0"}
+    ]
   }
 }}
 <div id="googlemeet_recordings_table" class="googlemeet-recordings-container">
@@ -145,18 +152,16 @@
         </div>
         {{/alltopics.0}}
         <div class="googlemeet-filters-group googlemeet-recordings-controls">
-          {{! Sort and page links extend the current filter URL (built with moodle_url, so the search and the topic
-              arrive URL-encoded): Mustache only HTML-escapes. allfilterurl and pendingfilterurl already carry
-              rorder; PHP keeps the last of two equal parameters, so the appended rorder wins. Neither carries
-              rpage: sorting returns to the first page. }}
+          {{! Sort and page links are complete URLs built in PHP (moodle_url, so the search and the topic arrive
+              URL-encoded and only HTML-escaped here). Sort links return to the first page. }}
           <span class="googlemeet-filters-label small text-muted">{{# str }} recordings_sort_by, mod_googlemeet {{/ str }}:</span>
           <div class="btn-group btn-group-sm googlemeet-sort-toggle" role="group" aria-label="{{# str }} recordings_sort_by, mod_googlemeet {{/ str }}">
-            <a href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rorder=DESC"
+            <a href="{{sortdescurl}}"
                class="btn {{#isorderdesc}}btn-primary{{/isorderdesc}}{{^isorderdesc}}btn-outline-secondary{{/isorderdesc}}" {{#isorderdesc}}aria-current="true"{{/isorderdesc}}>
               <span class="googlemeet-sort-label-full">{{# str }} recordingsorder_desc, mod_googlemeet {{/ str }}</span>
               <span class="googlemeet-sort-label-short">{{# str }} recordingsorder_desc_short, mod_googlemeet {{/ str }}</span>
             </a>
-            <a href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rorder=ASC"
+            <a href="{{sortascurl}}"
                class="btn {{#isorderasc}}btn-primary{{/isorderasc}}{{^isorderasc}}btn-outline-secondary{{/isorderasc}}" {{#isorderasc}}aria-current="true"{{/isorderasc}}>
               <span class="googlemeet-sort-label-full">{{# str }} recordingsorder_asc, mod_googlemeet {{/ str }}</span>
               <span class="googlemeet-sort-label-short">{{# str }} recordingsorder_asc_short, mod_googlemeet {{/ str }}</span>
@@ -504,7 +509,7 @@
     <ul class="pagination pagination-sm justify-content-center mb-0">
       {{#hasprevious}}
       <li class="page-item">
-        <a class="page-link" href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rpage={{previouspage}}">
+        <a class="page-link" href="{{previouspageurl}}">
           &laquo; {{# str }} recordings_page_previous, mod_googlemeet {{/ str }}
         </a>
       </li>
@@ -521,14 +526,14 @@
         <span class="page-link">{{number}}</span>
         {{/active}}
         {{^active}}
-        <a class="page-link" href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rpage={{page}}">{{number}}</a>
+        <a class="page-link" href="{{url}}">{{number}}</a>
         {{/active}}
       </li>
       {{/pages}}
 
       {{#hasnext}}
       <li class="page-item">
-        <a class="page-link" href="{{#ispendingfilter}}{{pendingfilterurl}}{{/ispendingfilter}}{{^ispendingfilter}}{{allfilterurl}}{{/ispendingfilter}}&amp;rpage={{nextpage}}">
+        <a class="page-link" href="{{nextpageurl}}">
           {{# str }} recordings_page_next, mod_googlemeet {{/ str }} &raquo;
         </a>
       </li>
@@ -618,79 +623,6 @@
 </div>
 
 {{#js}}
-(function() {
-  var form = document.getElementById('googlemeet-filter-form-{{coursemoduleid}}');
-  if (!form) {
-    return;
-  }
-  var focuskey = 'mod_googlemeet_rq_focus_{{coursemoduleid}}';
-  form.classList.add('googlemeet-filterbar-live');
-  // The search runs as you type: keep the submit button for keyboard and assistive technology users only.
-  var submitbutton = form.querySelector('.googlemeet-filter-submit');
-  if (submitbutton) {
-    submitbutton.classList.add('visually-hidden');
-  }
-
-  // "Filters" panel: open on desktop, collapsed on phones (the count badge shows what is active).
-  var panel = form.querySelector('.googlemeet-filters-panel');
-  var phone = window.matchMedia ? window.matchMedia('(max-width: 575.98px)') : null;
-  var syncpanel = function() {
-    if (panel && phone) {
-      panel.open = !phone.matches;
-    }
-  };
-  syncpanel();
-  if (phone && phone.addEventListener) {
-    phone.addEventListener('change', syncpanel);
-  }
-
-  var submitfilters = function(keepfocus) {
-    if (keepfocus) {
-      try {
-        sessionStorage.setItem(focuskey, '1');
-      } catch (e) {
-        // Storage may be blocked; the search still works, only the caret is not restored.
-      }
-    }
-    form.submit();
-  };
-
-  // Search as you type: lessons are filtered and paginated server-side, so submit after a pause.
-  var input = form.querySelector('input[name="rq"]');
-  if (input) {
-    var timer = null;
-    var submitted = input.value.trim();
-    input.addEventListener('input', function() {
-      clearTimeout(timer);
-      timer = setTimeout(function() {
-        var value = input.value.trim();
-        if (value === submitted || value.length === 1) {
-          return;
-        }
-        submitted = value;
-        submitfilters(true);
-      }, 600);
-    });
-    try {
-      if (sessionStorage.getItem(focuskey)) {
-        sessionStorage.removeItem(focuskey);
-        input.focus();
-        input.setSelectionRange(input.value.length, input.value.length);
-      }
-    } catch (e) {
-      // Ignore storage failures.
-    }
-  }
-  var topic = form.querySelector('select[name="topic"]');
-  if (topic) {
-    topic.addEventListener('change', function() {
-      submitfilters(false);
-    });
-  }
-})();
-{{/js}}
-
-{{#js}}
 require(['mod_googlemeet/sync'], function(m) {
   m.init();
 });
@@ -702,288 +634,20 @@ require(['mod_googlemeet/ai_panel'], function(m) {
     cangenerateai: {{#cangenerateai}}true{{/cangenerateai}}{{^cangenerateai}}false{{/cangenerateai}}
   });
 });
-{{/js}}
-
-{{#js}}
-require([
-  'jquery',
-  'core/ajax',
-  'core/notification'
-], function($, Ajax, Notification) {
-
-  $(document).ready(function() {
-    var recordingsScrollKey = 'mod_googlemeet_recordings_anchor_{{coursemoduleid}}';
-
-    function rememberRecordingAnchor(recordingid) {
-      var anchor = recordingid ? 'googlemeet-recording-' + recordingid : 'googlemeet_recordings_table';
-      try {
-        sessionStorage.setItem(recordingsScrollKey, anchor);
-      } catch (e) {
-        // Ignore storage failures; the hash still gives the browser a best-effort anchor.
-      }
-      window.location.hash = anchor;
+require(['mod_googlemeet/recordings_table'], function(m) {
+  m.init({
+    cmid: {{coursemoduleid}},
+    canmanage: {{#hascapability}}true{{/hascapability}}{{^hascapability}}false{{/hascapability}},
+    strings: {
+      {{#hascapability}}
+      renamelabel: {{# quote }}{{# str }} list_action_rename, mod_googlemeet {{/ str }}{{/ quote }},
+      hidden: {{# quote }}{{# str }} recording_hidden, mod_googlemeet {{/ str }}{{/ quote }},
+      purge: {{# quote }}{{# str }} recording_purge, mod_googlemeet {{/ str }}{{/ quote }},
+      purgeconfirm: {{# quote }}{{# str }} recording_purge_confirm, mod_googlemeet {{/ str }}{{/ quote }},
+      trash: {{# quote }}{{# str }} recording_trash, mod_googlemeet {{/ str }}{{/ quote }},
+      trashconfirm: {{# quote }}{{# str }} recording_trash_confirm, mod_googlemeet {{/ str }}{{/ quote }}
+      {{/hascapability}}
     }
-
-    function reloadRecordingList(recordingid) {
-      rememberRecordingAnchor(recordingid);
-      window.location.reload();
-    }
-
-    function restoreRecordingAnchor() {
-      var anchor = '';
-      var shouldrestore = false;
-      try {
-        anchor = sessionStorage.getItem(recordingsScrollKey) || '';
-        shouldrestore = anchor !== '';
-        sessionStorage.removeItem(recordingsScrollKey);
-      } catch (e) {
-        anchor = '';
-      }
-      if (!anchor && window.location.hash) {
-        anchor = window.location.hash.substring(1);
-        shouldrestore = anchor !== '';
-      }
-      if (!shouldrestore) {
-        return;
-      }
-      var target = anchor ? document.getElementById(anchor) : null;
-      if (!target) {
-        target = document.getElementById('googlemeet_recordings_table');
-      }
-      if (target) {
-        setTimeout(function() {
-          target.scrollIntoView({block: 'center'});
-        }, 80);
-      }
-      // Drop the anchor from the URL so a later manual refresh does not jump again.
-      if (window.location.hash && window.history && window.history.replaceState) {
-        window.history.replaceState(null, '', window.location.pathname + window.location.search);
-      }
-    }
-
-    restoreRecordingAnchor();
-
-    {{#hascapability}}
-      // Rename (from the row's Actions menu): edit the title inline in its row.
-      $('.recordingeditname').on('click', function() {
-        var recordingid = $(this).attr('data-id');
-        var card = $('#googlemeet-recording-' + recordingid).find('.googlemeet-card-title').first();
-        var text = card.find('.recording-name-text');
-        var originalname = text.attr('data-originalname') || text.text().trim();
-
-        text.hide();
-
-        var inputtext = document.createElement('input');
-        inputtext.type = 'text';
-        inputtext.className = 'form-control googlemeet-edit-input';
-        inputtext.setAttribute('aria-label', {{# quote }}{{# str }} list_action_rename, mod_googlemeet {{/ str }}{{/ quote }});
-        inputtext.id = recordingid;
-        inputtext.value = originalname;
-        inputtext.setAttribute('data-value', originalname);
-        inputtext.addEventListener('keydown', recordingeditkeydown);
-        inputtext.addEventListener('focusout', recordingeditonfocusout);
-
-        card.append(inputtext);
-        inputtext.focus();
-        inputtext.select();
-      });
-
-      function recordingeditkeydown(event) {
-        var keyCode = event.which || event.keyCode;
-        if (keyCode === 13) {
-          event.preventDefault();
-          event.currentTarget.removeEventListener('focusout', recordingeditonfocusout);
-          recordingeditperform(event.currentTarget);
-          return;
-        }
-        if (keyCode === 27) {
-          event.currentTarget.removeEventListener('focusout', recordingeditonfocusout);
-          recordingeditonfocusout(event.currentTarget);
-        }
-      }
-
-      function recordingeditperform(element) {
-        element = $(element);
-        var card = element.closest('.googlemeet-card-title');
-        var text = card.find('.recording-name-text');
-
-        // The spinner markup is rendered once into a <template> so the pix helper stays out of this script.
-        var loading = $(document.getElementById('googlemeet-inline-loading-template').content.firstElementChild.cloneNode(true));
-
-        text.text(element.val()).show();
-        element.hide();
-        card.append(loading);
-
-        Ajax.call([{
-          methodname: 'mod_googlemeet_recording_edit_name',
-          args: {
-            recordingid: element.attr('id'),
-            name: element.val(),
-            coursemoduleid: {{ coursemoduleid }}
-          }
-        }])[0].then(function(response) {
-          text.text(response.displayname || response.name).show();
-          text.attr('title', response.name);
-          text.attr('data-originalname', response.name);
-          $('.googlemeet-ai-edit-btn[data-id="' + element.attr('id') + '"]').attr('data-recordingname', response.name);
-          element.remove();
-          loading.remove();
-          return response;
-        }).fail(Notification.exception).fail(function() {
-          text.text(element.attr('data-value')).show();
-          element.remove();
-          loading.remove();
-        });
-      }
-
-      function recordingeditonfocusout(element) {
-        if (element instanceof FocusEvent) {
-          element = $(this);
-        } else {
-          element = $(element);
-        }
-
-        var card = element.closest('.googlemeet-card-title');
-        var text = card.find('.recording-name-text');
-        element.remove();
-        text.show();
-      }
-
-      // Toggle visibility
-      $('.recordinghowhide').on('click', function() {
-        var btn = $(this);
-        var recordingid = btn.attr('data-id');
-        // Works in both views: card grid (.googlemeet-recording-card) and
-        // list view (.googlemeet-recording-listitem).
-        var card = btn.closest('.googlemeet-recording-card, .googlemeet-recording-listitem');
-        var label = btn.find('.googlemeet-action-label');
-        var oldLabel = label.text();
-
-        btn.prop('disabled', true);
-
-        Ajax.call([{
-          methodname: 'mod_googlemeet_showhide_recording',
-          args: {
-            recordingid: recordingid,
-            coursemoduleid: {{ coursemoduleid }}
-          }
-        }])[0].then(function(response) {
-          var visible = response.visible === true || response.visible === 1 ||
-            response.visible === '1' || response.visible === 'true';
-          var visibilityLabel = btn.attr(visible ? 'data-label-hide' : 'data-label-show');
-          var isListRow = card.hasClass('googlemeet-recording-listitem');
-          btn.prop('disabled', false);
-          if (visibilityLabel) {
-            label.text(visibilityLabel);
-          }
-          if (visible) {
-            card.removeClass('googlemeet-recording-hidden');
-            if (isListRow) {
-              card.find('.googlemeet-listitem-hidden-tag').remove();
-            } else {
-              card.find('.googlemeet-recording-hidden-badge').remove();
-            }
-          } else {
-            card.addClass('googlemeet-recording-hidden');
-            if (isListRow) {
-              if (!card.find('.googlemeet-listitem-hidden-tag').length) {
-                var hiddentag = $('<span class="googlemeet-listitem-hidden-tag"></span>')
-                  .text({{# quote }}{{# str }} recording_hidden, mod_googlemeet {{/ str }}{{/ quote }});
-                card.find('.googlemeet-listitem-title').prepend(hiddentag);
-              }
-            } else {
-              if (!card.find('.googlemeet-recording-hidden-badge').length) {
-                card.prepend($('<div class="googlemeet-recording-hidden-badge"></div>')
-                  .text({{# quote }}{{# str }} recording_hidden, mod_googlemeet {{/ str }}{{/ quote }}));
-              }
-            }
-          }
-          return response;
-        }).fail(Notification.exception).fail(function() {
-          btn.prop('disabled', false);
-          label.text(oldLabel);
-        });
-      });
-
-      $('.googlemeet-restore-recording').on('click', function() {
-        var btn = $(this);
-        btn.prop('disabled', true);
-        Ajax.call([{
-          methodname: 'mod_googlemeet_restore_recording',
-          args: {
-            recordingid: btn.attr('data-id'),
-            coursemoduleid: {{ coursemoduleid }}
-          }
-        }])[0].then(function() {
-          reloadRecordingList(btn.attr('data-id'));
-          return true;
-        }).fail(function(ex) {
-          btn.prop('disabled', false);
-          Notification.exception(ex);
-        });
-      });
-
-      $('.googlemeet-purge-recording').on('click', function() {
-        var btn = $(this);
-        // A rejection before the confirmation is the dialogue being cancelled: nothing to report.
-        var confirmed = false;
-        Notification.saveCancelPromise(
-          {{# quote }}{{# str }} recording_purge, mod_googlemeet {{/ str }}{{/ quote }},
-          {{# quote }}{{# str }} recording_purge_confirm, mod_googlemeet {{/ str }}{{/ quote }},
-          {{# quote }}{{# str }} recording_purge, mod_googlemeet {{/ str }}{{/ quote }},
-          {triggerElement: btn.get(0)}
-        ).then(function() {
-          confirmed = true;
-          btn.prop('disabled', true);
-          return Ajax.call([{
-            methodname: 'mod_googlemeet_purge_recording',
-            args: {
-              recordingid: btn.attr('data-id'),
-              coursemoduleid: {{ coursemoduleid }}
-            }
-          }])[0];
-        }).then(function() {
-          reloadRecordingList(btn.attr('data-id'));
-          return true;
-        }).catch(function(ex) {
-          if (confirmed) {
-            btn.prop('disabled', false);
-            Notification.exception(ex);
-          }
-        });
-      });
-
-      $('.googlemeet-trash-recording').on('click', function() {
-        var btn = $(this);
-        // A rejection before the confirmation is the dialogue being cancelled: nothing to report.
-        var confirmed = false;
-        Notification.saveCancelPromise(
-          {{# quote }}{{# str }} recording_trash, mod_googlemeet {{/ str }}{{/ quote }},
-          {{# quote }}{{# str }} recording_trash_confirm, mod_googlemeet {{/ str }}{{/ quote }},
-          {{# quote }}{{# str }} recording_trash, mod_googlemeet {{/ str }}{{/ quote }},
-          {triggerElement: btn.get(0)}
-        ).then(function() {
-          confirmed = true;
-          btn.prop('disabled', true);
-          return Ajax.call([{
-            methodname: 'mod_googlemeet_trash_recording',
-            args: {
-              recordingid: btn.attr('data-id'),
-              coursemoduleid: {{ coursemoduleid }}
-            }
-          }])[0];
-        }).then(function() {
-          reloadRecordingList(btn.attr('data-id'));
-          return true;
-        }).catch(function(ex) {
-          if (confirmed) {
-            btn.prop('disabled', false);
-            Notification.exception(ex);
-          }
-        });
-      });
-    {{/hascapability}}
-
   });
 });
 {{/js}}

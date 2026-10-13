@@ -318,7 +318,7 @@ class practice_attempts {
                     continue;
                 }
                 $question['recordingid'] = $recordingid;
-                // Plain spelling: a PARAM_TEXT field that practice_session.js writes with .text().
+                // Plain spelling: a PARAM_TEXT field that practice_session.js writes as textContent.
                 $question['recordingname'] = format_string(
                     googlemeet_display_name((string)$recordings[$recordingid]->name),
                     true,

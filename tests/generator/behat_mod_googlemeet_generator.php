@@ -46,6 +46,12 @@ class behat_mod_googlemeet_generator extends behat_generator_base {
                 'required' => ['recording'],
                 'switchids' => ['recording' => 'recordingid'],
             ],
+            'practicequestions' => [
+                'singular' => 'practicequestion',
+                'datagenerator' => 'practice_question',
+                'required' => ['recording', 'stem', 'options', 'correct'],
+                'switchids' => ['recording' => 'recordingid'],
+            ],
         ];
     }
 

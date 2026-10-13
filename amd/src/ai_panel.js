@@ -21,14 +21,21 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import $ from 'jquery';
 import Ajax from 'core/ajax';
 import * as Notification from 'core/notification';
+import Pending from 'core/pending';
 import Templates from 'core/templates';
 import {getString, getStrings} from 'core/str';
+// The 5.2 entry point of the Bootstrap API; 5.3 maps it onto the 'bootstrap' module (theme_boost hook_listener).
+import {Modal} from 'theme_boost/index';
 
 const COMPONENT = 'mod_googlemeet';
 const TEMPLATE_AI_RESULT = 'mod_googlemeet/local/ai_result';
+
+/** @type {number} Duration of the panel slide, in milliseconds. */
+const SLIDE_DURATION = 200;
+/** @type {string[]} Box properties a slide animates. */
+const SLIDE_PROPERTIES = ['height', 'paddingTop', 'paddingBottom', 'marginTop', 'marginBottom'];
 
 const stringRequests = [
     {key: 'ai_copied', component: COMPONENT},
@@ -71,6 +78,8 @@ const loadedTranscripts = {};
 /** @type {{recordingid: string, hasanalysis: boolean, manual: boolean}} State of the analysis open in the edit modal. */
 let editState = {recordingid: '', hasanalysis: false, manual: false};
 const pollingIntervals = {};
+/** @type {WeakMap<HTMLElement, {animation: Animation, complete: Function}>} Slide running on each panel. */
+const runningSlides = new WeakMap();
 
 /**
  * Load and cache the strings used by this module.
@@ -87,10 +96,16 @@ const loadStrings = () => getStrings(stringRequests).then(values => {
 /**
  * Escape text for safe insertion into HTML strings.
  *
+ * Serialises a text node, so it escapes &, < and > (and a no-break space as &nbsp;) but not quotes.
+ *
  * @param {string} text Raw text.
  * @returns {string}
  */
-const escapeHtml = text => $('<div>').text(text || '').html();
+const escapeHtml = text => {
+    const holder = document.createElement('div');
+    holder.textContent = text || '';
+    return holder.innerHTML;
+};
 
 /**
  * Format plain multiline text as escaped HTML with line breaks.
@@ -107,13 +122,228 @@ const formatText = text => {
 };
 
 /**
+ * First descendant of a root matching a selector; a missing root matches nothing.
+ *
+ * @param {HTMLElement|null} root Root element.
+ * @param {string} selector CSS selector.
+ * @returns {HTMLElement|null}
+ */
+const find = (root, selector) => (root ? root.querySelector(selector) : null);
+
+/**
+ * Every descendant of a root matching a selector; a missing root matches nothing.
+ *
+ * @param {HTMLElement|null} root Root element.
+ * @param {string} selector CSS selector.
+ * @returns {HTMLElement[]}
+ */
+const findAll = (root, selector) => (root ? Array.from(root.querySelectorAll(selector)) : []);
+
+/**
+ * Hide an element through its inline display.
+ *
+ * @param {HTMLElement|null} element Element.
+ * @returns {void}
+ */
+const hide = element => {
+    if (element) {
+        element.style.display = 'none';
+    }
+};
+
+/**
+ * Show an element: drop the inline display, and force block when a stylesheet still hides it.
+ *
+ * @param {HTMLElement|null} element Element.
+ * @returns {void}
+ */
+const show = element => {
+    if (!element) {
+        return;
+    }
+    element.style.display = '';
+    if (window.getComputedStyle(element).display === 'none') {
+        element.style.display = 'block';
+    }
+};
+
+/**
+ * Hide every descendant of a root matching a selector.
+ *
+ * @param {HTMLElement|null} root Root element.
+ * @param {string} selector CSS selector.
+ * @returns {void}
+ */
+const hideAll = (root, selector) => findAll(root, selector).forEach(hide);
+
+/**
+ * Whether an element takes up space in the layout.
+ *
+ * @param {HTMLElement|null} element Element.
+ * @returns {boolean}
+ */
+const isVisible = element => !!element &&
+    !!(element.offsetWidth || element.offsetHeight || element.getClientRects().length);
+
+/**
+ * Set the disabled state and the text of a button that may be absent.
+ *
+ * @param {HTMLElement|null} button Button.
+ * @param {boolean} disabled Whether the button is disabled.
+ * @param {string} text Button text.
+ * @returns {void}
+ */
+const setButton = (button, disabled, text) => {
+    if (button) {
+        button.disabled = disabled;
+        button.textContent = text;
+    }
+};
+
+/**
+ * Parse an HTML string holding one element.
+ *
+ * @param {string} html Markup.
+ * @returns {HTMLElement}
+ */
+const createElement = html => {
+    const holder = document.createElement('div');
+    holder.innerHTML = html;
+    return holder.firstElementChild;
+};
+
+/**
+ * Value of a form control by id (undefined when it is absent).
+ *
+ * @param {string} id Element id.
+ * @returns {string|undefined}
+ */
+const getValue = id => {
+    const element = document.getElementById(id);
+    return element ? element.value : undefined;
+};
+
+/**
+ * Set the value of a form control by id, when it exists.
+ *
+ * @param {string} id Element id.
+ * @param {string} value New value.
+ * @returns {void}
+ */
+const setValue = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) {
+        element.value = value;
+    }
+};
+
+/**
+ * Show or hide the manual edit modal.
+ *
+ * @param {boolean} visible Whether to show it.
+ * @returns {void}
+ */
+const toggleEditModal = visible => {
+    const element = document.getElementById('googlemeet-ai-edit-modal');
+    if (!element) {
+        return;
+    }
+    const modal = Modal.getOrCreateInstance(element);
+    if (visible) {
+        modal.show();
+    } else {
+        modal.hide();
+    }
+};
+
+/**
+ * Slide a panel open or closed, then run a callback.
+ *
+ * A slide started while another runs on the same element first completes the running one.
+ * Behat waits for the slide through core/pending.
+ *
+ * @param {HTMLElement|null} element Panel.
+ * @param {boolean} open Whether to open (slide down) or close (slide up).
+ * @param {Function} [done] Called once the slide has ended.
+ * @returns {void}
+ */
+const slide = (element, open, done) => {
+    if (!element) {
+        return;
+    }
+    const running = runningSlides.get(element);
+    if (running) {
+        running.animation.cancel();
+        running.complete();
+    }
+
+    const pending = new Pending('mod_googlemeet/ai_panel:slide');
+    if (open) {
+        show(element);
+    }
+    const computed = window.getComputedStyle(element);
+    const expanded = {};
+    const collapsed = {};
+    SLIDE_PROPERTIES.forEach(property => {
+        expanded[property] = computed[property];
+        collapsed[property] = '0px';
+    });
+    const overflow = element.style.overflow;
+    element.style.overflow = 'hidden';
+
+    const animation = element.animate(open ? [collapsed, expanded] : [expanded, collapsed], {
+        duration: SLIDE_DURATION,
+        easing: 'ease-in-out',
+    });
+    let completed = false;
+    const complete = () => {
+        if (completed) {
+            return;
+        }
+        completed = true;
+        runningSlides.delete(element);
+        element.style.overflow = overflow;
+        if (!open) {
+            hide(element);
+        }
+        if (done) {
+            done();
+        }
+        pending.resolve();
+    };
+    runningSlides.set(element, {animation: animation, complete: complete});
+    animation.addEventListener('finish', complete);
+    animation.addEventListener('cancel', complete);
+};
+
+/**
+ * Handle clicks on elements matching a selector, delegated from the document.
+ *
+ * A click on a disabled match is ignored.
+ *
+ * @param {string} selector CSS selector.
+ * @param {Function} handler Called with the matching element and the event.
+ * @returns {void}
+ */
+const delegateClick = (selector, handler) => {
+    document.addEventListener('click', event => {
+        const element = event.target instanceof Element ? event.target.closest(selector) : null;
+        if (element && element.disabled !== true) {
+            handler(element, event);
+        }
+    });
+};
+
+/**
  * Find the visible card or list item for a recording.
  *
  * @param {number|string} recordingid Recording ID.
- * @returns {JQuery}
+ * @returns {HTMLElement|null}
  */
-const getRecordingItem = recordingid => $('.googlemeet-recording-card[data-recordingid="' + recordingid + '"], ' +
-    '.googlemeet-recording-listitem[data-recordingid="' + recordingid + '"]');
+const getRecordingItem = recordingid => document.querySelector(
+    '.googlemeet-recording-card[data-recordingid="' + recordingid + '"], ' +
+    '.googlemeet-recording-listitem[data-recordingid="' + recordingid + '"]'
+);
 
 /**
  * Call a Moodle external function.
@@ -121,7 +351,7 @@ const getRecordingItem = recordingid => $('.googlemeet-recording-card[data-recor
  * @param {string} methodname Web service method name.
  * @param {Object} args Web service arguments.
  * @param {number} [timeout] Optional timeout in milliseconds.
- * @returns {JQuery.Promise}
+ * @returns {Promise}
  */
 const call = (methodname, args, timeout) => {
     const request = {
@@ -181,17 +411,17 @@ const buildResultContext = (recordingid, data) => {
 /**
  * Render the shared AI result partial into the panel content.
  *
- * @param {JQuery} content Panel content element.
+ * @param {HTMLElement|null} content Panel content element.
  * @param {Object} context Template context.
  * @returns {Promise<void>}
  */
 const renderAiResult = async(content, context) => {
-    const result = content.find('.googlemeet-ai-result');
+    const result = find(content, '.googlemeet-ai-result');
     const rendered = await Templates.renderForPromise(TEMPLATE_AI_RESULT, context);
 
-    if (result.length) {
+    if (result) {
         Templates.replaceNode(result, rendered.html, rendered.js || '');
-    } else {
+    } else if (content) {
         Templates.appendNodeContents(content, rendered.html, rendered.js || '');
     }
 };
@@ -200,30 +430,40 @@ const renderAiResult = async(content, context) => {
  * Update the list/card presentation after an analysis has completed.
  *
  * @param {Object} data AI analysis data.
- * @param {JQuery} item Recording card/list item.
- * @param {JQuery} content Panel content element.
+ * @param {HTMLElement|null} item Recording card/list item.
+ * @param {HTMLElement|null} content Panel content element.
  * @returns {Promise<void>}
  */
 const updateRecordingPreview = async(data, item, content) => {
-    const isListItem = item.hasClass('googlemeet-recording-listitem');
+    const isListItem = !!item && item.classList.contains('googlemeet-recording-listitem');
     const keypoints = data.keypoints || [];
     const topics = data.topics || [];
     const countLabel = await keypointsLabel(keypoints.length);
-    const metaContainer = item.find('.googlemeet-card-meta, .googlemeet-listitem-meta');
 
-    item.addClass('googlemeet-recording-has-ai');
-    item.find('.googlemeet-ai-toggle-btn')
-        .addClass('googlemeet-ai-toggle-active')
-        .attr('data-hasai', '1');
-    content.attr('data-hasai', '1');
-
-    metaContainer.find('.googlemeet-ai-statuschip').remove();
-    let keypointsElement = metaContainer.find('.googlemeet-ai-keypoints-count');
-    if (!keypointsElement.length) {
-        keypointsElement = $('<span class="googlemeet-ai-keypoints-count"></span>');
-        metaContainer.append(keypointsElement);
+    if (content) {
+        content.setAttribute('data-hasai', '1');
     }
-    keypointsElement.text(countLabel);
+    if (!item) {
+        return;
+    }
+    const metaContainer = item.querySelector('.googlemeet-card-meta, .googlemeet-listitem-meta');
+
+    item.classList.add('googlemeet-recording-has-ai');
+    item.querySelectorAll('.googlemeet-ai-toggle-btn').forEach(button => {
+        button.classList.add('googlemeet-ai-toggle-active');
+        button.setAttribute('data-hasai', '1');
+    });
+
+    findAll(metaContainer, '.googlemeet-ai-statuschip').forEach(chip => chip.remove());
+    if (metaContainer) {
+        let keypointsElement = metaContainer.querySelector('.googlemeet-ai-keypoints-count');
+        if (!keypointsElement) {
+            keypointsElement = document.createElement('span');
+            keypointsElement.className = 'googlemeet-ai-keypoints-count';
+            metaContainer.append(keypointsElement);
+        }
+        keypointsElement.textContent = countLabel;
+    }
 
     if (isListItem) {
         await updateListPreview(item, metaContainer, topics);
@@ -236,7 +476,7 @@ const updateRecordingPreview = async(data, item, content) => {
 /**
  * Update a card-view recording preview after AI generation.
  *
- * @param {JQuery} item Recording card.
+ * @param {HTMLElement} item Recording card.
  * @param {Object} data AI analysis data.
  * @param {Array} topics Topic strings.
  * @returns {Promise<void>}
@@ -246,35 +486,40 @@ const updateCardPreview = async(item, data, topics) => {
     if (data.summary) {
         summaryPreview = data.summary.length > 200 ? data.summary.substring(0, 200) + '...' : data.summary;
     }
-    const cardBody = item.find('.googlemeet-card-body');
-    const cardSummary = cardBody.find('.googlemeet-card-summary');
+    const cardBody = item.querySelector('.googlemeet-card-body');
+    const cardSummary = find(cardBody, '.googlemeet-card-summary');
 
-    if (cardSummary.length) {
-        cardSummary.text(summaryPreview);
-    } else {
-        cardBody.append('<p class="googlemeet-card-summary">' + escapeHtml(summaryPreview) + '</p>');
+    if (cardSummary) {
+        cardSummary.textContent = summaryPreview;
+    } else if (cardBody) {
+        cardBody.insertAdjacentHTML('beforeend', '<p class="googlemeet-card-summary">' + escapeHtml(summaryPreview) + '</p>');
     }
 
     if (topics.length > 0) {
         const topicsHtml = await cardTopicsHtml(topics);
-        const cardTopics = cardBody.find('.googlemeet-card-topics');
-        if (cardTopics.length) {
-            cardTopics.replaceWith(topicsHtml);
-        } else {
-            cardBody.append(topicsHtml);
+        const cardTopics = find(cardBody, '.googlemeet-card-topics');
+        if (cardTopics) {
+            cardTopics.outerHTML = topicsHtml;
+        } else if (cardBody) {
+            cardBody.insertAdjacentHTML('beforeend', topicsHtml);
         }
     } else {
-        cardBody.find('.googlemeet-card-topics').remove();
+        findAll(cardBody, '.googlemeet-card-topics').forEach(element => element.remove());
     }
 
-    const cardMedia = item.find('.googlemeet-card-media');
-    let cardBadges = cardMedia.find('.googlemeet-card-badges');
-    if (!cardBadges.length) {
-        cardBadges = $('<span class="googlemeet-card-badges"></span>');
+    const cardMedia = item.querySelector('.googlemeet-card-media');
+    if (!cardMedia) {
+        return;
+    }
+    let cardBadges = cardMedia.querySelector('.googlemeet-card-badges');
+    if (!cardBadges) {
+        cardBadges = document.createElement('span');
+        cardBadges.className = 'googlemeet-card-badges';
         cardMedia.append(cardBadges);
     }
-    if (!cardBadges.find('.googlemeet-card-aibadge').length) {
-        cardBadges.append(
+    if (!cardBadges.querySelector('.googlemeet-card-aibadge')) {
+        cardBadges.insertAdjacentHTML(
+            'beforeend',
             '<span class="googlemeet-card-aibadge" title="' + escapeHtml(strings.ai_analysis_available) + '">' +
             escapeHtml(strings.ai_badge_label) + '</span>'
         );
@@ -284,21 +529,24 @@ const updateCardPreview = async(item, data, topics) => {
 /**
  * Update a list-row recording preview after AI generation.
  *
- * @param {JQuery} item Recording list item.
- * @param {JQuery} metaContainer Metadata container.
+ * @param {HTMLElement} item Recording list item.
+ * @param {HTMLElement|null} metaContainer Metadata container.
  * @param {Array} topics Topic strings.
  * @returns {Promise<void>}
  */
 const updateListPreview = async(item, metaContainer, topics) => {
-    metaContainer.find('.googlemeet-ai-topic-tag').remove();
+    findAll(metaContainer, '.googlemeet-ai-topic-tag').forEach(tag => tag.remove());
     if (topics.length > 0) {
         const chips = await topicChipsHtml(topics.slice(0, 2), topics.length - 2);
-        metaContainer.append(chips);
+        if (metaContainer) {
+            metaContainer.insertAdjacentHTML('beforeend', chips);
+        }
     }
 
-    const listTitle = item.find('.googlemeet-listitem-title');
-    if (!listTitle.find('.googlemeet-card-aibadge').length) {
-        listTitle.append(
+    const listTitle = item.querySelector('.googlemeet-listitem-title');
+    if (listTitle && !listTitle.querySelector('.googlemeet-card-aibadge')) {
+        listTitle.insertAdjacentHTML(
+            'beforeend',
             '<span class="googlemeet-card-aibadge" title="' + escapeHtml(strings.ai_analysis_available) + '">' +
             escapeHtml(strings.ai_badge_label) + '</span>'
         );
@@ -344,17 +592,17 @@ const topicChipsHtml = async(topics, overflow) => {
  *
  * @param {number|string} recordingid Recording ID.
  * @param {Object} data AI analysis response.
- * @param {JQuery} item Recording card/list item.
- * @param {JQuery} content Panel content.
+ * @param {HTMLElement|null} item Recording card/list item.
+ * @param {HTMLElement|null} content Panel content.
  * @returns {Promise<void>}
  */
 const displayAiAnalysis = async(recordingid, data, item, content) => {
-    content.find('.googlemeet-ai-nodata').hide();
-    content.find('.googlemeet-ai-loading').hide();
-    content.find('.googlemeet-ai-error').hide();
+    hideAll(content, '.googlemeet-ai-nodata');
+    hideAll(content, '.googlemeet-ai-loading');
+    hideAll(content, '.googlemeet-ai-error');
 
     await renderAiResult(content, buildResultContext(recordingid, data));
-    content.find('.googlemeet-ai-result').show();
+    findAll(content, '.googlemeet-ai-result').forEach(show);
     loadedTranscripts[recordingid] = true;
 
     await updateRecordingPreview(data, item, content);
@@ -368,13 +616,23 @@ const displayAiAnalysis = async(recordingid, data, item, content) => {
  *
  * @param {number|string} recordingid Recording ID.
  * @param {Object} data AI analysis response.
- * @param {JQuery} item Recording card/list item.
- * @param {JQuery} content Panel content.
+ * @param {HTMLElement|null} item Recording card/list item.
+ * @param {HTMLElement|null} content Panel content.
  * @returns {void}
  */
 const showAiAnalysis = (recordingid, data, item, content) => {
     displayAiAnalysis(recordingid, data, item, content).catch(Notification.exception);
 };
+
+/**
+ * Transcript containers of a recording.
+ *
+ * @param {number|string} recordingid Recording ID.
+ * @returns {HTMLElement[]}
+ */
+const transcriptElements = recordingid => Array.from(
+    document.querySelectorAll('.googlemeet-ai-transcript-text[data-recordingid="' + recordingid + '"]')
+);
 
 /**
  * Load a transcript on demand.
@@ -387,18 +645,23 @@ const loadTranscript = recordingid => {
         recordingid: recordingid,
         coursemoduleid: settings.cmid,
     }).then(response => {
-        const element = $('.googlemeet-ai-transcript-text[data-recordingid="' + recordingid + '"]');
+        const elements = transcriptElements(recordingid);
         if (response.found && response.transcript) {
-            element.html(formatText(response.transcript));
+            elements.forEach(element => {
+                element.innerHTML = formatText(response.transcript);
+            });
             loadedTranscripts[recordingid] = true;
         } else {
-            element.text(strings.ai_transcript_unavailable);
+            elements.forEach(element => {
+                element.textContent = strings.ai_transcript_unavailable;
+            });
             loadedTranscripts[recordingid] = true;
         }
         return;
-    }).fail(() => {
-        $('.googlemeet-ai-transcript-text[data-recordingid="' + recordingid + '"]')
-            .text(strings.ai_transcript_unavailable);
+    }).catch(() => {
+        transcriptElements(recordingid).forEach(element => {
+            element.textContent = strings.ai_transcript_unavailable;
+        });
     });
 };
 
@@ -419,6 +682,22 @@ const formatElapsed = elapsed => {
 };
 
 /**
+ * Panel content of a recording.
+ *
+ * @param {number|string} recordingid Recording ID.
+ * @returns {HTMLElement|null}
+ */
+const getContent = recordingid => document.querySelector('.googlemeet-ai-content[data-recordingid="' + recordingid + '"]');
+
+/**
+ * Generate button of a recording.
+ *
+ * @param {number|string} recordingid Recording ID.
+ * @returns {HTMLElement|null}
+ */
+const getGenerateButton = recordingid => document.querySelector('.googlemeet-ai-generate-btn[data-id="' + recordingid + '"]');
+
+/**
  * Generate an AI analysis.
  *
  * @param {number|string} recordingid Recording ID.
@@ -427,29 +706,31 @@ const formatElapsed = elapsed => {
  * @returns {void}
  */
 const generateAiAnalysis = (recordingid, regenerate, forcedownload) => {
-    const content = $('.googlemeet-ai-content[data-recordingid="' + recordingid + '"]');
-    const generateButton = $('.googlemeet-ai-generate-btn[data-id="' + recordingid + '"]');
+    const content = getContent(recordingid);
+    const generateButton = getGenerateButton(recordingid);
     const item = getRecordingItem(recordingid);
-    const loadingElement = content.find('.googlemeet-ai-loading');
+    const loadingElements = findAll(content, '.googlemeet-ai-loading');
     const startTime = Date.now();
     let progressDots = 0;
 
     forcedownload = !!forcedownload;
 
-    content.find('.googlemeet-ai-nodata').hide();
-    content.find('.googlemeet-ai-result').hide();
-    content.find('.googlemeet-ai-error').hide();
-    loadingElement.show();
-    generateButton.prop('disabled', true).text(strings.ai_generating);
+    hideAll(content, '.googlemeet-ai-nodata');
+    hideAll(content, '.googlemeet-ai-result');
+    hideAll(content, '.googlemeet-ai-error');
+    loadingElements.forEach(show);
+    setButton(generateButton, true, strings.ai_generating);
 
     const progressInterval = setInterval(() => {
         progressDots = (progressDots + 1) % 4;
         const dots = '.'.repeat(progressDots);
         const elapsed = Math.floor((Date.now() - startTime) / 1000);
-        loadingElement.find('p').html(
-            escapeHtml(strings.ai_generating) + dots + '<br><small style="opacity: 0.7;">&#9201; ' +
-            escapeHtml(formatElapsed(elapsed)) + '</small>'
-        );
+        loadingElements.forEach(loadingElement => {
+            loadingElement.querySelectorAll('p').forEach(paragraph => {
+                paragraph.innerHTML = escapeHtml(strings.ai_generating) + dots +
+                    '<br><small style="opacity: 0.7;">&#9201; ' + escapeHtml(formatElapsed(elapsed)) + '</small>';
+            });
+        });
     }, 500);
 
     call('mod_googlemeet_generate_ai_analysis', {
@@ -459,8 +740,8 @@ const generateAiAnalysis = (recordingid, regenerate, forcedownload) => {
         forcedownload: forcedownload,
     }).then(response => {
         clearInterval(progressInterval);
-        content.find('.googlemeet-ai-loading').hide();
-        generateButton.prop('disabled', false).text(strings.ai_regenerate);
+        hideAll(content, '.googlemeet-ai-loading');
+        setButton(generateButton, false, strings.ai_regenerate);
 
         if (response.status === 'completed') {
             showAiAnalysis(recordingid, response, item, content);
@@ -472,10 +753,10 @@ const generateAiAnalysis = (recordingid, regenerate, forcedownload) => {
             showAiError(recordingid, strings.ai_status_pending);
         }
         return;
-    }).fail(ex => {
+    }).catch(ex => {
         clearInterval(progressInterval);
-        content.find('.googlemeet-ai-loading').hide();
-        generateButton.prop('disabled', false).text(strings.ai_generate);
+        hideAll(content, '.googlemeet-ai-loading');
+        setButton(generateButton, false, strings.ai_generate);
 
         let errorMessage = '';
         if (ex.message) {
@@ -500,48 +781,57 @@ const generateAiAnalysis = (recordingid, regenerate, forcedownload) => {
  * @returns {void}
  */
 const showAiError = (recordingid, message) => {
-    const content = $('.googlemeet-ai-content[data-recordingid="' + recordingid + '"]');
-    const errorElement = content.find('.googlemeet-ai-error').attr('role', 'alert').show();
-    const alert = errorElement.find('.alert');
+    const content = getContent(recordingid);
+    const errorElements = findAll(content, '.googlemeet-ai-error');
+    errorElements.forEach(element => {
+        element.setAttribute('role', 'alert');
+        show(element);
+    });
+    const alerts = [];
+    errorElements.forEach(element => alerts.push(...element.querySelectorAll('.alert')));
 
-    content.find('.googlemeet-ai-nodata').hide();
-    content.find('.googlemeet-ai-loading').hide();
-    content.find('.googlemeet-ai-result').hide();
-    content.find('.googlemeet-ai-processing').hide();
+    hideAll(content, '.googlemeet-ai-nodata');
+    hideAll(content, '.googlemeet-ai-loading');
+    hideAll(content, '.googlemeet-ai-result');
+    hideAll(content, '.googlemeet-ai-processing');
 
     if (message === 'ai_subtitles_unavailable') {
-        const explain = document.createElement('div');
-        explain.textContent = strings.ai_subtitles_unavailable;
-        const forceButton = document.createElement('button');
-        forceButton.type = 'button';
-        forceButton.className = 'btn btn-sm btn-warning mt-2 googlemeet-ai-force-video-btn';
-        forceButton.setAttribute('data-id', recordingid);
-        forceButton.textContent = strings.ai_transcribe_from_video;
-        alert.empty().append(explain).append(forceButton);
+        alerts.forEach(alert => {
+            const explain = document.createElement('div');
+            explain.textContent = strings.ai_subtitles_unavailable;
+            const forceButton = document.createElement('button');
+            forceButton.type = 'button';
+            forceButton.className = 'btn btn-sm btn-warning mt-2 googlemeet-ai-force-video-btn';
+            forceButton.setAttribute('data-id', recordingid);
+            forceButton.textContent = strings.ai_transcribe_from_video;
+            alert.replaceChildren(explain, forceButton);
+        });
         return;
     }
 
-    alert.text(message);
+    alerts.forEach(alert => {
+        alert.textContent = message;
+    });
 };
 
 /**
  * Show the background-processing status and start polling.
  *
  * @param {number|string} recordingid Recording ID.
- * @param {JQuery} content Panel content.
- * @param {JQuery} generateButton Generate button.
+ * @param {HTMLElement|null} content Panel content.
+ * @param {HTMLElement|null} generateButton Generate button.
  * @param {number} [queuedat] Unix time the analysis was queued (shown as "queued since hh:mm").
  * @returns {void}
  */
 const showProcessingStatus = (recordingid, content, generateButton, queuedat) => {
-    content.find('.googlemeet-ai-nodata').hide();
-    content.find('.googlemeet-ai-loading').hide();
-    content.find('.googlemeet-ai-result').hide();
-    content.find('.googlemeet-ai-error').hide();
+    hideAll(content, '.googlemeet-ai-nodata');
+    hideAll(content, '.googlemeet-ai-loading');
+    hideAll(content, '.googlemeet-ai-result');
+    hideAll(content, '.googlemeet-ai-error');
 
-    let processingElement = content.find('.googlemeet-ai-processing');
-    if (!processingElement.length) {
-        processingElement = $('<div class="googlemeet-ai-processing alert alert-info">' +
+    let processingElement = find(content, '.googlemeet-ai-processing');
+    if (!processingElement && content) {
+        processingElement = createElement('<div class="googlemeet-ai-processing alert alert-info">' +
             '<div class="d-flex align-items-center">' +
             '<div class="spinner-border spinner-border-sm me-2" role="status"></div>' +
             '<div><strong>' + escapeHtml(strings.ai_processing_background) + '</strong><br>' +
@@ -553,18 +843,22 @@ const showProcessingStatus = (recordingid, content, generateButton, queuedat) =>
         content.append(processingElement);
     }
     const since = parseInt(queuedat, 10);
-    let sinceElement = processingElement.find('.googlemeet-ai-queued-since');
-    if (since > 0) {
-        if (!sinceElement.length) {
-            sinceElement = $('<div class="googlemeet-ai-queued-since small mt-1"></div>');
-            processingElement.find('.d-flex').first().after(sinceElement);
+    if (processingElement && since > 0) {
+        let sinceElement = processingElement.querySelector('.googlemeet-ai-queued-since');
+        if (!sinceElement) {
+            sinceElement = document.createElement('div');
+            sinceElement.className = 'googlemeet-ai-queued-since small mt-1';
+            const flex = processingElement.querySelector('.d-flex');
+            if (flex) {
+                flex.after(sinceElement);
+            }
         }
         const time = new Date(since * 1000).toLocaleTimeString([], {hour: '2-digit', minute: '2-digit'});
-        sinceElement.text(strings.ai_queued_since.split('{$a}').join(time));
+        sinceElement.textContent = strings.ai_queued_since.split('{$a}').join(time);
     }
-    processingElement.show();
+    show(processingElement);
 
-    generateButton.prop('disabled', true).text(strings.ai_status_processing);
+    setButton(generateButton, true, strings.ai_status_processing);
 
     if (pollingIntervals[recordingid]) {
         clearInterval(pollingIntervals[recordingid]);
@@ -584,7 +878,7 @@ const showProcessingStatus = (recordingid, content, generateButton, queuedat) =>
  * Check the current status of an AI analysis and update its panel.
  *
  * @param {number|string} recordingid Recording ID.
- * @returns {JQuery.Promise} Resolves with the analysis status, 'stuck' when the worker died, or
+ * @returns {Promise} Resolves with the analysis status, 'stuck' when the worker died, or
  *     'error' when the request failed; it does not reject on a failed request.
  */
 const checkAnalysisStatus = recordingid => {
@@ -592,22 +886,22 @@ const checkAnalysisStatus = recordingid => {
         recordingid: recordingid,
         coursemoduleid: settings.cmid,
     }).then(response => {
-        const content = $('.googlemeet-ai-content[data-recordingid="' + recordingid + '"]');
+        const content = getContent(recordingid);
         const item = getRecordingItem(recordingid);
-        const generateButton = $('.googlemeet-ai-generate-btn[data-id="' + recordingid + '"]');
+        const generateButton = getGenerateButton(recordingid);
 
         if (response.found && response.status === 'completed') {
-            content.find('.googlemeet-ai-processing').hide();
-            generateButton.prop('disabled', false).text(strings.ai_regenerate);
+            hideAll(content, '.googlemeet-ai-processing');
+            setButton(generateButton, false, strings.ai_regenerate);
             showAiAnalysis(recordingid, response, item, content);
         } else if (response.found && response.status === 'failed') {
-            content.find('.googlemeet-ai-processing').hide();
-            generateButton.prop('disabled', false).text(strings.ai_generate);
+            hideAll(content, '.googlemeet-ai-processing');
+            setButton(generateButton, false, strings.ai_generate);
             showAiError(recordingid, response.error || strings.ai_error_unknown);
         } else if (response.found && response.status === 'processing' && response.stuck) {
             // The worker died: stop polling and let the teacher retry (regenerate re-queues a stuck row).
-            content.find('.googlemeet-ai-processing').hide();
-            generateButton.prop('disabled', false).text(strings.ai_regenerate);
+            hideAll(content, '.googlemeet-ai-processing');
+            setButton(generateButton, false, strings.ai_regenerate);
             showAiError(recordingid, strings.ai_status_stuck_panel);
             return 'stuck';
         }
@@ -626,7 +920,8 @@ const checkAnalysisStatus = recordingid => {
  * @returns {string}
  */
 const displayTitle = (recordingid, fallback) => {
-    const title = getRecordingItem(recordingid).find('.recording-name-text').first().text().trim();
+    const element = find(getRecordingItem(recordingid), '.recording-name-text');
+    const title = element ? element.textContent.trim() : '';
     return title || fallback || '';
 };
 
@@ -654,89 +949,268 @@ const confirmReplace = (message, manual, trigger) => {
 };
 
 /**
+ * Open or close the AI panel of a recording from its toggle button.
+ *
+ * @param {HTMLElement} button Toggle button.
+ * @returns {void}
+ */
+const togglePanel = button => {
+    const recordingid = button.getAttribute('data-id');
+    const hasAi = button.getAttribute('data-hasai') === '1';
+    const panelRow = document.querySelector('.googlemeet-ai-panel-row[data-recordingid="' + recordingid + '"]');
+    const panel = find(panelRow, '.googlemeet-ai-panel');
+
+    if (isVisible(panel)) {
+        slide(panel, false, () => {
+            panelRow.classList.remove('googlemeet-ai-panel-row-open');
+        });
+        button.classList.remove('expanded');
+        button.setAttribute('aria-expanded', 'false');
+        return;
+    }
+
+    if (hasAi && !loadedTranscripts[recordingid]) {
+        loadTranscript(recordingid);
+    }
+    if (panelRow) {
+        panelRow.classList.add('googlemeet-ai-panel-row-open');
+    }
+    slide(panel, true);
+    button.classList.add('expanded');
+    button.setAttribute('aria-expanded', 'true');
+};
+
+/**
+ * Generate, or confirm and regenerate, the analysis of a recording.
+ *
+ * @param {HTMLElement} trigger Generate button.
+ * @returns {void}
+ */
+const requestGeneration = trigger => {
+    const recordingid = trigger.getAttribute('data-id');
+    const content = getContent(recordingid);
+    const hasAi = !!content && content.getAttribute('data-hasai') === '1';
+    if (!hasAi) {
+        generateAiAnalysis(recordingid, false);
+        return;
+    }
+    // Regenerating replaces summary, key points, topics and chapters: confirm first,
+    // and warn explicitly when the current analysis was edited by hand (aimodel = 'manual').
+    const ask = manual => confirmReplace(strings.ai_regenerate_replace_confirm, manual, trigger)
+        .then(() => generateAiAnalysis(recordingid, true))
+        .catch(() => null);
+    call('mod_googlemeet_get_ai_analysis', {
+        recordingid: recordingid,
+        coursemoduleid: settings.cmid,
+    }).then(response => ask(!!response.found && response.aimodel === 'manual'))
+        .catch(() => ask(false));
+};
+
+/**
+ * Confirm, then transcribe a recording from its full video.
+ *
+ * @param {HTMLElement} button Force-video button.
+ * @returns {void}
+ */
+const requestVideoTranscription = button => {
+    const recordingid = button.getAttribute('data-id');
+    Notification.saveCancelPromise(
+        strings.ai_transcribe_from_video,
+        strings.ai_transcribe_from_video_confirm,
+        strings.ai_transcribe_from_video,
+        {triggerElement: button}
+    ).then(() => {
+        generateAiAnalysis(recordingid, true, true);
+        return;
+    }).catch(() => {
+        return;
+    });
+};
+
+/**
+ * Copy the transcript of a recording to the clipboard.
+ *
+ * @param {HTMLElement} button Copy button.
+ * @returns {void}
+ */
+const copyTranscript = button => {
+    const recordingid = button.getAttribute('data-id');
+    const transcriptText = transcriptElements(recordingid).map(element => element.textContent).join('');
+
+    navigator.clipboard.writeText(transcriptText).then(() => {
+        const originalHtml = button.innerHTML;
+        button.innerHTML = '&#10003; ' + escapeHtml(strings.ai_copied);
+        setTimeout(() => {
+            button.innerHTML = originalHtml;
+        }, 2000);
+        return;
+    }).catch(Notification.exception);
+};
+
+/**
  * Bind AI panel toggle/generation/copy events.
  *
  * @returns {void}
  */
 const bindPanelEvents = () => {
-    $(document).on('click', '.googlemeet-ai-toggle-btn', function() {
-        const button = $(this);
-        const recordingid = button.attr('data-id');
-        const hasAi = button.attr('data-hasai') === '1';
-        const panelRow = $('.googlemeet-ai-panel-row[data-recordingid="' + recordingid + '"]');
-        const panel = panelRow.find('.googlemeet-ai-panel');
-
-        if (panel.is(':visible')) {
-            panel.slideUp(200, () => {
-                panelRow.removeClass('googlemeet-ai-panel-row-open');
-            });
-            button.removeClass('expanded').attr('aria-expanded', 'false');
-            return;
-        }
-
-        if (hasAi && !loadedTranscripts[recordingid]) {
-            loadTranscript(recordingid);
-        }
-        panelRow.addClass('googlemeet-ai-panel-row-open');
-        panel.slideDown(200);
-        button.addClass('expanded').attr('aria-expanded', 'true');
+    delegateClick('.googlemeet-ai-toggle-btn', togglePanel);
+    delegateClick('.googlemeet-ai-generate-btn', requestGeneration);
+    delegateClick('.googlemeet-ai-refresh-btn', button => {
+        checkAnalysisStatus(button.getAttribute('data-id')).catch(Notification.exception);
     });
-
-    $(document).on('click', '.googlemeet-ai-generate-btn', function() {
-        const trigger = this;
-        const recordingid = $(trigger).attr('data-id');
-        const content = $('.googlemeet-ai-content[data-recordingid="' + recordingid + '"]');
-        const hasAi = content.attr('data-hasai') === '1';
-        if (!hasAi) {
-            generateAiAnalysis(recordingid, false);
-            return;
-        }
-        // Regenerating replaces summary, key points, topics and chapters: confirm first,
-        // and warn explicitly when the current analysis was edited by hand (aimodel = 'manual').
-        const ask = manual => confirmReplace(strings.ai_regenerate_replace_confirm, manual, trigger)
-            .then(() => generateAiAnalysis(recordingid, true))
-            .catch(() => null);
-        call('mod_googlemeet_get_ai_analysis', {
-            recordingid: recordingid,
-            coursemoduleid: settings.cmid,
-        }).then(response => ask(!!response.found && response.aimodel === 'manual'))
-            .fail(() => ask(false));
-    });
-
-    $(document).on('click', '.googlemeet-ai-refresh-btn', function() {
-        checkAnalysisStatus($(this).attr('data-id')).catch(Notification.exception);
-    });
-
-    $(document).on('click', '.googlemeet-ai-force-video-btn', function() {
-        const button = this;
-        const recordingid = $(button).attr('data-id');
-        Notification.saveCancelPromise(
-            strings.ai_transcribe_from_video,
-            strings.ai_transcribe_from_video_confirm,
-            strings.ai_transcribe_from_video,
-            {triggerElement: button}
-        ).then(() => {
-            generateAiAnalysis(recordingid, true, true);
-            return;
-        }).catch(() => {
-            return;
-        });
-    });
-
-    $(document).on('click', '.googlemeet-ai-copy-btn', function(event) {
+    delegateClick('.googlemeet-ai-force-video-btn', requestVideoTranscription);
+    delegateClick('.googlemeet-ai-copy-btn', (button, event) => {
         event.stopPropagation();
-        const button = $(this);
-        const recordingid = button.attr('data-id');
-        const transcriptText = $('.googlemeet-ai-transcript-text[data-recordingid="' + recordingid + '"]').text();
+        copyTranscript(button);
+    });
+};
 
-        navigator.clipboard.writeText(transcriptText).then(() => {
-            const originalHtml = button.html();
-            button.html('&#10003; ' + escapeHtml(strings.ai_copied));
+/**
+ * Open the manual edit modal for a recording and load its stored analysis.
+ *
+ * @param {HTMLElement} button Edit button.
+ * @returns {void}
+ */
+const openEditModal = button => {
+    const recordingid = button.getAttribute('data-id');
+    const recordingname = displayTitle(recordingid, button.getAttribute('data-recordingname') || '');
+
+    editState = {recordingid: recordingid, hasanalysis: false, manual: false};
+    setValue('googlemeet-ai-edit-recordingid', recordingid);
+    setValue('googlemeet-ai-edit-summary', '');
+    setValue('googlemeet-ai-edit-keypoints', '');
+    setValue('googlemeet-ai-edit-topics', '');
+    setValue('googlemeet-ai-edit-transcript', '');
+    const title = document.getElementById('googlemeet-ai-edit-modal-title');
+    if (title) {
+        title.textContent = strings.ai_edit_manual_title + ': ' + recordingname;
+    }
+
+    call('mod_googlemeet_get_ai_analysis', {
+        recordingid: recordingid,
+        coursemoduleid: settings.cmid,
+    }).then(response => {
+        if (response.found && response.status === 'completed' && editState.recordingid === recordingid) {
+            editState.hasanalysis = true;
+            editState.manual = response.aimodel === 'manual';
+            setValue('googlemeet-ai-edit-summary', response.summary || '');
+            setValue('googlemeet-ai-edit-keypoints', (response.keypoints || []).join('\n'));
+            setValue('googlemeet-ai-edit-topics', (response.topics || []).join(', '));
+            setValue('googlemeet-ai-edit-transcript', response.transcript || '');
+        }
+        return;
+    }).catch(Notification.exception);
+
+    toggleEditModal(true);
+};
+
+/**
+ * Run the Gemini transcript analysis and load the result into the edit form.
+ *
+ * @param {HTMLElement} button Analyze button.
+ * @param {string} transcript Transcript text.
+ * @returns {void}
+ */
+const analyzeTranscript = (button, transcript) => {
+    const recordingid = getValue('googlemeet-ai-edit-recordingid');
+    const originalText = button.innerHTML;
+    button.disabled = true;
+    button.innerHTML = '<span class="spinner-border spinner-border-sm me-1"></span> ' + escapeHtml(strings.ai_analyzing);
+
+    call('mod_googlemeet_analyze_transcript', {
+        transcript: transcript,
+        recordingid: parseInt(recordingid, 10),
+        coursemoduleid: settings.cmid,
+    }, 120000).then(response => {
+        button.disabled = false;
+        button.innerHTML = originalText;
+        if (response.success) {
+            editState.hasanalysis = true;
+            editState.manual = false;
+            setValue('googlemeet-ai-edit-summary', response.summary || '');
+            setValue('googlemeet-ai-edit-keypoints', (response.keypoints || []).join('\n'));
+            setValue('googlemeet-ai-edit-topics', (response.topics || []).join(', '));
+            Notification.addNotification({
+                message: strings.ai_analyze_success,
+                type: 'success',
+            });
+        } else {
+            Notification.addNotification({
+                message: response.error || strings.ai_error_unknown,
+                type: 'error',
+            });
+        }
+        return;
+    }).catch(ex => {
+        button.disabled = false;
+        button.innerHTML = originalText;
+        Notification.exception(ex);
+    });
+};
+
+/**
+ * Analyse the transcript typed in the edit modal, confirming first when content would be replaced.
+ *
+ * @param {HTMLElement} button Analyze button.
+ * @returns {void}
+ */
+const requestTranscriptAnalysis = button => {
+    const transcript = getValue('googlemeet-ai-edit-transcript');
+
+    if (!transcript.trim()) {
+        Notification.addNotification({
+            message: strings.ai_analyze_empty_transcript,
+            type: 'warning',
+        });
+        return;
+    }
+
+    // The analyze WS saves the new summary/key points/topics straight away: when there is
+    // something to lose (a stored analysis or text typed in the form), confirm first.
+    const formHasContent = ['googlemeet-ai-edit-summary', 'googlemeet-ai-edit-keypoints', 'googlemeet-ai-edit-topics']
+        .some(id => (getValue(id) || '').trim() !== '');
+    if (!editState.hasanalysis && !formHasContent) {
+        analyzeTranscript(button, transcript);
+        return;
+    }
+    confirmReplace(strings.ai_analyze_replace_confirm, editState.manual, button)
+        .then(() => analyzeTranscript(button, transcript))
+        .catch(() => null);
+};
+
+/**
+ * Save the analysis typed in the edit modal, then reload the page.
+ *
+ * @param {HTMLElement} button Save button.
+ * @returns {void}
+ */
+const saveManualAnalysis = button => {
+    const recordingid = getValue('googlemeet-ai-edit-recordingid');
+
+    setButton(button, true, strings.ai_edit_saving);
+    call('mod_googlemeet_save_ai_analysis', {
+        recordingid: parseInt(recordingid, 10),
+        coursemoduleid: settings.cmid,
+        summary: getValue('googlemeet-ai-edit-summary'),
+        keypoints: getValue('googlemeet-ai-edit-keypoints'),
+        topics: getValue('googlemeet-ai-edit-topics'),
+        transcript: getValue('googlemeet-ai-edit-transcript'),
+    }).then(response => {
+        setButton(button, false, strings.ai_edit_save);
+        if (response.success) {
+            toggleEditModal(false);
+            Notification.addNotification({
+                message: strings.ai_edit_saved,
+                type: 'success',
+            });
             setTimeout(() => {
-                button.html(originalHtml);
-            }, 2000);
-            return;
-        }).catch(Notification.exception);
+                window.location.reload();
+            }, 1000);
+        }
+        return;
+    }).catch(ex => {
+        setButton(button, false, strings.ai_edit_save);
+        Notification.exception(ex);
     });
 };
 
@@ -746,134 +1220,34 @@ const bindPanelEvents = () => {
  * @returns {void}
  */
 const bindManualEditEvents = () => {
-    $(document).on('click', '.googlemeet-ai-edit-btn', function(event) {
+    delegateClick('.googlemeet-ai-edit-btn', (button, event) => {
         event.stopPropagation();
-        const recordingid = $(this).attr('data-id');
-        const recordingname = displayTitle(recordingid, $(this).attr('data-recordingname') || '');
-
-        editState = {recordingid: recordingid, hasanalysis: false, manual: false};
-        $('#googlemeet-ai-edit-recordingid').val(recordingid);
-        $('#googlemeet-ai-edit-summary').val('');
-        $('#googlemeet-ai-edit-keypoints').val('');
-        $('#googlemeet-ai-edit-topics').val('');
-        $('#googlemeet-ai-edit-transcript').val('');
-        $('#googlemeet-ai-edit-modal-title').text(strings.ai_edit_manual_title + ': ' + recordingname);
-
-        call('mod_googlemeet_get_ai_analysis', {
-            recordingid: recordingid,
-            coursemoduleid: settings.cmid,
-        }).then(response => {
-            if (response.found && response.status === 'completed' && editState.recordingid === recordingid) {
-                editState.hasanalysis = true;
-                editState.manual = response.aimodel === 'manual';
-                $('#googlemeet-ai-edit-summary').val(response.summary || '');
-                $('#googlemeet-ai-edit-keypoints').val((response.keypoints || []).join('\n'));
-                $('#googlemeet-ai-edit-topics').val((response.topics || []).join(', '));
-                $('#googlemeet-ai-edit-transcript').val(response.transcript || '');
-            }
-            return;
-        }).fail(Notification.exception);
-
-        $('#googlemeet-ai-edit-modal').modal('show');
+        openEditModal(button);
     });
 
-    /**
-     * Run the Gemini transcript analysis and load the result into the edit form.
-     *
-     * @param {JQuery} button Analyze button.
-     * @param {string} transcript Transcript text.
-     * @returns {void}
-     */
-    const analyzeTranscript = (button, transcript) => {
-        const recordingid = $('#googlemeet-ai-edit-recordingid').val();
-        const originalText = button.html();
-        button.prop('disabled', true)
-            .html('<span class="spinner-border spinner-border-sm me-1"></span> ' + escapeHtml(strings.ai_analyzing));
+    // Bound directly, as before: the modal is rendered once with the page.
+    const analyzeButton = document.getElementById('googlemeet-ai-analyze-transcript');
+    if (analyzeButton) {
+        analyzeButton.addEventListener('click', () => requestTranscriptAnalysis(analyzeButton));
+    }
+    const saveButton = document.getElementById('googlemeet-ai-edit-save');
+    if (saveButton) {
+        saveButton.addEventListener('click', () => saveManualAnalysis(saveButton));
+    }
+};
 
-        call('mod_googlemeet_analyze_transcript', {
-            transcript: transcript,
-            recordingid: parseInt(recordingid, 10),
-            coursemoduleid: settings.cmid,
-        }, 120000).then(response => {
-            button.prop('disabled', false).html(originalText);
-            if (response.success) {
-                editState.hasanalysis = true;
-                editState.manual = false;
-                $('#googlemeet-ai-edit-summary').val(response.summary || '');
-                $('#googlemeet-ai-edit-keypoints').val((response.keypoints || []).join('\n'));
-                $('#googlemeet-ai-edit-topics').val((response.topics || []).join(', '));
-                Notification.addNotification({
-                    message: strings.ai_analyze_success,
-                    type: 'success',
-                });
-            } else {
-                Notification.addNotification({
-                    message: response.error || strings.ai_error_unknown,
-                    type: 'error',
-                });
-            }
-            return;
-        }).fail(ex => {
-            button.prop('disabled', false).html(originalText);
-            Notification.exception(ex);
-        });
-    };
-
-    $('#googlemeet-ai-analyze-transcript').on('click', function() {
-        const button = $(this);
-        const transcript = $('#googlemeet-ai-edit-transcript').val();
-
-        if (!transcript.trim()) {
-            Notification.addNotification({
-                message: strings.ai_analyze_empty_transcript,
-                type: 'warning',
-            });
-            return;
-        }
-
-        // The analyze WS saves the new summary/key points/topics straight away: when there is
-        // something to lose (a stored analysis or text typed in the form), confirm first.
-        const formHasContent = ['#googlemeet-ai-edit-summary', '#googlemeet-ai-edit-keypoints', '#googlemeet-ai-edit-topics']
-            .some(selector => ($(selector).val() || '').trim() !== '');
-        if (!editState.hasanalysis && !formHasContent) {
-            analyzeTranscript(button, transcript);
-            return;
-        }
-        confirmReplace(strings.ai_analyze_replace_confirm, editState.manual, this)
-            .then(() => analyzeTranscript(button, transcript))
-            .catch(() => null);
-    });
-
-    $('#googlemeet-ai-edit-save').on('click', function() {
-        const button = $(this);
-        const recordingid = $('#googlemeet-ai-edit-recordingid').val();
-
-        button.prop('disabled', true).text(strings.ai_edit_saving);
-        call('mod_googlemeet_save_ai_analysis', {
-            recordingid: parseInt(recordingid, 10),
-            coursemoduleid: settings.cmid,
-            summary: $('#googlemeet-ai-edit-summary').val(),
-            keypoints: $('#googlemeet-ai-edit-keypoints').val(),
-            topics: $('#googlemeet-ai-edit-topics').val(),
-            transcript: $('#googlemeet-ai-edit-transcript').val(),
-        }).then(response => {
-            button.prop('disabled', false).text(strings.ai_edit_save);
-            if (response.success) {
-                $('#googlemeet-ai-edit-modal').modal('hide');
-                Notification.addNotification({
-                    message: strings.ai_edit_saved,
-                    type: 'success',
-                });
-                setTimeout(() => {
-                    window.location.reload();
-                }, 1000);
-            }
-            return;
-        }).fail(ex => {
-            button.prop('disabled', false).text(strings.ai_edit_save);
-            Notification.exception(ex);
-        });
-    });
+/**
+ * Run a callback once the document has been parsed.
+ *
+ * @param {Function} callback Callback.
+ * @returns {void}
+ */
+const whenReady = callback => {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', callback, {once: true});
+    } else {
+        callback();
+    }
 };
 
 /**
@@ -899,7 +1273,7 @@ export const init = config => {
     };
 
     loadStrings().then(() => {
-        $(document).ready(() => {
+        whenReady(() => {
             if (settings.aienabled) {
                 bindPanelEvents();
             }

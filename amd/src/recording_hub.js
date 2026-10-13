@@ -21,11 +21,12 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import $ from 'jquery';
 import Ajax from 'core/ajax';
 import * as Notification from 'core/notification';
 import Modal from 'core/modal';
 import {getStrings} from 'core/str';
+// Moodle 5.2 and 5.3 both map theme_boost/index to the Bootstrap 5 bundle (5.3 until 7.0).
+import {Modal as BootstrapModal, Tab} from 'theme_boost/index';
 
 const COMPONENT = 'mod_googlemeet';
 
@@ -99,20 +100,101 @@ const loadStrings = () => getStrings(stringRequests).then(values => {
 });
 
 /**
+ * The hub root element, or the document when the hub is not on the page.
+ *
+ * @returns {HTMLElement|Document}
+ */
+const hubRoot = () => document.getElementById('googlemeet-recording-hub') || document;
+
+/**
+ * Every element matching a selector inside a root (the hub by default), in document order.
+ *
+ * @param {string} selector CSS selector.
+ * @param {HTMLElement|Document} [root] Container to search.
+ * @returns {HTMLElement[]}
+ */
+const findAll = (selector, root) => Array.from((root || hubRoot()).querySelectorAll(selector));
+
+/**
+ * The first element matching a selector inside a root (the hub by default).
+ *
+ * @param {string} selector CSS selector.
+ * @param {HTMLElement|Document} [root] Container to search.
+ * @returns {HTMLElement|null}
+ */
+const findOne = (selector, root) => (root || hubRoot()).querySelector(selector);
+
+/**
+ * Set the text of every element in a list.
+ *
+ * @param {HTMLElement[]} elements Elements to update.
+ * @param {string} text New text.
+ * @returns {void}
+ */
+const setText = (elements, text) => {
+    elements.forEach(element => {
+        element.textContent = text;
+    });
+};
+
+/**
+ * Read a form control's value by id (undefined when the control is missing).
+ *
+ * @param {string} id Element id.
+ * @returns {string|undefined}
+ */
+const valueOf = id => {
+    const element = document.getElementById(id);
+    return element ? element.value : undefined;
+};
+
+/**
+ * Set a form control's value by id; null and undefined become an empty string.
+ *
+ * @param {string} id Element id.
+ * @param {string|null|undefined} value New value.
+ * @returns {void}
+ */
+const setValue = (id, value) => {
+    const element = document.getElementById(id);
+    if (element) {
+        element.value = (value === null || value === undefined) ? '' : value;
+    }
+};
+
+/**
  * Escape text for safe insertion into HTML strings.
+ *
+ * Serialises a text node, so &, < and > (and a no-break space) are escaped and quotes are not.
  *
  * @param {string} value Raw text.
  * @returns {string}
  */
-const escapeHtml = value => $('<div>').text(value || '').html();
+const escapeHtml = value => {
+    const holder = document.createElement('div');
+    holder.textContent = value || '';
+    return holder.innerHTML;
+};
+
+/**
+ * Show a hub tab button through the Bootstrap 5 Tab component.
+ *
+ * @param {HTMLElement} tab Tab button.
+ * @returns {void}
+ */
+const showTab = tab => {
+    Tab.getOrCreateInstance(tab).show();
+};
 
 /**
  * Get the currently active hub tab target.
  *
  * @returns {string}
  */
-const activeTabTarget = () => $('#googlemeet-recording-hub .nav-link.active[data-bs-target]')
-    .attr('data-bs-target') || '';
+const activeTabTarget = () => {
+    const tab = document.querySelector('#googlemeet-recording-hub .nav-link.active[data-bs-target]');
+    return (tab && tab.getAttribute('data-bs-target')) || '';
+};
 
 /**
  * Remember active tab and scroll position for a reload.
@@ -165,15 +247,10 @@ const restoreHubState = () => {
     }
 
     if (state.tab) {
-        const tab = $('#googlemeet-recording-hub .nav-link[data-bs-target]').filter(function() {
-            return $(this).attr('data-bs-target') === state.tab;
-        }).get(0);
+        const tab = Array.from(document.querySelectorAll('#googlemeet-recording-hub .nav-link[data-bs-target]'))
+            .find(link => link.getAttribute('data-bs-target') === state.tab);
         if (tab) {
-            if (window.bootstrap && window.bootstrap.Tab) {
-                window.bootstrap.Tab.getOrCreateInstance(tab).show();
-            } else if (typeof $(tab).tab === 'function') {
-                $(tab).tab('show');
-            }
+            showTab(tab);
         }
     }
 
@@ -197,40 +274,40 @@ const confirmAction = (title, body, label, triggerElement) =>
 /**
  * Update a recording visibility action after the AJAX toggle response.
  *
- * @param {JQuery} button Visibility button.
+ * @param {HTMLElement} button Visibility button.
  * @param {boolean} visible Whether the recording is now visible to students.
  * @returns {void}
  */
 const updateVisibilityButton = (button, visible) => {
-    const label = button.attr(visible ? 'data-label-hide' : 'data-label-show') || '';
+    const label = button.getAttribute(visible ? 'data-label-hide' : 'data-label-show') || '';
     if (!label) {
         return;
     }
 
-    if (button.text().trim()) {
-        button.text(label);
+    if (button.textContent.trim()) {
+        button.textContent = label;
     }
-    if (button.attr('title')) {
-        button.attr('title', label);
+    if (button.getAttribute('title')) {
+        button.setAttribute('title', label);
     }
-    if (button.attr('aria-label')) {
-        button.attr('aria-label', label);
+    if (button.getAttribute('aria-label')) {
+        button.setAttribute('aria-label', label);
     }
 };
 
 /**
- * Call an external function and reload on success.
+ * Call an external function and reload on success; a failure is reported.
  *
  * @param {string} methodname Web service method name.
  * @param {Object} args Web service arguments.
- * @returns {JQuery.Promise}
+ * @returns {Promise}
  */
 const call = (methodname, args) => Ajax.call([{methodname: methodname, args: args}])[0]
     .then(() => {
         reloadHub();
         return;
     })
-    .fail(Notification.exception);
+    .catch(Notification.exception);
 
 /**
  * Whether the page is currently visible enough to count heartbeat seconds.
@@ -273,10 +350,9 @@ const currentProgressState = () => {
  */
 const refreshProgressUi = () => {
     const state = currentProgressState();
-    const badge = $('.googlemeet-hub-progress .googlemeet-progress-badge');
-    const meter = $('.googlemeet-hub-progress .googlemeet-progress-meter');
-    const bar = meter.find('.progress-bar');
-    const button = $('.googlemeet-mark-viewed');
+    const badges = findAll('.googlemeet-hub-progress .googlemeet-progress-badge');
+    const meters = findAll('.googlemeet-hub-progress .googlemeet-progress-meter');
+    const buttons = findAll('.googlemeet-mark-viewed');
     const aria = (strings.recording_progress_aria || '{$a}').replace('{$a}', state.label);
 
     let badgeclass = 'googlemeet-progress-badge-unseen';
@@ -286,22 +362,37 @@ const refreshProgressUi = () => {
         badgeclass = 'googlemeet-progress-badge-partial';
     }
 
-    badge
-        .removeClass('googlemeet-progress-badge-completed googlemeet-progress-badge-partial googlemeet-progress-badge-unseen')
-        .addClass(badgeclass)
-        .attr('aria-label', aria);
-    badge.find('[aria-hidden="true"]').text(isViewed() ? '\u2713' : '\u25cb');
-    badge.find('.googlemeet-progress-status-text').text(state.label);
-    meter.attr('aria-valuenow', state.percent);
-    bar.css('width', state.percent + '%');
+    badges.forEach(badge => {
+        badge.classList.remove(
+            'googlemeet-progress-badge-completed',
+            'googlemeet-progress-badge-partial',
+            'googlemeet-progress-badge-unseen'
+        );
+        badge.classList.add(badgeclass);
+        badge.setAttribute('aria-label', aria);
+        setText(findAll('[aria-hidden="true"]', badge), isViewed() ? '\u2713' : '\u25cb');
+        setText(findAll('.googlemeet-progress-status-text', badge), state.label);
+    });
+    meters.forEach(meter => {
+        meter.setAttribute('aria-valuenow', state.percent);
+        findAll('.progress-bar', meter).forEach(bar => {
+            bar.style.width = state.percent + '%';
+        });
+    });
 
-    if (isViewed()) {
-        button.prop('disabled', true).text(strings.recording_progress_completed)
-            .removeClass('btn-primary').addClass('btn-outline-success');
-    } else {
-        button.prop('disabled', false).text(strings.recording_mark_viewed)
-            .removeClass('btn-outline-success').addClass('btn-primary');
-    }
+    buttons.forEach(button => {
+        if (isViewed()) {
+            button.disabled = true;
+            button.textContent = strings.recording_progress_completed;
+            button.classList.remove('btn-primary');
+            button.classList.add('btn-outline-success');
+        } else {
+            button.disabled = false;
+            button.textContent = strings.recording_mark_viewed;
+            button.classList.remove('btn-outline-success');
+            button.classList.add('btn-primary');
+        }
+    });
 };
 
 /**
@@ -353,12 +444,14 @@ const sendProgress = (delta, completed, silent) => {
         progress.markedviewed = !!response.markedviewed;
         refreshProgressUi();
         return;
-    }).fail(error => {
+    }).catch(error => {
         progress.pendingseconds += delta;
         if (!silent) {
             refreshProgressUi();
             Notification.exception(error);
         }
+        // Stay rejected so the caller's next step is skipped.
+        throw error;
     });
 };
 
@@ -380,7 +473,10 @@ const flushProgressHeartbeat = force => {
 
     const delta = Math.min(progress.pendingseconds, 60);
     progress.pendingseconds -= delta;
-    sendProgress(delta, false, true);
+    sendProgress(delta, false, true).catch(() => {
+        // The seconds went back to the buffer in sendProgress(); the next beat retries them.
+        return;
+    });
 };
 
 /**
@@ -389,8 +485,7 @@ const flushProgressHeartbeat = force => {
  * @returns {void}
  */
 const bindRecordingProgress = () => {
-    const root = $('.googlemeet-hub-progress');
-    if (!root.length) {
+    if (!findOne('.googlemeet-hub-progress')) {
         return;
     }
 
@@ -404,22 +499,24 @@ const bindRecordingProgress = () => {
     progress.visibleSince = (!progress.completed && pageIsVisible()) ? Date.now() : 0;
     refreshProgressUi();
 
-    $('.googlemeet-mark-viewed').on('click', function() {
-        if (isViewed()) {
-            return;
-        }
+    findAll('.googlemeet-mark-viewed').forEach(button => {
+        button.addEventListener('click', () => {
+            if (isViewed()) {
+                return;
+            }
 
-        const button = $(this);
-        collectVisibleSeconds();
-        const delta = Math.min(progress.pendingseconds, 60);
-        progress.pendingseconds -= delta;
-        button.prop('disabled', true).text(strings.recording_progress_saving);
-        sendProgress(delta, true, false).then(() => {
-            refreshProgressUi();
-            return;
-        }).catch(() => {
-            // The failure was already reported by sendProgress().
-            return;
+            collectVisibleSeconds();
+            const delta = Math.min(progress.pendingseconds, 60);
+            progress.pendingseconds -= delta;
+            button.disabled = true;
+            button.textContent = strings.recording_progress_saving;
+            sendProgress(delta, true, false).then(() => {
+                refreshProgressUi();
+                return;
+            }).catch(() => {
+                // The failure was already reported by sendProgress().
+                return;
+            });
         });
     });
 
@@ -454,11 +551,7 @@ const showTranscriptTab = () => {
     if (!tab) {
         return;
     }
-    if (window.bootstrap && window.bootstrap.Tab) {
-        window.bootstrap.Tab.getOrCreateInstance(tab).show();
-    } else if (typeof $(tab).tab === 'function') {
-        $(tab).tab('show');
-    }
+    showTab(tab);
 };
 
 /**
@@ -468,15 +561,16 @@ const showTranscriptTab = () => {
  * @returns {boolean} Whether a matching timestamp was found.
  */
 const highlightTranscriptTimestamp = timestamp => {
-    const root = $('.googlemeet-ai-transcript-text').get(0);
+    const root = findOne('.googlemeet-ai-transcript-text');
     if (!root || !timestamp) {
         return false;
     }
 
-    $('.googlemeet-transcript-highlight').removeClass('googlemeet-transcript-highlight');
-    const existing = $(root).find('[data-chapter-timestamp]').filter(function() {
-        return $(this).attr('data-chapter-timestamp') === timestamp;
-    }).get(0);
+    findAll('.googlemeet-transcript-highlight').forEach(element => {
+        element.classList.remove('googlemeet-transcript-highlight');
+    });
+    const existing = findAll('[data-chapter-timestamp]', root)
+        .find(element => element.getAttribute('data-chapter-timestamp') === timestamp);
     if (existing) {
         existing.classList.add('googlemeet-transcript-highlight');
         existing.scrollIntoView({block: 'center', behavior: 'smooth'});
@@ -518,18 +612,18 @@ const highlightTranscriptTimestamp = timestamp => {
  * @returns {Promise<void>}
  */
 const copyTimestamp = timestamp => {
-    const feedback = $('[data-region="chapter-feedback"]');
+    const feedback = findAll('[data-region="chapter-feedback"]');
     const reference = (strings.chapter_timestamp_reference || '{$a}').replace('{$a}', timestamp);
     if (!navigator.clipboard || !navigator.clipboard.writeText) {
-        feedback.text(reference);
+        setText(feedback, reference);
         return Promise.resolve();
     }
 
     return navigator.clipboard.writeText(timestamp).then(() => {
-        feedback.text((strings.chapter_timestamp_copied || '{$a}').replace('{$a}', timestamp));
+        setText(feedback, (strings.chapter_timestamp_copied || '{$a}').replace('{$a}', timestamp));
         return;
     }).catch(() => {
-        feedback.text(reference);
+        setText(feedback, reference);
     });
 };
 
@@ -645,12 +739,14 @@ const bindChaptersToggle = () => {
  */
 const markActiveChapter = seconds => {
     let active = null;
-    $('.googlemeet-chapter-button').each(function() {
-        const start = parseInt(this.getAttribute('data-start-seconds'), 10);
+    findAll('.googlemeet-chapter-button').forEach(button => {
+        const start = parseInt(button.getAttribute('data-start-seconds'), 10);
         if (!Number.isNaN(start) && start <= seconds) {
-            active = this;
+            active = button;
         }
-    }).removeAttr('aria-current').removeClass('googlemeet-chapter-active');
+        button.removeAttribute('aria-current');
+        button.classList.remove('googlemeet-chapter-active');
+    });
     if (active) {
         active.setAttribute('aria-current', 'true');
         active.classList.add('googlemeet-chapter-active');
@@ -692,7 +788,7 @@ const rememberLastJump = seconds => {
  */
 const seekTo = (rawseconds, {scroll = true, announce = true, remember = true} = {}) => {
     const seconds = Math.max(0, Math.floor(Number(rawseconds) || 0));
-    const nativeVideo = $('#googlemeet-recording-hub video').get(0);
+    const nativeVideo = document.querySelector('#googlemeet-recording-hub video');
     const iframe = nativeVideo ? null : getPlayerIframe();
     if (!nativeVideo && !iframe) {
         return false;
@@ -718,7 +814,8 @@ const seekTo = (rawseconds, {scroll = true, announce = true, remember = true} = 
     }
 
     if (announce) {
-        $('[data-region="seek-feedback"]').text(
+        setText(
+            findAll('[data-region="seek-feedback"]'),
             (strings.chapter_seek_announce || '{$a}').replace('{$a}', formatSeconds(seconds))
         );
     }
@@ -755,9 +852,9 @@ const buildMomentLink = seconds => {
  * @returns {Promise<void>}
  */
 const copyMomentLink = (seconds, timestamp) => {
-    const feedback = $('[data-region="chapter-feedback"]');
+    const feedback = findAll('[data-region="chapter-feedback"]');
     const link = buildMomentLink(seconds);
-    const manual = () => feedback.text((strings.chapter_link_copy_manual || '{$a}').replace('{$a}', link));
+    const manual = () => setText(feedback, (strings.chapter_link_copy_manual || '{$a}').replace('{$a}', link));
     if (!link) {
         return Promise.resolve();
     }
@@ -766,7 +863,7 @@ const copyMomentLink = (seconds, timestamp) => {
         return Promise.resolve();
     }
     return navigator.clipboard.writeText(link).then(() => {
-        feedback.text((strings.chapter_link_copied || '{$a}').replace('{$a}', timestamp));
+        setText(feedback, (strings.chapter_link_copied || '{$a}').replace('{$a}', timestamp));
         return;
     }).catch(manual);
 };
@@ -790,21 +887,20 @@ const applyInitialStart = () => {
  * @returns {void}
  */
 const bindChapters = () => {
-    $('.googlemeet-chapter-button').on('click', function() {
-        const button = $(this);
-        const timestamp = button.attr('data-chapter-timestamp') || '';
-        const seconds = parseInt(button.attr('data-start-seconds'), 10);
-        const feedback = $('[data-region="chapter-feedback"]');
+    findAll('.googlemeet-chapter-button').forEach(button => button.addEventListener('click', () => {
+        const timestamp = button.getAttribute('data-chapter-timestamp') || '';
+        const seconds = parseInt(button.getAttribute('data-start-seconds'), 10);
+        const feedback = findAll('[data-region="chapter-feedback"]');
 
         if (!Number.isNaN(seconds) && seconds >= 0 && seekTo(seconds)) {
             return;
         }
 
-        if (settings.caneditrecording && $('#googlemeet-transcript-tab').length) {
+        if (settings.caneditrecording && document.getElementById('googlemeet-transcript-tab')) {
             showTranscriptTab();
             window.setTimeout(() => {
                 if (highlightTranscriptTimestamp(timestamp)) {
-                    feedback.text((strings.chapter_transcript_highlighted || '{$a}').replace('{$a}', timestamp));
+                    setText(feedback, (strings.chapter_transcript_highlighted || '{$a}').replace('{$a}', timestamp));
                     return;
                 }
                 copyTimestamp(timestamp);
@@ -813,18 +909,18 @@ const bindChapters = () => {
         }
 
         copyTimestamp(timestamp);
-    });
+    }));
 
-    $('.googlemeet-chapter-copylink').on('click', function() {
-        const seconds = Math.max(0, parseInt(this.getAttribute('data-start-seconds'), 10) || 0);
-        copyMomentLink(seconds, this.getAttribute('data-chapter-timestamp') || '');
-    });
+    findAll('.googlemeet-chapter-copylink').forEach(button => button.addEventListener('click', () => {
+        const seconds = Math.max(0, parseInt(button.getAttribute('data-start-seconds'), 10) || 0);
+        copyMomentLink(seconds, button.getAttribute('data-chapter-timestamp') || '');
+    }));
 
     applyInitialStart();
 
-    $('.googlemeet-resume-button').on('click', function() {
-        seekTo(parseInt(this.getAttribute('data-seek-seconds'), 10));
-    });
+    findAll('.googlemeet-resume-button').forEach(button => button.addEventListener('click', () => {
+        seekTo(parseInt(button.getAttribute('data-seek-seconds'), 10));
+    }));
 
     bindChaptersToggle();
 };
@@ -955,9 +1051,13 @@ const bindTimestampLinks = () => {
     const maxseconds = parseInt(hub.getAttribute('data-duration-seconds'), 10) || 0;
     hub.querySelectorAll(TIMESTAMP_CONTAINERS).forEach(root => linkifyTimestampsIn(root, maxseconds));
 
-    $(hub).on('click', '.googlemeet-timestamp-link', function(e) {
+    hub.addEventListener('click', e => {
+        const link = e.target.closest('.googlemeet-timestamp-link');
+        if (!link || !hub.contains(link)) {
+            return;
+        }
         e.preventDefault();
-        seekTo(parseInt(this.getAttribute('data-seek-seconds'), 10));
+        seekTo(parseInt(link.getAttribute('data-seek-seconds'), 10));
     });
 };
 
@@ -1140,15 +1240,34 @@ const bindTranscriptSearch = () => {
             seekTo(seconds);
         }
     };
-    $(root).on('click', 'mark.googlemeet-transcript-match[data-seek-seconds]', function() {
-        activate(this);
-    });
-    $(root).on('keydown', 'mark.googlemeet-transcript-match[data-seek-seconds]', function(e) {
-        if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            activate(this);
+    const matchAt = e => {
+        const mark = e.target.closest('mark.googlemeet-transcript-match[data-seek-seconds]');
+        return (mark && root.contains(mark)) ? mark : null;
+    };
+    root.addEventListener('click', e => {
+        const mark = matchAt(e);
+        if (mark) {
+            activate(mark);
         }
     });
+    root.addEventListener('keydown', e => {
+        const mark = matchAt(e);
+        if (mark && (e.key === 'Enter' || e.key === ' ')) {
+            e.preventDefault();
+            activate(mark);
+        }
+    });
+};
+
+/**
+ * The question id of the card an action button sits in (NaN outside a card).
+ *
+ * @param {HTMLElement} button Action button.
+ * @returns {number}
+ */
+const cardQuestionId = button => {
+    const card = button.closest('.googlemeet-question-card');
+    return parseInt(card ? card.getAttribute('data-questionid') : '', 10);
 };
 
 /**
@@ -1157,18 +1276,18 @@ const bindTranscriptSearch = () => {
  * @returns {void}
  */
 const bindQuestionManagement = () => {
-    $('.googlemeet-question-generate').on('click', function() {
-        $(this).prop('disabled', true).text(strings.question_generating);
+    findAll('.googlemeet-question-generate').forEach(button => button.addEventListener('click', () => {
+        button.disabled = true;
+        button.textContent = strings.question_generating;
         call('mod_googlemeet_queue_generate_questions', {
             recordingid: settings.recordingid,
             coursemoduleid: settings.cmid,
-            count: parseInt($(this).attr('data-count'), 10) || 10,
+            count: parseInt(button.getAttribute('data-count'), 10) || 10,
         });
-    });
+    }));
 
-    $('.googlemeet-question-unpublish').on('click', function() {
-        const button = this;
-        const questionid = parseInt($(this).closest('.googlemeet-question-card').attr('data-questionid'), 10);
+    findAll('.googlemeet-question-unpublish').forEach(button => button.addEventListener('click', () => {
+        const questionid = cardQuestionId(button);
         confirmAction(
             strings.question_unpublish,
             strings.question_unpublish_confirm,
@@ -1182,11 +1301,10 @@ const bindQuestionManagement = () => {
             // Cancelled, or the request failed and call() already reported it.
             return;
         });
-    });
+    }));
 
-    $('.googlemeet-question-discard').on('click', function() {
-        const button = this;
-        const questionid = parseInt($(this).closest('.googlemeet-question-card').attr('data-questionid'), 10);
+    findAll('.googlemeet-question-discard').forEach(button => button.addEventListener('click', () => {
+        const questionid = cardQuestionId(button);
         confirmAction(
             strings.question_discard,
             strings.question_discard_confirm,
@@ -1200,37 +1318,41 @@ const bindQuestionManagement = () => {
             // Cancelled, or the request failed and call() already reported it.
             return;
         });
-    });
+    }));
 
     // Selection, publish and bulk actions live in mod_googlemeet/question_review.
 
-    $('.googlemeet-question-edit').on('click', function() {
-        const button = $(this);
-        $('#googlemeet-question-edit-id').val(button.closest('.googlemeet-question-card').attr('data-questionid'));
-        $('#googlemeet-question-edit-stem').val(button.attr('data-stem') || '');
-        $('#googlemeet-question-edit-feedback').val(button.attr('data-feedback') || '');
-        $('#googlemeet-question-edit-correct').val(button.attr('data-correctindex') || '0');
-        $('.googlemeet-question-edit-answer').each(function() {
-            $(this).val(button.attr('data-answer' + $(this).attr('data-index')) || '');
+    findAll('.googlemeet-question-edit').forEach(button => button.addEventListener('click', () => {
+        const card = button.closest('.googlemeet-question-card');
+        setValue('googlemeet-question-edit-id', card ? card.getAttribute('data-questionid') : undefined);
+        setValue('googlemeet-question-edit-stem', button.getAttribute('data-stem') || '');
+        setValue('googlemeet-question-edit-feedback', button.getAttribute('data-feedback') || '');
+        setValue('googlemeet-question-edit-correct', button.getAttribute('data-correctindex') || '0');
+        findAll('.googlemeet-question-edit-answer').forEach(field => {
+            field.value = button.getAttribute('data-answer' + field.getAttribute('data-index')) || '';
         });
-        $('#googlemeet-question-edit-modal').modal('show');
-    });
+        const modal = document.getElementById('googlemeet-question-edit-modal');
+        if (modal) {
+            BootstrapModal.getOrCreateInstance(modal).show();
+        }
+    }));
 
-    $('#googlemeet-question-edit-save').on('click', () => {
-        const options = $('.googlemeet-question-edit-answer').map(function() {
-            return $(this).val();
-        }).get();
-        call('mod_googlemeet_update_question', {
-            recordingid: settings.recordingid,
-            coursemoduleid: settings.cmid,
-            questionid: parseInt($('#googlemeet-question-edit-id').val(), 10),
-            stem: $('#googlemeet-question-edit-stem').val(),
-            options: options,
-            correctindex: parseInt($('#googlemeet-question-edit-correct').val(), 10),
-            explanation: $('#googlemeet-question-edit-feedback').val(),
-            citation: '',
+    const save = document.getElementById('googlemeet-question-edit-save');
+    if (save) {
+        save.addEventListener('click', () => {
+            const options = findAll('.googlemeet-question-edit-answer').map(field => field.value);
+            call('mod_googlemeet_update_question', {
+                recordingid: settings.recordingid,
+                coursemoduleid: settings.cmid,
+                questionid: parseInt(valueOf('googlemeet-question-edit-id'), 10),
+                stem: valueOf('googlemeet-question-edit-stem'),
+                options: options,
+                correctindex: parseInt(valueOf('googlemeet-question-edit-correct'), 10),
+                explanation: valueOf('googlemeet-question-edit-feedback'),
+                citation: '',
+            });
         });
-    });
+    }
 };
 
 /**
@@ -1239,8 +1361,7 @@ const bindQuestionManagement = () => {
  * @returns {void}
  */
 const bindRecordingManagement = () => {
-    $('.recordinghowhide').on('click', function() {
-        const button = $(this);
+    findAll('.recordinghowhide').forEach(button => button.addEventListener('click', () => {
         Ajax.call([{
             methodname: 'mod_googlemeet_showhide_recording',
             args: {
@@ -1252,13 +1373,12 @@ const bindRecordingManagement = () => {
                 response.visible === '1' || response.visible === 'true';
             updateVisibilityButton(button, visible);
             return;
-        }).fail(Notification.exception);
-    });
+        }).catch(Notification.exception);
+    }));
 
-    $('.recordingeditname').on('click', function() {
-        const trigger = this;
-        const title = $('.recording-name-text').first();
-        const current = title.attr('data-originalname') || title.text().trim();
+    findAll('.recordingeditname').forEach(trigger => trigger.addEventListener('click', () => {
+        const title = findOne('.recording-name-text');
+        const current = (title && title.getAttribute('data-originalname')) || (title ? title.textContent.trim() : '');
 
         // The modal root, kept for the step that runs once the body is rendered.
         let modalroot = null;
@@ -1277,17 +1397,25 @@ const bindRecordingManagement = () => {
             show: true,
             returnElement: trigger,
         }).then(modal => {
-            const root = modal.getRoot();
+            // The core modal hands back a jQuery-wrapped root; work on its element.
+            const root = modal.getRoot()[0];
             modalroot = root;
-            root.on('click', '.googlemeet-recording-rename-save', function(event) {
-                event.preventDefault();
-                const saveButton = $(this);
-                const name = root.find('#googlemeet-recording-rename-input').val();
-                if (!name) {
-                    root.find('#googlemeet-recording-rename-input').focus();
+            const input = () => root.querySelector('#googlemeet-recording-rename-input');
+            root.addEventListener('click', event => {
+                const saveButton = event.target.closest('.googlemeet-recording-rename-save');
+                if (!saveButton || !root.contains(saveButton)) {
                     return;
                 }
-                saveButton.prop('disabled', true);
+                event.preventDefault();
+                const field = input();
+                const name = field ? field.value : undefined;
+                if (!name) {
+                    if (field) {
+                        field.focus();
+                    }
+                    return;
+                }
+                saveButton.disabled = true;
                 modal.destroy();
                 call('mod_googlemeet_recording_edit_name', {
                     recordingid: settings.recordingid,
@@ -1295,18 +1423,29 @@ const bindRecordingManagement = () => {
                     coursemoduleid: settings.cmid,
                 });
             });
-            root.on('keydown', '#googlemeet-recording-rename-input', event => {
+            root.addEventListener('keydown', event => {
+                if (!event.target.closest('#googlemeet-recording-rename-input')) {
+                    return;
+                }
                 if ((event.which || event.keyCode) === 13) {
                     event.preventDefault();
-                    root.find('.googlemeet-recording-rename-save').trigger('click');
+                    const saveButton = root.querySelector('.googlemeet-recording-rename-save');
+                    if (saveButton) {
+                        saveButton.click();
+                    }
                 }
             });
             return modal.getBodyPromise();
         }).then(() => {
-            modalroot.find('#googlemeet-recording-rename-input').val(current).focus().select();
+            const field = modalroot.querySelector('#googlemeet-recording-rename-input');
+            if (field) {
+                field.value = current;
+                field.focus();
+                field.select();
+            }
             return;
         }).catch(Notification.exception);
-    });
+    }));
 };
 
 /**
@@ -1326,10 +1465,19 @@ const findCorrectOption = (question, answerid) => {
 };
 
 /**
+ * The value of an attribute on the first element of a list (undefined for an empty list).
+ *
+ * @param {HTMLElement[]} elements Elements.
+ * @param {string} name Attribute name.
+ * @returns {string|null|undefined}
+ */
+const firstAttr = (elements, name) => (elements[0] ? elements[0].getAttribute(name) : undefined);
+
+/**
  * Update the practice header (position, live score and progress bar).
  *
  * @param {Object} practice Practice state.
- * @param {JQuery} player Practice player.
+ * @param {HTMLElement} player Practice player.
  * @param {boolean} answered Whether the current question has been answered.
  * @returns {void}
  */
@@ -1337,26 +1485,47 @@ const updatePracticeHeader = (practice, player, answered) => {
     const total = practice.queue.length;
     const current = Math.min(practice.index + 1, total);
     const done = practice.index + (answered ? 1 : 0);
-    const label = (player.attr('data-progress-tpl') || '{$a->current} / {$a->total}')
+    const label = (player.getAttribute('data-progress-tpl') || '{$a->current} / {$a->total}')
         .replace('{$a->current}', current)
         .replace('{$a->total}', total);
     let roundLabel = '';
     if (practice.reviewing) {
         roundLabel = strings.practice_round_review + ' · ';
     }
-    $('.googlemeet-practice-progress').text(roundLabel + label);
-    const live = $('.googlemeet-practice-livescore');
-    live.removeClass('d-none').text((live.attr('data-template') || '{$a}').replace('{$a}', practice.correct));
+    setText(findAll('.googlemeet-practice-progress'), roundLabel + label);
+    const live = findAll('.googlemeet-practice-livescore');
+    const liveTemplate = firstAttr(live, 'data-template') || '__a__';
+    live.forEach(element => {
+        element.classList.remove('d-none');
+        element.textContent = liveTemplate.replace('__a__', practice.correct);
+    });
     const pct = total ? Math.round((done / total) * 100) : 0;
-    $('.googlemeet-practice-meter').removeClass('d-none').attr('aria-valuenow', pct)
-        .find('.progress-bar').css('width', pct + '%');
+    findAll('.googlemeet-practice-meter').forEach(meter => {
+        meter.classList.remove('d-none');
+        meter.setAttribute('aria-valuenow', pct);
+        findAll('.progress-bar', meter).forEach(bar => {
+            bar.style.width = pct + '%';
+        });
+    });
+};
+
+/**
+ * Give the practice stem a focus target and move the focus there.
+ *
+ * @returns {void}
+ */
+const focusPracticeStem = () => {
+    findAll('.googlemeet-practice-stem').forEach(stem => {
+        stem.setAttribute('tabindex', '-1');
+        stem.focus();
+    });
 };
 
 /**
  * Render the current practice question.
  *
  * @param {Object} practice Practice state.
- * @param {JQuery} player Practice player.
+ * @param {HTMLElement} player Practice player.
  * @returns {void}
  */
 const renderPracticeQuestion = (practice, player) => {
@@ -1365,15 +1534,30 @@ const renderPracticeQuestion = (practice, player) => {
     let optionsHtml = '';
 
     practice.checked = false;
-    $('.googlemeet-practice-loading, .googlemeet-practice-complete, .googlemeet-practice-error').addClass('d-none');
-    $('.googlemeet-practice-question').removeClass('d-none');
+    findAll('.googlemeet-practice-loading, .googlemeet-practice-complete, .googlemeet-practice-error').forEach(element => {
+        element.classList.add('d-none');
+    });
+    findAll('.googlemeet-practice-question').forEach(element => {
+        element.classList.remove('d-none');
+    });
     updatePracticeHeader(practice, player, false);
     // Stem, options and explanation are format_text() output from question_service: insert them
     // as HTML; escaping them here would break their formatting (bold, sub/sup).
-    $('.googlemeet-practice-stem').html(question.stem);
-    $('.googlemeet-practice-feedback').addClass('d-none').removeClass('alert alert-success alert-warning').empty();
-    $('.googlemeet-practice-check').prop('disabled', true).removeClass('d-none');
-    $('.googlemeet-practice-next').addClass('d-none');
+    findAll('.googlemeet-practice-stem').forEach(stem => {
+        stem.innerHTML = question.stem;
+    });
+    findAll('.googlemeet-practice-feedback').forEach(feedback => {
+        feedback.classList.add('d-none');
+        feedback.classList.remove('alert', 'alert-success', 'alert-warning');
+        feedback.textContent = '';
+    });
+    findAll('.googlemeet-practice-check').forEach(button => {
+        button.disabled = true;
+        button.classList.remove('d-none');
+    });
+    findAll('.googlemeet-practice-next').forEach(button => {
+        button.classList.add('d-none');
+    });
 
     question.options.forEach((option, index) => {
         const inputid = 'googlemeet-practice-' + question.questionid + '-' + option.answerid;
@@ -1385,22 +1569,22 @@ const renderPracticeQuestion = (practice, player) => {
             '<span class="googlemeet-practice-option-state"></span>' +
             '</label>';
     });
-    $('.googlemeet-practice-options').html(optionsHtml);
+    findAll('.googlemeet-practice-options').forEach(options => {
+        options.innerHTML = optionsHtml;
+    });
 };
 
 /**
  * Show the practice completion state with the score of the round just finished.
  *
  * @param {Object} practice Practice state.
- * @param {JQuery} player Practice player.
+ * @param {HTMLElement} player Practice player.
  * @returns {void}
  */
 const showPracticeComplete = (practice, player) => {
     const total = practice.queue.length;
     const pct = total ? Math.round((practice.correct / total) * 100) : 0;
-    const complete = $('.googlemeet-practice-complete');
-    const message = complete.find('.googlemeet-practice-message');
-    const scoreText = complete.find('.googlemeet-practice-score-text');
+    const complete = findOne('.googlemeet-practice-complete');
     let level = 'low';
     if (pct >= 80) {
         level = 'great';
@@ -1409,19 +1593,34 @@ const showPracticeComplete = (practice, player) => {
     }
 
     updatePracticeHeader(practice, player, true);
-    $('.googlemeet-practice-question, .googlemeet-practice-loading, .googlemeet-practice-error').addClass('d-none');
-    complete.removeClass('d-none googlemeet-practice-level-great googlemeet-practice-level-good googlemeet-practice-level-low')
-        .addClass('googlemeet-practice-level-' + level);
-    complete.find('.googlemeet-practice-score-value').text(pct + '%');
-    scoreText.text((scoreText.attr('data-template') || '{$a->correct}/{$a->total}')
+    findAll('.googlemeet-practice-question, .googlemeet-practice-loading, .googlemeet-practice-error').forEach(element => {
+        element.classList.add('d-none');
+    });
+    if (!complete) {
+        return;
+    }
+    const message = findAll('.googlemeet-practice-message', complete);
+    const scoreText = findAll('.googlemeet-practice-score-text', complete);
+    complete.classList.remove(
+        'd-none',
+        'googlemeet-practice-level-great',
+        'googlemeet-practice-level-good',
+        'googlemeet-practice-level-low'
+    );
+    complete.classList.add('googlemeet-practice-level-' + level);
+    setText(findAll('.googlemeet-practice-score-value', complete), pct + '%');
+    setText(scoreText, (firstAttr(scoreText, 'data-template') || '{$a->correct}/{$a->total}')
         .replace('{$a->correct}', practice.correct)
         .replace('{$a->total}', total));
-    message.text(message.attr('data-' + level) || '');
+    setText(message, firstAttr(message, 'data-' + level) || '');
 
-    const review = complete.find('.googlemeet-practice-review');
-    review.toggleClass('d-none', practice.wrong.length === 0)
-        .text((review.attr('data-template') || '{$a}').replace('{$a}', practice.wrong.length));
-    complete.trigger('focus');
+    const review = findAll('.googlemeet-practice-review', complete);
+    const reviewText = (firstAttr(review, 'data-template') || '__a__').replace('__a__', practice.wrong.length);
+    review.forEach(button => {
+        button.classList.toggle('d-none', practice.wrong.length === 0);
+        button.textContent = reviewText;
+    });
+    complete.focus();
 };
 
 /**
@@ -1430,8 +1629,8 @@ const showPracticeComplete = (practice, player) => {
  * @returns {void}
  */
 const bindPracticePlayer = () => {
-    const player = $('.googlemeet-practice-player');
-    if (!player.length || settings.canmanagequestions || !settings.hasquestions) {
+    const player = findOne('.googlemeet-practice-player');
+    if (!player || settings.canmanagequestions || !settings.hasquestions) {
         return;
     }
 
@@ -1452,14 +1651,14 @@ const bindPracticePlayer = () => {
         practice.wrong = [];
         practice.reviewing = reviewing;
         renderPracticeQuestion(practice, player);
-        $('.googlemeet-practice-stem').attr('tabindex', '-1').trigger('focus');
+        focusPracticeStem();
     };
 
     const loadPracticeQuestions = () => {
-        if (player.attr('data-loaded') === '1') {
+        if (player.getAttribute('data-loaded') === '1') {
             return;
         }
-        player.attr('data-loaded', '1');
+        player.setAttribute('data-loaded', '1');
         Ajax.call([{
             methodname: 'mod_googlemeet_get_practice_questions',
             args: {
@@ -1469,46 +1668,73 @@ const bindPracticePlayer = () => {
         }])[0].then(response => {
             practice.questions = response.questions || [];
             if (!practice.questions.length) {
-                $('.googlemeet-practice-loading')
-                    .removeClass('alert-info')
-                    .addClass('alert-secondary')
-                    .text(strings.question_empty_student);
+                findAll('.googlemeet-practice-loading').forEach(loading => {
+                    loading.classList.remove('alert-info');
+                    loading.classList.add('alert-secondary');
+                    loading.textContent = strings.question_empty_student;
+                });
                 return;
             }
             practice.queue = practice.questions.slice();
             practice.index = 0;
             renderPracticeQuestion(practice, player);
             return;
-        }).fail(error => {
-            $('.googlemeet-practice-loading').addClass('d-none');
-            $('.googlemeet-practice-error')
-                .removeClass('d-none')
-                .text(error.message || strings.ai_error_unknown);
+        }).catch(error => {
+            findAll('.googlemeet-practice-loading').forEach(loading => {
+                loading.classList.add('d-none');
+            });
+            findAll('.googlemeet-practice-error').forEach(element => {
+                element.classList.remove('d-none');
+                element.textContent = error.message || strings.ai_error_unknown;
+            });
         });
     };
 
-    $('#googlemeet-questions-tab').on('shown.bs.tab', loadPracticeQuestions);
-    if ($('#googlemeet-questions-panel').hasClass('active')) {
+    const questionsTab = document.getElementById('googlemeet-questions-tab');
+    if (questionsTab) {
+        // Bootstrap 5 dispatches its tab events as native DOM events.
+        questionsTab.addEventListener('shown.bs.tab', loadPracticeQuestions);
+    }
+    const questionsPanel = document.getElementById('googlemeet-questions-panel');
+    if (questionsPanel && questionsPanel.classList.contains('active')) {
         loadPracticeQuestions();
     }
 
-    player.on('change', '.googlemeet-practice-answer', function() {
-        player.find('.googlemeet-practice-option').removeClass('googlemeet-practice-option-selected');
-        $(this).closest('.googlemeet-practice-option').addClass('googlemeet-practice-option-selected');
-        $('.googlemeet-practice-check').prop('disabled', false);
+    player.addEventListener('change', e => {
+        const answer = e.target.closest('.googlemeet-practice-answer');
+        if (!answer || !player.contains(answer)) {
+            return;
+        }
+        findAll('.googlemeet-practice-option', player).forEach(option => {
+            option.classList.remove('googlemeet-practice-option-selected');
+        });
+        const selected = answer.closest('.googlemeet-practice-option');
+        if (selected) {
+            selected.classList.add('googlemeet-practice-option-selected');
+        }
+        findAll('.googlemeet-practice-check').forEach(button => {
+            button.disabled = false;
+        });
     });
 
-    $('.googlemeet-practice-check').on('click', () => {
+    const checkButtons = findAll('.googlemeet-practice-check');
+    const setCheckDisabled = disabled => checkButtons.forEach(button => {
+        button.disabled = disabled;
+    });
+    checkButtons.forEach(checkButton => checkButton.addEventListener('click', () => {
         if (practice.checked) {
             return;
         }
         const question = practice.queue[practice.index];
-        const answerid = parseInt($('.googlemeet-practice-answer:checked').val(), 10);
+        const checked = findOne('.googlemeet-practice-answer:checked');
+        const answerid = parseInt(checked ? checked.value : undefined, 10);
         if (!answerid) {
             return;
         }
-        $('.googlemeet-practice-error').addClass('d-none');
-        $('.googlemeet-practice-check').prop('disabled', true);
+        findAll('.googlemeet-practice-error').forEach(element => {
+            element.classList.add('d-none');
+        });
+        setCheckDisabled(true);
         Ajax.call([{
             methodname: 'mod_googlemeet_check_practice_answer',
             args: {
@@ -1524,19 +1750,34 @@ const bindPracticePlayer = () => {
             } else {
                 practice.wrong.push(question);
             }
-            $('.googlemeet-practice-answer').prop('disabled', true);
-            player.find('.googlemeet-practice-options').addClass('googlemeet-practice-options-answered');
-            $('.googlemeet-practice-answer').each(function() {
-                const option = $(this).closest('.googlemeet-practice-option');
-                const state = option.find('.googlemeet-practice-option-state');
-                if (parseInt($(this).val(), 10) === parseInt(response.correctanswerid, 10)) {
-                    option.addClass('googlemeet-practice-option-correct');
-                    state.html('<span aria-hidden="true">&#10003;</span><span class="googlemeet-practice-option-statetext">' +
-                        escapeHtml(strings.practice_right_option) + '</span>');
-                } else if ($(this).is(':checked')) {
-                    option.addClass('googlemeet-practice-option-incorrect');
-                    state.html('<span aria-hidden="true">&#10007;</span><span class="googlemeet-practice-option-statetext">' +
-                        escapeHtml(strings.practice_your_answer) + '</span>');
+            const answers = findAll('.googlemeet-practice-answer');
+            answers.forEach(answer => {
+                answer.disabled = true;
+            });
+            findAll('.googlemeet-practice-options', player).forEach(options => {
+                options.classList.add('googlemeet-practice-options-answered');
+            });
+            answers.forEach(answer => {
+                const option = answer.closest('.googlemeet-practice-option');
+                const states = option ? findAll('.googlemeet-practice-option-state', option) : [];
+                if (parseInt(answer.value, 10) === parseInt(response.correctanswerid, 10)) {
+                    if (option) {
+                        option.classList.add('googlemeet-practice-option-correct');
+                    }
+                    states.forEach(state => {
+                        state.innerHTML = '<span aria-hidden="true">&#10003;</span>' +
+                            '<span class="googlemeet-practice-option-statetext">' +
+                            escapeHtml(strings.practice_right_option) + '</span>';
+                    });
+                } else if (answer.checked) {
+                    if (option) {
+                        option.classList.add('googlemeet-practice-option-incorrect');
+                    }
+                    states.forEach(state => {
+                        state.innerHTML = '<span aria-hidden="true">&#10007;</span>' +
+                            '<span class="googlemeet-practice-option-statetext">' +
+                            escapeHtml(strings.practice_your_answer) + '</span>';
+                    });
                 }
             });
 
@@ -1545,54 +1786,52 @@ const bindPracticePlayer = () => {
             const feedbackClass = response.correct ? 'alert-success' : 'alert-warning';
             const statusText = response.correct ? strings.practice_correct : strings.practice_incorrect;
             const icon = response.correct ? '&#10003;' : '&#10007;';
-            $('.googlemeet-practice-feedback')
-                .removeClass('d-none alert-success alert-warning')
-                .addClass('alert ' + feedbackClass)
-                .html('<div class="fw-bold"><span aria-hidden="true">' + icon + '</span> ' +
-                    escapeHtml(statusText) + '</div>' +
-                    (response.correct ? '' : '<div class="mt-2"><strong>' + escapeHtml(strings.practice_correct_answer) +
-                        '</strong> ' + correctText + '</div>') +
-                    (response.explanation ? '<div class="mt-2">' + response.explanation + '</div>' : ''));
+            const feedbackHtml = '<div class="fw-bold"><span aria-hidden="true">' + icon + '</span> ' +
+                escapeHtml(statusText) + '</div>' +
+                (response.correct ? '' : '<div class="mt-2"><strong>' + escapeHtml(strings.practice_correct_answer) +
+                    '</strong> ' + correctText + '</div>') +
+                (response.explanation ? '<div class="mt-2">' + response.explanation + '</div>' : '');
+            findAll('.googlemeet-practice-feedback').forEach(feedback => {
+                feedback.classList.remove('d-none', 'alert-success', 'alert-warning');
+                feedback.classList.add('alert', feedbackClass);
+                feedback.innerHTML = feedbackHtml;
+            });
             updatePracticeHeader(practice, player, true);
-            $('.googlemeet-practice-check').addClass('d-none');
-            $('.googlemeet-practice-next').removeClass('d-none').text(
-                practice.index + 1 >= practice.queue.length ? strings.practice_finish : strings.practice_next
-            ).trigger('focus');
+            checkButtons.forEach(button => {
+                button.classList.add('d-none');
+            });
+            const nextText = practice.index + 1 >= practice.queue.length ? strings.practice_finish : strings.practice_next;
+            findAll('.googlemeet-practice-next').forEach(button => {
+                button.classList.remove('d-none');
+                button.textContent = nextText;
+                button.focus();
+            });
             return;
-        }).fail(error => {
-            $('.googlemeet-practice-check').prop('disabled', false);
-            $('.googlemeet-practice-error')
-                .removeClass('d-none')
-                .text(error.message || strings.ai_error_unknown);
+        }).catch(error => {
+            setCheckDisabled(false);
+            findAll('.googlemeet-practice-error').forEach(element => {
+                element.classList.remove('d-none');
+                element.textContent = error.message || strings.ai_error_unknown;
+            });
         });
-    });
+    }));
 
-    $('.googlemeet-practice-next').on('click', () => {
+    findAll('.googlemeet-practice-next').forEach(button => button.addEventListener('click', () => {
         practice.index++;
         if (practice.index >= practice.queue.length) {
             showPracticeComplete(practice, player);
         } else {
             renderPracticeQuestion(practice, player);
-            $('.googlemeet-practice-stem').attr('tabindex', '-1').trigger('focus');
+            focusPracticeStem();
         }
-    });
+    }));
 
-    $('.googlemeet-practice-review').on('click', () => startRound(practice.wrong, true));
-    $('.googlemeet-practice-retry').on('click', () => startRound(practice.questions, false));
-};
-
-/**
- * Show a hub tab button through Bootstrap (or the jQuery bridge when only that exists).
- *
- * @param {HTMLElement} tab Tab button.
- * @returns {void}
- */
-const showTab = tab => {
-    if (window.bootstrap && window.bootstrap.Tab) {
-        window.bootstrap.Tab.getOrCreateInstance(tab).show();
-    } else if (typeof $(tab).tab === 'function') {
-        $(tab).tab('show');
-    }
+    findAll('.googlemeet-practice-review').forEach(button => button.addEventListener('click', () => {
+        startRound(practice.wrong, true);
+    }));
+    findAll('.googlemeet-practice-retry').forEach(button => button.addEventListener('click', () => {
+        startRound(practice.questions, false);
+    }));
 };
 
 /**
@@ -1630,22 +1869,26 @@ const bindTabHash = () => {
     }
     window.addEventListener('hashchange', fromHash);
     // Buttons that jump to another tab (study sidebar, end of practice).
-    $(hub).on('click', '[data-hub-goto]', function() {
-        const tab = byName(this.getAttribute('data-hub-goto'));
+    hub.addEventListener('click', e => {
+        const trigger = e.target.closest('[data-hub-goto]');
+        if (!trigger || !hub.contains(trigger)) {
+            return;
+        }
+        const tab = byName(trigger.getAttribute('data-hub-goto'));
         if (tab) {
             showTab(tab);
             reveal(tab);
             tab.focus();
         }
     });
-    $(tabs).on('shown.bs.tab', function() {
-        reveal(this);
+    tabs.forEach(tab => tab.addEventListener('shown.bs.tab', () => {
+        reveal(tab);
         if (window.history && window.history.replaceState) {
             const url = new URL(window.location.href);
-            url.hash = this.getAttribute('data-hub-tab');
+            url.hash = tab.getAttribute('data-hub-tab');
             window.history.replaceState(window.history.state, '', url.toString());
         }
-    });
+    }));
 };
 
 /**
@@ -1728,7 +1971,10 @@ const bindReadMore = () => {
         measure();
     };
     ready();
-    $('#googlemeet-summary-tab').on('shown.bs.tab', ready);
+    const summaryTab = document.getElementById('googlemeet-summary-tab');
+    if (summaryTab) {
+        summaryTab.addEventListener('shown.bs.tab', ready);
+    }
     toggle.addEventListener('click', () => {
         const expanded = toggle.getAttribute('aria-expanded') === 'true';
         body.classList.toggle('googlemeet-collapsed', expanded);
@@ -1844,6 +2090,20 @@ const bindKeypointChecklist = () => {
 };
 
 /**
+ * Run a callback once the document has been parsed (at once when it already has).
+ *
+ * @param {Function} callback Callback.
+ * @returns {void}
+ */
+const whenDomReady = callback => {
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', callback, {once: true});
+    } else {
+        callback();
+    }
+};
+
+/**
  * Initialise recording hub behaviours.
  *
  * @param {Object} config Module configuration.
@@ -1877,7 +2137,7 @@ export const init = config => {
     settings.hubStateKey = 'mod_googlemeet_hub_state_' + settings.cmid + '_' + settings.recordingid;
 
     loadStrings().then(() => {
-        $(document).ready(() => {
+        whenDomReady(() => {
             restoreHubState();
             bindTabHash();
             bindTabsOverflow();
