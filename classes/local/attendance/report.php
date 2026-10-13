@@ -184,10 +184,78 @@ class report {
         if ($fence === null) {
             return $rows;
         }
-        $seeunmatched = has_capability('mod/googlemeet:manageattendance', \context_module::instance($cm->id), $viewerid);
+        $seeunmatched = self::sees_unmatched($cm, $viewerid);
         return array_values(array_filter($rows, static function (array $row) use ($fence, $seeunmatched): bool {
-            return $row['kind'] === self::ROW_UNMATCHED ? $seeunmatched : isset($fence[$row['userid']]);
+            return self::in_fence($row['userid'], $fence, $seeunmatched);
         }));
+    }
+
+    /**
+     * Past sessions of the activity for a viewer, with match counts over the participants that viewer is shown.
+     *
+     * The list itself is not fenced: sessions belong to the activity, not to a group, so every viewer
+     * of the report lists (and may open) every session. The stored counts of a session
+     * (googlemeet_attendance_sync participants and matched) cover everybody who joined, so for a
+     * viewer fenced to their own groups both are recounted from the attendance rows with the
+     * predicate {@see self::session_rows()} filters its rows by ({@see self::in_fence()}).
+     *
+     * @param \stdClass $googlemeet Activity record.
+     * @param int $now Sessions starting after this are left out.
+     * @param int $viewerid User looking at the attendance.
+     * @return \stdClass[] id => session, as {@see service::get_sessions()}.
+     */
+    public static function sessions(\stdClass $googlemeet, int $now, int $viewerid): array {
+        global $DB;
+
+        $sessions = service::get_sessions((int)$googlemeet->id, $now);
+        $fence = self::fenced_userids($googlemeet, $viewerid);
+        if ($fence === null || !$sessions) {
+            return $sessions;
+        }
+        foreach ($sessions as $session) {
+            $session->participants = 0;
+            $session->matched = 0;
+        }
+        $cm = get_coursemodule_from_instance('googlemeet', $googlemeet->id, 0, false, MUST_EXIST);
+        $seeunmatched = self::sees_unmatched($cm, $viewerid);
+        $rs = $DB->get_recordset('googlemeet_attendance', ['googlemeetid' => $googlemeet->id], '', 'id, eventid, userid');
+        foreach ($rs as $row) {
+            $userid = (int)$row->userid;
+            if (!isset($sessions[$row->eventid]) || !self::in_fence($userid, $fence, $seeunmatched)) {
+                continue;
+            }
+            $sessions[$row->eventid]->participants++;
+            if ($userid) {
+                $sessions[$row->eventid]->matched++;
+            }
+        }
+        $rs->close();
+        return $sessions;
+    }
+
+    /**
+     * Whether a fenced viewer is shown the unmatched participants: only to link them, so only with
+     * mod/googlemeet:manageattendance.
+     *
+     * @param \stdClass|\cm_info $cm Course-module of the activity.
+     * @param int $viewerid User looking at the attendance.
+     * @return bool
+     */
+    protected static function sees_unmatched($cm, int $viewerid): bool {
+        return has_capability('mod/googlemeet:manageattendance', \context_module::instance($cm->id), $viewerid);
+    }
+
+    /**
+     * Whether a fenced viewer is shown an attendance row or a student: the one predicate behind both the
+     * rows ({@see self::session_rows()}) and the counts ({@see self::sessions()}) of such a viewer.
+     *
+     * @param int $userid Matched or absent user; 0 for an unmatched participant.
+     * @param array $fence User id => true, from {@see self::fenced_userids()}.
+     * @param bool $seeunmatched Result of {@see self::sees_unmatched()} for the viewer.
+     * @return bool
+     */
+    protected static function in_fence(int $userid, array $fence, bool $seeunmatched): bool {
+        return $userid === 0 ? $seeunmatched : isset($fence[$userid]);
     }
 
     /**

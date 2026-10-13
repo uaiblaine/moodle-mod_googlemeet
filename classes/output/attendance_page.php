@@ -37,7 +37,7 @@ class attendance_page implements \renderable, \templatable {
     /** @var \stdClass Course-module. */
     protected $cm;
 
-    /** @var \stdClass[] Past sessions, from service::get_sessions(). */
+    /** @var \stdClass[] Past sessions, from report::sessions(). */
     protected $sessions;
 
     /** @var \stdClass|null Selected session (googlemeet_events row), null for the list alone. */
@@ -68,7 +68,7 @@ class attendance_page implements \renderable, \templatable {
      * Constructor.
      *
      * @param \stdClass $cm Course-module.
-     * @param \stdClass[] $sessions Past sessions, from service::get_sessions().
+     * @param \stdClass[] $sessions Past sessions, from report::sessions().
      * @param \stdClass|null $session Selected session, or null.
      * @param \stdClass|null $sync Sync row of the selected session, or null.
      * @param array[] $rows Rows of the selected session, from report::session_rows().

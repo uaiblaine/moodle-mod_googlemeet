@@ -81,6 +81,10 @@ if (($action === 'refetch' || $action === 'link') && $session) {
     }
 }
 if ($action === 'refetch' && $session) {
+    // No group fence: sessions belong to the activity and every viewer of this page lists every
+    // session ({@see report::sessions()}). A refetch re-reads the whole session from Google, as the
+    // scheduled fetch does, and keeps every teacher's manual link and unlink ({@see service::store()}),
+    // so a manager fenced to their own groups overrides no decision taken for another group.
     service::request_refetch((int)$googlemeet->id, (int)$session->id);
     redirect(
         new moodle_url($baseurl, ['session' => $session->id]),
@@ -148,7 +152,7 @@ if (scope::is_organiser($googlemeet, $USER)) {
     }
 }
 
-$sessions = service::get_sessions((int)$googlemeet->id, time());
+$sessions = report::sessions($googlemeet, time(), (int)$USER->id);
 $sync = null;
 $candidates = [];
 $downloadselector = '';

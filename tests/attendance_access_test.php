@@ -342,4 +342,90 @@ final class attendance_access_test extends \advanced_testcase {
         $this->assertFalse($this->denied($link + ['attendanceid' => $this->rows['guest'], 'userid' => $a]));
         $this->assertEquals($a, $DB->get_field('googlemeet_attendance', 'userid', ['id' => $this->rows['guest']]));
     }
+
+    /**
+     * Store the fetch outcome of the session with the counts a fetch over everybody records.
+     *
+     * @param int $participants Participants of the whole session.
+     * @param int $matched Of those, matched to a user.
+     * @return void
+     */
+    private function insert_done_sync(int $participants, int $matched): void {
+        global $DB;
+        $DB->insert_record('googlemeet_attendance_sync', (object)[
+            'googlemeetid' => $this->googlemeet->id,
+            'eventid' => $this->eventid,
+            'status' => service::STATUS_DONE,
+            'participants' => $participants,
+            'matched' => $matched,
+            'timemodified' => time(),
+        ]);
+    }
+
+    /**
+     * The participants cell of the session in the sessions list of a page.
+     *
+     * @param int $matched Matched participants expected.
+     * @param int $total Participants expected.
+     * @return string
+     */
+    private function counts_cell(int $matched, int $total): string {
+        return '<td class="cell c2">'
+            . get_string('attendance_counts', 'googlemeet', (object)['matched' => $matched, 'total' => $total])
+            . '</td>';
+    }
+
+    /**
+     * In separate groups the session counts a fenced teacher is shown cover the rows they are shown:
+     * group A's matched student, plus the unmatched participant once they may manage attendance. The
+     * editing teacher, who is not fenced, is shown the stored counts over everybody.
+     */
+    public function test_separate_groups_fence_counts(): void {
+        $this->build(SEPARATEGROUPS);
+        // Students a and b matched, the guest unmatched: what a fetch over everybody stores.
+        $this->insert_done_sync(3, 2);
+        $teacherid = (int)$this->teacher->id;
+
+        $this->setUser($this->teacher);
+        $session = report::sessions($this->googlemeet, time(), $teacherid)[$this->eventid];
+        $this->assertSame([1, 1], [$session->matched, $session->participants]);
+        $html = $this->run_page([], false);
+        $this->assertStringContainsString($this->counts_cell(1, 1), $html);
+        $this->assertStringNotContainsString($this->counts_cell(2, 3), $html);
+
+        $this->allow_teacher_to_manage();
+        $rows = report::session_rows($this->googlemeet, $this->eventid, null, $teacherid);
+        $this->assertCount(2, $rows);
+        $html = $this->run_page([], false);
+        $this->assertStringContainsString($this->counts_cell(1, 2), $html);
+
+        // Control: the unfenced editing teacher keeps the stored counts.
+        $this->setUser($this->editor);
+        $html = $this->run_page([], false);
+        $this->assertStringContainsString($this->counts_cell(2, 3), $html);
+    }
+
+    /**
+     * Sessions are not fenced: a manager fenced to group A lists the session, is offered its refetch and
+     * may queue it, as an unfenced manager may. A refetch keeps the manual decisions of every group
+     * ({@see service::store()}), so there is no group whose session they could not ask to read again.
+     */
+    public function test_separate_groups_fenced_manager_may_refetch(): void {
+        global $DB;
+        $this->build(SEPARATEGROUPS);
+        $this->allow_teacher_to_manage();
+        $teacherid = (int)$this->teacher->id;
+        $this->setUser($this->teacher);
+        $this->assertNotNull(report::fenced_userids($this->googlemeet, $teacherid), 'The teacher is not fenced.');
+
+        $this->assertArrayHasKey($this->eventid, report::sessions($this->googlemeet, time(), $teacherid));
+        $html = $this->run_page(['session' => $this->eventid], false);
+        $this->assertMatchesRegularExpression('~<form method="post"[^>]*>(?:(?!</form>).)*name="action" value="refetch"~s', $html);
+
+        $this->assertFalse($this->denied(['session' => $this->eventid, 'action' => 'refetch']));
+        $this->assertSame(
+            service::STATUS_PENDING,
+            $DB->get_field('googlemeet_attendance_sync', 'status', ['eventid' => $this->eventid])
+        );
+    }
 }

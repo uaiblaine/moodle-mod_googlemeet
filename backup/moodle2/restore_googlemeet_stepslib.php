@@ -104,7 +104,8 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $data->course = $this->get_courseid();
 
         // Any changes to the list of dates that needs to be rolled should be same during course restore and course reset.
-        // See MDL-9367.
+        // See MDL-9367. Reset moves these in googlemeet_reset_userdata() and the session, holiday and cancelled
+        // dates in {@see \mod_googlemeet\local\schedule::shift_dates()}.
         $data->eventdate = $this->apply_date_offset($data->eventdate);
         $data->eventenddate = $this->apply_date_offset($data->eventenddate);
         $data->timemodified = $this->apply_date_offset($data->timemodified);
