@@ -34,6 +34,31 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(log_room_entered::class)]
 final class room_entered_test extends \advanced_testcase {
     /**
+     * Call a web service the way the AJAX layer does (session key in the request, returns cleaned).
+     *
+     * @param string $function Web service name.
+     * @param array $args Arguments.
+     * @return array call_external_function() result.
+     */
+    private function ws(string $function, array $args): array {
+        $_POST['sesskey'] = sesskey();
+        return external_api::call_external_function($function, $args);
+    }
+
+    /**
+     * Call a web service that must succeed and return its cleaned data.
+     *
+     * @param string $function Web service name.
+     * @param array $args Arguments.
+     * @return array Returned data.
+     */
+    private function ws_ok(string $function, array $args): array {
+        $result = $this->ws($function, $args);
+        $this->assertFalse($result['error'], json_encode($result['exception'] ?? null));
+        return $result['data'];
+    }
+
+    /**
      * Activity + student.
      *
      * @param string $url Meet URL.
@@ -119,8 +144,7 @@ final class room_entered_test extends \advanced_testcase {
         $this->setUser($student);
 
         $sink = $this->redirectEvents();
-        $result = log_room_entered::execute($cm->id, 'mobile');
-        $result = external_api::clean_returnvalue(log_room_entered::execute_returns(), $result);
+        $result = $this->ws_ok('mod_googlemeet_log_room_entered', ['coursemoduleid' => $cm->id, 'via' => 'mobile']);
         $events = $sink->get_events();
         $sink->close();
 
@@ -139,7 +163,7 @@ final class room_entered_test extends \advanced_testcase {
         $this->setUser($student);
 
         $sink = $this->redirectEvents();
-        $result = log_room_entered::execute($cm->id, 'mobile');
+        $result = $this->ws_ok('mod_googlemeet_log_room_entered', ['coursemoduleid' => $cm->id, 'via' => 'mobile']);
         $events = $sink->get_events();
         $sink->close();
 

@@ -103,7 +103,7 @@ $functions = [
         'description' => 'Analyze a pasted transcript using Gemini AI',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/googlemeet:editrecording',
+        'capabilities' => 'mod/googlemeet:editrecording, mod/googlemeet:generateai',
     ],
     'mod_googlemeet_publish_questions' => [
         'classname' => 'mod_googlemeet_external',
@@ -151,7 +151,7 @@ $functions = [
         'description' => 'Queue AI question generation for a Google Meet recording',
         'type' => 'write',
         'ajax' => true,
-        'capabilities' => 'mod/googlemeet:managequestions',
+        'capabilities' => 'mod/googlemeet:managequestions, mod/googlemeet:generateai',
     ],
     'mod_googlemeet_get_questions' => [
         'classname' => 'mod_googlemeet_external',

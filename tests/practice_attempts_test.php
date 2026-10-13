@@ -70,6 +70,31 @@ final class practice_attempts_test extends \advanced_testcase {
     }
 
     /**
+     * Call a web service the way the AJAX layer does (session key in the request, returns cleaned).
+     *
+     * @param string $function Web service name.
+     * @param array $args Arguments.
+     * @return array call_external_function() result.
+     */
+    private function ws(string $function, array $args): array {
+        $_POST['sesskey'] = sesskey();
+        return external_api::call_external_function($function, $args);
+    }
+
+    /**
+     * Call a web service that must succeed and return its cleaned data.
+     *
+     * @param string $function Web service name.
+     * @param array $args Arguments.
+     * @return array Returned data.
+     */
+    private function ws_ok(string $function, array $args): array {
+        $result = $this->ws($function, $args);
+        $this->assertFalse($result['error'], json_encode($result['exception'] ?? null));
+        return $result['data'];
+    }
+
+    /**
      * Insert a recording, optionally with AI topics.
      *
      * @param array $topics AI topics.
@@ -157,15 +182,10 @@ final class practice_attempts_test extends \advanced_testcase {
         $answers = $this->answer_ids($qid);
 
         $this->setUser($this->student);
-        $result = external_api::clean_returnvalue(
-            \mod_googlemeet_external::check_practice_answer_returns(),
-            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $qid, $answers[0])
-        );
+        $args = ['recordingid' => $rec, 'coursemoduleid' => $this->cm->id, 'questionid' => $qid];
+        $result = $this->ws_ok('mod_googlemeet_check_practice_answer', $args + ['answerid' => $answers[0]]);
         $this->assertFalse($result['correct']);
-        external_api::clean_returnvalue(
-            \mod_googlemeet_external::check_practice_answer_returns(),
-            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $qid, $answers[1])
-        );
+        $this->ws_ok('mod_googlemeet_check_practice_answer', $args + ['answerid' => $answers[1]]);
 
         $attempts = array_values($DB->get_records(practice_attempts::TABLE, ['userid' => $this->student->id], 'id ASC'));
         $this->assertCount(2, $attempts);
@@ -188,12 +208,11 @@ final class practice_attempts_test extends \advanced_testcase {
         $answers = $this->answer_ids($draft);
 
         $this->setUser($this->student);
-        try {
-            \mod_googlemeet_external::check_practice_answer($rec, $this->cm->id, $draft, $answers[0]);
-            $this->fail('Exception expected');
-        } catch (\moodle_exception $e) {
-            $this->assertEquals(0, $DB->count_records(practice_attempts::TABLE));
-        }
+        $result = $this->ws('mod_googlemeet_check_practice_answer', [
+            'recordingid' => $rec, 'coursemoduleid' => $this->cm->id, 'questionid' => $draft, 'answerid' => $answers[0],
+        ]);
+        $this->assertTrue($result['error'], 'A draft question must be refused.');
+        $this->assertEquals(0, $DB->count_records(practice_attempts::TABLE));
     }
 
     /**
@@ -303,21 +322,17 @@ final class practice_attempts_test extends \advanced_testcase {
         practice_attempts::record((int)$this->googlemeet->id, $rec, $qid, (int)$this->student->id, false);
 
         $this->setUser($this->student);
-        $result = external_api::clean_returnvalue(
-            external\get_practice_session::execute_returns(),
-            external\get_practice_session::execute($this->cm->id, 'failed', '')
-        );
+        $args = ['coursemoduleid' => $this->cm->id];
+        $result = $this->ws_ok('mod_googlemeet_get_practice_session', $args + ['mode' => 'failed', 'topic' => '']);
         $this->assertCount(1, $result['questions']);
         $this->assertEquals($rec, $result['questions'][0]['recordingid']);
 
-        $result = external_api::clean_returnvalue(
-            external\get_practice_session::execute_returns(),
-            external\get_practice_session::execute($this->cm->id, 'topic', 'tema')
-        );
+        $result = $this->ws_ok('mod_googlemeet_get_practice_session', $args + ['mode' => 'topic', 'topic' => 'tema']);
         $this->assertCount(1, $result['questions']);
 
-        $this->expectException(\invalid_parameter_exception::class);
-        external\get_practice_session::execute($this->cm->id, 'everything', '');
+        $result = $this->ws('mod_googlemeet_get_practice_session', $args + ['mode' => 'everything', 'topic' => '']);
+        $this->assertTrue($result['error']);
+        $this->assertSame('invalidparameter', $result['exception']->errorcode);
     }
 
     /**

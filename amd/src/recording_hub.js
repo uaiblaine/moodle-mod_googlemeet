@@ -1163,7 +1163,6 @@ const bindQuestionManagement = () => {
             recordingid: settings.recordingid,
             coursemoduleid: settings.cmid,
             count: parseInt($(this).attr('data-count'), 10) || 10,
-            sesskey: settings.sesskey,
         });
     });
 
@@ -1179,7 +1178,6 @@ const bindQuestionManagement = () => {
             recordingid: settings.recordingid,
             coursemoduleid: settings.cmid,
             questionids: [questionid],
-            sesskey: settings.sesskey,
         })).catch(() => {
             // Cancelled, or the request failed and call() already reported it.
             return;
@@ -1198,7 +1196,6 @@ const bindQuestionManagement = () => {
             recordingid: settings.recordingid,
             coursemoduleid: settings.cmid,
             questionids: [questionid],
-            sesskey: settings.sesskey,
         })).catch(() => {
             // Cancelled, or the request failed and call() already reported it.
             return;
@@ -1232,7 +1229,6 @@ const bindQuestionManagement = () => {
             correctindex: parseInt($('#googlemeet-question-edit-correct').val(), 10),
             explanation: $('#googlemeet-question-edit-feedback').val(),
             citation: '',
-            sesskey: settings.sesskey,
         });
     });
 };
@@ -1853,7 +1849,6 @@ const bindKeypointChecklist = () => {
  * @param {Object} config Module configuration.
  * @param {number} config.cmid Course module ID.
  * @param {number} config.recordingid Recording ID.
- * @param {string} config.sesskey Session key.
  * @param {boolean} config.caneditrecording Whether recording actions are available.
  * @param {boolean} config.canmanagequestions Whether question management is available.
  * @param {boolean} config.hasquestions Whether questions exist for the recording.
@@ -1871,7 +1866,6 @@ export const init = config => {
     settings = {
         cmid: parseInt(config.cmid, 10),
         recordingid: parseInt(config.recordingid, 10),
-        sesskey: config.sesskey || '',
         caneditrecording: !!config.caneditrecording,
         canmanagequestions: !!config.canmanagequestions,
         hasquestions: !!config.hasquestions,
