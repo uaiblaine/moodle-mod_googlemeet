@@ -78,7 +78,7 @@ class mod_googlemeet_external extends external_api {
             ]
         );
 
-        $cm = get_coursemodule_from_id('googlemeet', $coursemoduleid, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
@@ -86,7 +86,7 @@ class mod_googlemeet_external extends external_api {
         // Verify the recording belongs to this googlemeet instance (prevent IDOR).
         $recording = $DB->get_record(
             'googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0],
             '*',
             IGNORE_MISSING
         );
@@ -94,7 +94,7 @@ class mod_googlemeet_external extends external_api {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
-        $recording->name = $name;
+        $recording->name = $params['name'];
         $recording->timemodified = time();
 
         $DB->update_record('googlemeet_recordings', $recording);
@@ -104,9 +104,16 @@ class mod_googlemeet_external extends external_api {
             'other' => ['field' => 'name'],
         ])->trigger();
 
+        // The name passed PARAM_TEXT validation, so it is returned as stored (the edit field reads it back).
+        // The display name is derived from it: format_string() without escaping keeps it a valid PARAM_TEXT
+        // value (a bare '<' left by the derivation would fail the whole response).
         return (object)[
             'name' => $recording->name,
-            'displayname' => googlemeet_display_name((string)$recording->name),
+            'displayname' => format_string(
+                googlemeet_display_name((string)$recording->name),
+                true,
+                ['context' => $context, 'escape' => false]
+            ),
         ];
     }
 
@@ -118,8 +125,8 @@ class mod_googlemeet_external extends external_api {
     public static function recording_edit_name_returns() {
         return new external_single_structure(
             [
-                'name' => new external_value(PARAM_RAW, 'New recording name'),
-                'displayname' => new external_value(PARAM_RAW, 'New recording display name'),
+                'name' => new external_value(PARAM_TEXT, 'New recording name'),
+                'displayname' => new external_value(PARAM_TEXT, 'New recording display name'),
             ]
         );
     }
@@ -157,7 +164,7 @@ class mod_googlemeet_external extends external_api {
             ]
         );
 
-        $cm = get_coursemodule_from_id('googlemeet', $coursemoduleid, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
@@ -165,7 +172,7 @@ class mod_googlemeet_external extends external_api {
         // Verify the recording belongs to this googlemeet instance (prevent IDOR).
         $recording = $DB->get_record(
             'googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0],
             '*',
             IGNORE_MISSING
         );
@@ -189,7 +196,7 @@ class mod_googlemeet_external extends external_api {
         ])->trigger();
 
         return (object)[
-            'visible' => $recording->visible,
+            'visible' => !empty($recording->visible),
         ];
     }
 
@@ -201,7 +208,7 @@ class mod_googlemeet_external extends external_api {
     public static function showhide_recording_returns() {
         return new external_single_structure(
             [
-                'visible' => new external_value(PARAM_RAW, 'Visible or hidden recording'),
+                'visible' => new external_value(PARAM_BOOL, 'Whether the recording is now visible to students'),
             ]
         );
     }
@@ -239,7 +246,7 @@ class mod_googlemeet_external extends external_api {
             ]
         );
 
-        $cm = get_coursemodule_from_id('googlemeet', $coursemoduleid, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:removerecording', $context);
@@ -598,7 +605,7 @@ class mod_googlemeet_external extends external_api {
             'keypoints' => is_array($analysis->keypoints) ? $analysis->keypoints : [],
             'topics' => is_array($analysis->topics) ? $analysis->topics : [],
             'transcript' => $analysis->transcript ?? '',
-            'language' => $analysis->language ?? 'es',
+            'language' => (string)($analysis->language ?? ''),
             'status' => $analysis->status,
             'error' => $analysis->error ?? '',
             'aimodel' => $analysis->aimodel ?? '',
@@ -688,7 +695,7 @@ class mod_googlemeet_external extends external_api {
             ]
         );
 
-        $cm = get_coursemodule_from_id('googlemeet', $coursemoduleid, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:view', $context);
@@ -703,7 +710,7 @@ class mod_googlemeet_external extends external_api {
         // analysis built from the recording's existing transcript.
         $recording = $DB->get_record(
             'googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0],
             'id, visible, transcripttext',
             IGNORE_MISSING
         );
@@ -713,7 +720,7 @@ class mod_googlemeet_external extends external_api {
         }
 
         $aiservice = new \mod_googlemeet\ai_service();
-        $analysis = $aiservice->get_analysis($recordingid);
+        $analysis = $aiservice->get_analysis($params['recordingid']);
 
         // Unreviewed content is not served to students (it looks as if there was no analysis yet).
         $canreview = has_capability(\mod_googlemeet\local\ai_review::CAPABILITY, $context);
@@ -737,7 +744,7 @@ class mod_googlemeet_external extends external_api {
             return [
                 'found' => false,
                 'id' => 0,
-                'recordingid' => $recordingid,
+                'recordingid' => $params['recordingid'],
                 'summary' => '',
                 'keypoints' => [],
                 'topics' => [],
@@ -775,7 +782,7 @@ class mod_googlemeet_external extends external_api {
             'keypoints' => is_array($analysis->keypoints) ? $analysis->keypoints : [],
             'topics' => is_array($analysis->topics) ? $analysis->topics : [],
             'transcript' => $cantranscript ? $transcript : '',
-            'language' => $analysis->language ?? 'es',
+            'language' => (string)($analysis->language ?? ''),
             'status' => $analysis->status,
             'error' => $error,
             'aimodel' => $analysis->aimodel ?? '',
@@ -879,7 +886,7 @@ class mod_googlemeet_external extends external_api {
             ]
         );
 
-        $cm = get_coursemodule_from_id('googlemeet', $coursemoduleid, 0, false, MUST_EXIST);
+        $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
@@ -887,13 +894,19 @@ class mod_googlemeet_external extends external_api {
         // Verify the recording exists and belongs to this googlemeet instance (prevent IDOR).
         $recording = $DB->get_record(
             'googlemeet_recordings',
-            ['id' => $recordingid, 'googlemeetid' => $cm->instance, 'deleted' => 0],
+            ['id' => $params['recordingid'], 'googlemeetid' => $cm->instance, 'deleted' => 0],
             '*',
             IGNORE_MISSING
         );
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
+
+        $recordingid = (int)$recording->id;
+        $summary = $params['summary'];
+        $keypoints = $params['keypoints'];
+        $topics = $params['topics'];
+        $transcript = $params['transcript'];
 
         // Parse keypoints (one per line).
         $keypointsarray = [];
@@ -953,7 +966,8 @@ class mod_googlemeet_external extends external_api {
             $analysis->keypoints = json_encode($keypointsarray);
             $analysis->topics = json_encode($topicsarray);
             $analysis->transcript = $transcript;
-            $analysis->language = 'es';
+            // A pasted analysis has no detected language; readers fall back to current_language().
+            $analysis->language = null;
             $analysis->status = 'completed';
             $analysis->error = null;
             $analysis->aimodel = 'manual';
@@ -1047,6 +1061,8 @@ class mod_googlemeet_external extends external_api {
         $context = context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:editrecording', $context);
+        // Each call is a paid Gemini request: the same capability as generate_ai_analysis.
+        require_capability('mod/googlemeet:generateai', $context);
 
         // Validate recording ID.
         if (empty($params['recordingid']) || $params['recordingid'] <= 0) {
@@ -1082,7 +1098,7 @@ class mod_googlemeet_external extends external_api {
             $analysis->keypoints = json_encode($result->keypoints ?? []);
             $analysis->topics = json_encode($result->topics ?? []);
             $analysis->transcript = $params['transcript'];
-            $analysis->language = $result->language ?? 'es';
+            $analysis->language = ($result->language ?? '') !== '' ? $result->language : null;
             $analysis->status = 'completed';
             $analysis->error = null;
             $analysis->aimodel = $client->get_last_used_model() ?? $client->get_model();
@@ -1109,7 +1125,7 @@ class mod_googlemeet_external extends external_api {
                 'keypoints' => [],
                 'topics' => [],
                 'error' => ($e instanceof \mod_googlemeet\gemini_safety_exception)
-                    ? $e->getMessage() : get_string('ai_error_generic', 'googlemeet'),
+                    ? $e->get_user_message() : get_string('ai_error_generic', 'googlemeet'),
             ];
         }
 
@@ -1160,7 +1176,6 @@ class mod_googlemeet_external extends external_api {
             'recordingid' => new external_value(PARAM_INT, 'Recording ID'),
             'coursemoduleid' => new external_value(PARAM_INT, 'Course module ID'),
             'questionids' => new external_multiple_structure(new external_value(PARAM_INT, 'Question ID')),
-            'sesskey' => new external_value(PARAM_RAW, 'Session key'),
         ]);
     }
 
@@ -1200,10 +1215,6 @@ class mod_googlemeet_external extends external_api {
     private static function validate_question_action(array $params): array {
         global $DB;
 
-        if (!confirm_sesskey($params['sesskey'])) {
-            throw new \moodle_exception('invalidsesskey');
-        }
-
         $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
@@ -1228,15 +1239,13 @@ class mod_googlemeet_external extends external_api {
      * @param int $recordingid Recording ID.
      * @param int $coursemoduleid Course module ID.
      * @param array $questionids Question IDs.
-     * @param string $sesskey Session key.
      * @return array
      */
-    public static function publish_questions($recordingid, $coursemoduleid, $questionids, $sesskey) {
+    public static function publish_questions($recordingid, $coursemoduleid, $questionids) {
         $params = self::validate_parameters(self::question_list_action_parameters(), [
             'recordingid' => $recordingid,
             'coursemoduleid' => $coursemoduleid,
             'questionids' => $questionids,
-            'sesskey' => $sesskey,
         ]);
         [, , $context, $rows, $service] = self::validate_question_action($params);
         $count = $service->set_status($rows, \core_question\local\bank\question_version_status::QUESTION_STATUS_READY);
@@ -1250,15 +1259,13 @@ class mod_googlemeet_external extends external_api {
      * @param int $recordingid Recording ID.
      * @param int $coursemoduleid Course module ID.
      * @param array $questionids Question IDs.
-     * @param string $sesskey Session key.
      * @return array
      */
-    public static function unpublish_questions($recordingid, $coursemoduleid, $questionids, $sesskey) {
+    public static function unpublish_questions($recordingid, $coursemoduleid, $questionids) {
         $params = self::validate_parameters(self::question_list_action_parameters(), [
             'recordingid' => $recordingid,
             'coursemoduleid' => $coursemoduleid,
             'questionids' => $questionids,
-            'sesskey' => $sesskey,
         ]);
         [, , $context, $rows, $service] = self::validate_question_action($params);
         $count = $service->set_status($rows, \core_question\local\bank\question_version_status::QUESTION_STATUS_DRAFT);
@@ -1272,15 +1279,13 @@ class mod_googlemeet_external extends external_api {
      * @param int $recordingid Recording ID.
      * @param int $coursemoduleid Course module ID.
      * @param array $questionids Question IDs.
-     * @param string $sesskey Session key.
      * @return array
      */
-    public static function discard_questions($recordingid, $coursemoduleid, $questionids, $sesskey) {
+    public static function discard_questions($recordingid, $coursemoduleid, $questionids) {
         $params = self::validate_parameters(self::question_list_action_parameters(), [
             'recordingid' => $recordingid,
             'coursemoduleid' => $coursemoduleid,
             'questionids' => $questionids,
-            'sesskey' => $sesskey,
         ]);
         [, , $context, $rows, $service] = self::validate_question_action($params);
         $count = $service->discard_drafts($rows);
@@ -1335,7 +1340,6 @@ class mod_googlemeet_external extends external_api {
     public static function publish_activity_drafts_parameters() {
         return new external_function_parameters([
             'coursemoduleid' => new external_value(PARAM_INT, 'Course module ID'),
-            'sesskey' => new external_value(PARAM_RAW, 'Session key'),
         ]);
     }
 
@@ -1343,19 +1347,14 @@ class mod_googlemeet_external extends external_api {
      * Publish every draft question of the activity (one all-or-nothing batch per recording).
      *
      * @param int $coursemoduleid Course module ID.
-     * @param string $sesskey Session key.
      * @return array
      */
-    public static function publish_activity_drafts($coursemoduleid, $sesskey) {
+    public static function publish_activity_drafts($coursemoduleid) {
         global $DB;
 
         $params = self::validate_parameters(self::publish_activity_drafts_parameters(), [
             'coursemoduleid' => $coursemoduleid,
-            'sesskey' => $sesskey,
         ]);
-        if (!confirm_sesskey($params['sesskey'])) {
-            throw new \moodle_exception('invalidsesskey');
-        }
 
         $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = \context_module::instance($cm->id);
@@ -1405,7 +1404,6 @@ class mod_googlemeet_external extends external_api {
             'correctindex' => new external_value(PARAM_INT, 'Correct option index'),
             'explanation' => new external_value(PARAM_RAW, 'Explanation'),
             'citation' => new external_value(PARAM_RAW, 'Citation', VALUE_DEFAULT, ''),
-            'sesskey' => new external_value(PARAM_RAW, 'Session key'),
         ]);
     }
 
@@ -1420,7 +1418,6 @@ class mod_googlemeet_external extends external_api {
      * @param int $correctindex Correct index.
      * @param string $explanation Explanation.
      * @param string $citation Citation.
-     * @param string $sesskey Session key.
      * @return array
      */
     public static function update_question(
@@ -1431,8 +1428,7 @@ class mod_googlemeet_external extends external_api {
         $options,
         $correctindex,
         $explanation,
-        $citation,
-        $sesskey
+        $citation = ''
     ) {
         $params = self::validate_parameters(self::update_question_parameters(), [
             'recordingid' => $recordingid,
@@ -1443,13 +1439,11 @@ class mod_googlemeet_external extends external_api {
             'correctindex' => $correctindex,
             'explanation' => $explanation,
             'citation' => $citation,
-            'sesskey' => $sesskey,
         ]);
         $actionparams = [
             'recordingid' => $params['recordingid'],
             'coursemoduleid' => $params['coursemoduleid'],
             'questionids' => [$params['questionid']],
-            'sesskey' => $params['sesskey'],
         ];
         [, , $context, $rows, $service] = self::validate_question_action($actionparams);
         $service->update_question(
@@ -1483,7 +1477,6 @@ class mod_googlemeet_external extends external_api {
             'recordingid' => new external_value(PARAM_INT, 'Recording ID'),
             'coursemoduleid' => new external_value(PARAM_INT, 'Course module ID'),
             'count' => new external_value(PARAM_INT, 'Question count', VALUE_DEFAULT, 10),
-            'sesskey' => new external_value(PARAM_RAW, 'Session key'),
         ]);
     }
 
@@ -1493,26 +1486,23 @@ class mod_googlemeet_external extends external_api {
      * @param int $recordingid Recording ID.
      * @param int $coursemoduleid Course module ID.
      * @param int $count Question count.
-     * @param string $sesskey Session key.
      * @return array
      */
-    public static function queue_generate_questions($recordingid, $coursemoduleid, $count, $sesskey) {
+    public static function queue_generate_questions($recordingid, $coursemoduleid, $count = 10) {
         global $DB, $USER;
 
         $params = self::validate_parameters(self::queue_generate_questions_parameters(), [
             'recordingid' => $recordingid,
             'coursemoduleid' => $coursemoduleid,
             'count' => $count,
-            'sesskey' => $sesskey,
         ]);
-        if (!confirm_sesskey($params['sesskey'])) {
-            throw new \moodle_exception('invalidsesskey');
-        }
 
         $cm = get_coursemodule_from_id('googlemeet', $params['coursemoduleid'], 0, false, MUST_EXIST);
         $context = \context_module::instance($cm->id);
         self::validate_context($context);
         require_capability('mod/googlemeet:managequestions', $context);
+        // Generating questions is a paid Gemini call, gated like every other AI generation.
+        require_capability('mod/googlemeet:generateai', $context);
         if (
             !$DB->record_exists(
                 'googlemeet_recordings',
@@ -1600,7 +1590,7 @@ class mod_googlemeet_external extends external_api {
         return new external_single_structure([
             'questions' => new external_multiple_structure(new external_single_structure([
                 'id' => new external_value(PARAM_INT, 'Question ID'),
-                'name' => new external_value(PARAM_RAW, 'Question name'),
+                'name' => new external_value(PARAM_TEXT, 'Question name (format_string output)'),
                 'stem' => new external_value(PARAM_RAW, 'Question stem HTML'),
                 'stemplain' => new external_value(PARAM_RAW, 'Question stem plain text'),
                 'generalfeedback' => new external_value(PARAM_RAW, 'General feedback HTML'),

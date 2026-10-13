@@ -60,20 +60,6 @@ function mod_googlemeet_admin_status_date(?int $time): string {
     return $time ? userdate($time, get_string('strftimedatetimeshort', 'langconfig')) : get_string('never', 'googlemeet');
 }
 
-/**
- * Localised status label.
- *
- * @param string $status
- * @return string
- */
-function mod_googlemeet_admin_status_label(string $status): string {
-    if ($status === '') {
-        return '-';
-    }
-    $key = 'adminstatus_status_' . $status;
-    return get_string_manager()->string_exists($key, 'googlemeet') ? get_string($key, 'googlemeet') : s($status);
-}
-
 echo $OUTPUT->header();
 echo html_writer::tag('p', get_string('adminstatus_intro', 'googlemeet', ops_status::WINDOW_DAYS));
 
@@ -95,7 +81,7 @@ if (!$rows) {
     ];
     foreach ($rows as $row) {
         $last = $row->lastfailure ? mod_googlemeet_admin_status_date($row->lastfailure) . ' · '
-            . mod_googlemeet_admin_status_label($row->laststatus)
+            . ops_status::status_label($row->laststatus)
             . ($row->lastmessage !== '' ? html_writer::div(s($row->lastmessage), 'small text-muted') : '') : '-';
         $table->data[] = [
             format_string($row->coursename), mod_googlemeet_admin_status_activity_link($row), s($row->creatoremail),
@@ -143,7 +129,7 @@ if (!$rows) {
     foreach ($rows as $row) {
         $table->data[] = [
             mod_googlemeet_admin_status_activity_link($row) . ' (#' . (int)$row->googlemeetid . ')',
-            get_string('adminstatus_kind_' . $row->kind, 'googlemeet'),
+            ops_status::kind_label((string)$row->kind),
             mod_googlemeet_admin_status_date((int)$row->timequeued), s((string)$row->message),
         ];
     }
@@ -168,9 +154,9 @@ foreach ($rows as $row) {
         mod_googlemeet_admin_status_date((int)$row->lastsync),
         (int)$row->autosynchours > 0 ? (int)$row->autosynchours : get_string('no'),
         $row->manualtime ? mod_googlemeet_admin_status_date($row->manualtime) . ' · '
-            . mod_googlemeet_admin_status_label($row->manualstatus) : '-',
+            . ops_status::status_label($row->manualstatus) : '-',
         $row->autotime ? mod_googlemeet_admin_status_date($row->autotime) . ' · '
-            . mod_googlemeet_admin_status_label($row->autostatus) : '-',
+            . ops_status::status_label($row->autostatus) : '-',
     ];
 }
 echo html_writer::div(html_writer::table($table), 'table-responsive');

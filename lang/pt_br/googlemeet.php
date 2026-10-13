@@ -140,6 +140,13 @@ $string['aicontext'] = 'Contexto de ensino para a IA';
 $string['aicontext_desc'] = 'Breve descrição do tipo de aulas deste site (área de conhecimento, público, prova ou qualificação em preparação). É adicionada a todo prompt do Gemini para que resumos, tópicos, capítulos e questões de prática usem o foco e a terminologia corretos. Exemplo: "Aulas ao vivo de preparação para exames de habilitação em enfermagem". Deixe vazio para não enviar contexto. Máximo de 500 caracteres.';
 $string['aimodel'] = 'Modelo de IA';
 $string['aimodel_desc'] = 'Selecione o modelo do Gemini a ser usado na análise. O Flash é mais rápido e tem uma camada gratuita generosa; o Pro é mais capaz, mas tem limites gratuitos menores.';
+$string['aimodel_note_capable'] = 'Mais capaz';
+$string['aimodel_note_default'] = 'Estável, padrão';
+$string['aimodel_note_fallback'] = 'Estável, barato/rápido, alternativa';
+$string['aimodel_note_fast'] = 'Rápido';
+$string['aimodel_note_preview'] = 'Prévia';
+$string['aimodel_note_previewcapable'] = 'Prévia, o mais capaz';
+$string['aimodel_option'] = '{$a->name} ({$a->note})';
 $string['aireview_bulk_hint'] = 'Abra cada aula para revisá-la ou publique todos os resumos de uma só vez, se já tiver conferido.';
 $string['aireview_bulk_message'] = '{$a} resumos de IA aguardam a sua revisão: os alunos ainda não podem vê-los.';
 $string['aireview_bulk_message_one'] = '1 resumo de IA aguarda a sua revisão: os alunos ainda não podem vê-lo.';
@@ -308,7 +315,7 @@ $string['emailcontent_default'] = '<p>Olá %userfirstname%,</p>
 <p><b>%googlemeetname%</b></p>
 <p>Quando: %eventdate% %duration% %timezone%</p>
 <p>Link de acesso: %url%</p>';
-$string['emailcontent_help'] = 'Quando uma notificação é enviada a um aluno, ele obtém o conteúdo do email desse campo. Os seguintes curingas podem ser usados:
+$string['emailcontent_desc'] = 'Quando uma notificação é enviada a um aluno, ele obtém o conteúdo do email desse campo. Os seguintes curingas podem ser usados:
 <ul>
 <li>%userfirstname%</li>
 <li>%userlastname%</li>
@@ -465,6 +472,7 @@ $string['messageprovider:notification'] = 'Lembrete de início do evento do Goog
 $string['messageprovider:recordingavailable'] = 'Gravação do Google Meet disponível';
 $string['messageprovider:stalerecurrence'] = 'Alerta de recorrência de aula ao vivo abandonada';
 $string['minutesbefore'] = 'Minutos antes';
+$string['minutesbefore_desc'] = 'Padrão para novas atividades: quantos minutos antes de cada sessão o lembrete é enviado.';
 $string['minutesbefore_help'] = 'Número de minutos antes do início do evento quando a notificação deve ser enviada.';
 $string['mobile_chapters'] = 'Capítulos';
 $string['mobile_keypoints'] = 'Pontos-chave';
@@ -487,9 +495,10 @@ $string['noeventswithperiod'] = 'Com os dias selecionados e o período de "Repet
 $string['noholidayperiods'] = 'Nenhum período de exclusão definido';
 $string['notification'] = 'Notificação';
 $string['notificationexpanded'] = 'Notificação expandida';
+$string['notificationexpanded_desc'] = 'Mostrar as configurações de "Notificação" expandidas por padrão ao criar uma nova sala.';
 $string['notify'] = 'Enviar notificação para o estudante';
+$string['notify_desc'] = 'Padrão para novas atividades: enviar aos estudantes um lembrete antes do início de cada sessão.';
 $string['notify_help'] = 'Se marcada, uma notificação será enviada ao aluno sobre a data de início do evento.';
-$string['notifycationexpanded_desc'] = 'Mostrar as configurações de "Notificação" expandidas por padrão ao criar uma nova sala.';
 $string['notifyhoursbefore'] = 'Lembrete antecipado';
 $string['notifyhoursbefore_desc'] = 'Padrão para novas atividades: enviar um segundo lembrete esta quantidade de horas antes de cada sessão, além do lembrete de "Minutos antes". "Desativado" o desabilita.';
 $string['notifyhoursbefore_help'] = 'Envia um segundo lembrete esta quantidade de horas antes de cada sessão (por exemplo, no dia anterior), além do lembrete enviado em "Minutos antes". Cada lembrete é enviado uma vez por aluno e sessão. Requer "Enviar notificação ao aluno".';
@@ -700,7 +709,6 @@ $string['recording_watch_cta'] = 'Abrir aula';
 $string['recordingavailable_body'] = '{$a->count} nova(s) gravação(ões) estão disponíveis em {$a->name}.' . "\n\n" . 'Abra a atividade: {$a->url}';
 $string['recordingavailable_body_many'] = 'Olá, {$a->user},' . "\n\n" . '{$a->count} novas gravações já estão disponíveis em "{$a->name}".' . "\n\n" . 'Assista aqui: {$a->url}';
 $string['recordingavailable_body_one'] = 'Olá, {$a->user},' . "\n\n" . 'Uma nova gravação já está disponível em "{$a->name}".' . "\n\n" . 'Assista aqui: {$a->url}';
-$string['recordingavailable_subject'] = '{$a->count} nova(s) gravação(ões) disponível(is): {$a->name}';
 $string['recordingavailable_subject_many'] = '{$a->count} novas gravações disponíveis em {$a->name}';
 $string['recordingavailable_subject_one'] = 'Nova gravação disponível em {$a->name}';
 $string['recordingfilter'] = 'Filtro de nome da gravação';
@@ -846,7 +854,6 @@ $string['subscriberecordings'] = 'Receber avisos';
 $string['subtitlelanguage'] = 'Idioma das legendas';
 $string['subtitlelanguage_desc'] = 'Código de idioma usado ao extrair as legendas geradas automaticamente das gravações do Google Drive (ex.: es, en, pt-BR). O padrão é es.';
 $string['sync_already_running'] = 'Sincronização já em andamento. Tente novamente em alguns minutos.';
-$string['sync_deleted_recordings'] = '{$a} gravação(ões) removida(s)';
 $string['sync_enrichment_queued'] = 'Transcrições, anotações e permissões estão sendo processadas em segundo plano.';
 $string['sync_help_title'] = 'Como funciona a sincronização';
 $string['sync_info'] = 'Aguarde ao menos 10 minutos para que o arquivo da gravação seja gerado e salvo em "Meu Drive > Meet Recordings" do organizador.

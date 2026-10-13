@@ -262,7 +262,7 @@ class process_autosync extends \core\task\scheduled_task {
                                 $stats = $client->syncrecordings($googlemeet, true);
                                 if (is_array($stats)) {
                                     mtrace("  sync ran: inserted={$stats['inserted']} "
-                                        . "updated={$stats['updated']} deleted={$stats['deleted']} "
+                                        . "updated={$stats['updated']} "
                                         . "trashed={$stats['trashed']} restored={$stats['restored']} "
                                         . "found={$stats['found']}.");
                                 }
@@ -284,15 +284,7 @@ class process_autosync extends \core\task\scheduled_task {
             $counts = ['success' => 0, 'permanent' => 0, 'infra_failure' => 0, 'retry' => 0, 'exhausted' => 0];
             foreach ($events as $ev) {
                 $newattempts = (int) $ev->syncattempts + 1;
-                $outcome = $this->classify_outcome(
-                    $loggedin,
-                    $exception,
-                    $stats,
-                    $identitymissing,
-                    $authfailure,
-                    $ev,
-                    (int) $ev->syncattempts
-                );
+                $outcome = $this->classify_outcome($exception, $stats, $identitymissing, $authfailure);
 
                 if ($outcome === 'success' || $outcome === 'permanent') {
                     $counts[$outcome]++;
@@ -369,26 +361,19 @@ class process_autosync extends \core\task\scheduled_task {
      *                     the sync threw a non-infrastructure error. The attempt cap in
      *                     process_activity() bounds these retries.
      *
-     * @param bool $loggedin True iff the client is enabled and check_login() succeeded for the creator.
-     *                       False covers: no creator email, no Moodle user, token missing or revoked.
      * @param \Throwable|null $exception Set if syncrecordings() threw; null otherwise.
-     * @param array|null $stats ['inserted','updated','deleted','trashed','restored','found'] when sync ran;
+     * @param array|null $stats ['inserted','updated','trashed','restored','found'] when sync ran;
      *                          null if sync was skipped (e.g. not logged in).
      * @param bool $identitymissing True when there is no creator email or no Moodle user
      *                              for it (the only permanent, non-recoverable failures).
      * @param bool $authfailure True when a refresh token existed before check_login() but auth failed.
-     * @param \stdClass $event Has fields eventid, eventdate, duration, syncattempts.
-     * @param int $attemptsdone Attempts before this one (this is attempt #attemptsdone+1).
      * @return string One of 'success', 'permanent', 'infra_failure', 'retry'.
      */
     private function classify_outcome(
-        bool $loggedin,
         ?\Throwable $exception,
         ?array $stats,
         bool $identitymissing,
-        bool $authfailure,
-        \stdClass $event,
-        int $attemptsdone
+        bool $authfailure
     ): string {
         // Got what we came for: at least one recording landed in the DB.
         if (

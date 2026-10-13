@@ -76,13 +76,6 @@ Examples:
     exit(0);
 }
 
-$dbman = $DB->get_manager();
-$table = new xmldb_table('googlemeet_ai_analysis');
-$field = new xmldb_field('chapters');
-if (!$dbman->field_exists($table, $field)) {
-    cli_error('The googlemeet_ai_analysis.chapters column is not available yet. Run this only after the F3 upgrade.');
-}
-
 $dryrun = !empty($options['dry-run']);
 $force = !empty($options['force']);
 $limit = max(0, (int)$options['limit']);

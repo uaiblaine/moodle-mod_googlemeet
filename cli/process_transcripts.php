@@ -24,24 +24,12 @@
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
+use mod_googlemeet\ai_service;
+
 define('CLI_SCRIPT', true);
 
 require(__DIR__ . '/../../../config.php');
 require_once($CFG->libdir . '/clilib.php');
-require_once(__DIR__ . '/../classes/subtitle_extractor.php');
-
-// Transient Gemini failure policy; mirrors ai_service::record_transient_failure(), keep in step.
-/** @var int[] Back-off in seconds, indexed by the retrycount before this failure. */
-const TRANSIENT_BACKOFF = [
-    0 => 2 * 3600, // 1st failure: retry in 2h.
-    1 => 4 * 3600, // 2nd failure: retry in 4h.
-    2 => 8 * 3600, // 3rd failure: retry in 8h.
-    3 => 24 * 3600, // Not reached while MAX_RETRIES is 4.
-];
-/** @var int The 4th transient failure gives up. */
-const MAX_RETRIES = 4;
-/** @var int Sentinel retrycount: permanent error, never retried. */
-const PERMANENT_RETRYCOUNT = 99;
 
 [$options, $unrecognized] = cli_get_params([
     'googlemeetid' => 0,
@@ -84,28 +72,22 @@ if (empty($options['googlemeetid'])) {
 
 $dryrun = $options['dry-run'];
 $skipgemini = $options['skip-gemini'];
-// Fast-fail with an install hint; the extractor resolves yt-dlp itself. Mirrors
-// subtitle_extractor::find_ytdlp() (configured path, then PATH), keep in step. There is
-// deliberately no /tmp fallback: /tmp is world-writable, so a planted binary would run.
-$ytdlp = trim((string)get_config('googlemeet', 'ytdlppath'));
-if ($ytdlp === '' || !is_executable($ytdlp)) {
-    $which = trim((string)(shell_exec('command -v yt-dlp 2>/dev/null') ?: ''));
-    $ytdlp = ($which !== '' && is_executable($which)) ? $which : '';
-}
-
-if ($ytdlp === '' || !is_executable($ytdlp)) {
-    cli_error("yt-dlp not found. Set the googlemeet/ytdlppath admin setting or install it "
-        . "to a persistent path (NOT /tmp): "
-        . "curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp "
-        . "-o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp");
-}
 
 // Resolve subtitle language: explicit CLI param > site setting > 'es'.
 $language = !empty($options['language'])
     ? $options['language']
     : (get_config('googlemeet', 'subtitlelanguage') ?: 'es');
 
+// The extractor resolves yt-dlp (configured path, then PATH; never /tmp, which is world-writable).
 $extractor = new \mod_googlemeet\subtitle_extractor($language);
+if (!$extractor->is_available()) {
+    cli_error("yt-dlp not found. Set the googlemeet/ytdlppath admin setting or install it "
+        . "to a persistent path (NOT /tmp): "
+        . "curl -sL https://github.com/yt-dlp/yt-dlp/releases/latest/download/yt-dlp "
+        . "-o /usr/local/bin/yt-dlp && chmod +x /usr/local/bin/yt-dlp");
+}
+
+$aiservice = new ai_service();
 
 // Get recordings to process.
 $params = ['googlemeetid' => $options['googlemeetid']];
@@ -153,7 +135,8 @@ foreach ($recordings as $recording) {
     $nr = (int)($recording->nextretry ?? 0);
     $now = time();
 
-    if ($rc >= MAX_RETRIES || $rc === PERMANENT_RETRYCOUNT) {
+    // A retrycount of ai_service::MAX_TRANSIENT_RETRIES or more (PERMANENT_RETRYCOUNT included) ends retries.
+    if ($rc >= ai_service::MAX_TRANSIENT_RETRIES) {
         cli_writeln("  SKIP: Marked as permanent failure (retrycount={$rc}). Manual intervention required.");
         $skipped++;
         continue;
@@ -166,7 +149,7 @@ foreach ($recordings as $recording) {
         continue;
     }
 
-    // Step 1: Extract subtitle URL via yt-dlp.
+    // Steps 1 and 2: subtitle URL through yt-dlp, then the subtitle track, parsed to text.
     $driveurl = $recording->webviewlink;
     if (empty($driveurl)) {
         cli_writeln("  ERROR: No webviewlink for this recording.");
@@ -174,51 +157,15 @@ foreach ($recordings as $recording) {
         continue;
     }
 
-    cli_writeln("  Step 1: Extracting subtitle URL from Google Drive...");
-
-    $timedtexturl = $extractor->get_timedtext_url($driveurl);
-    if (!$timedtexturl) {
-        cli_writeln("  ERROR: Could not extract timedtext URL. Video may not have subtitles.");
+    cli_writeln("  Steps 1-2: Extracting subtitles from Google Drive...");
+    $transcript = $extractor->extract($driveurl);
+    if ($transcript === null) {
+        cli_writeln("  ERROR: No usable subtitles (no subtitle track, download failed or under 100 characters).");
         $errors++;
         continue;
     }
-
-    cli_writeln("  Found timedtext URL.");
-
-    // Step 2: Download subtitles.
-    cli_writeln("  Step 2: Downloading subtitles...");
-
-    // Get base URL (strip track-specific params).
-    $baseurl = preg_replace('/&type=track.*$/', '', $timedtexturl);
-
-    // The fmt=1 format is the simple XML with timestamps that parse_xml() reads; try the ASR
-    // (auto-generated) track first. Mirrors subtitle_extractor::extract(), keep in step.
-    $langparam = rawurlencode($language);
-    $suburl = $baseurl . '&type=track&lang=' . $langparam . '&kind=asr&fmt=1';
-    $subxml = $extractor->download_subtitle($suburl);
-
-    if (empty($subxml)) {
-        // Try the named track "1" as fallback.
-        $suburl = $baseurl . '&type=track&lang=' . $langparam . '&name=1&fmt=1';
-        $subxml = $extractor->download_subtitle($suburl);
-    }
-
-    if (empty($subxml)) {
-        cli_writeln("  ERROR: Could not download subtitle content.");
-        $errors++;
-        continue;
-    }
-
-    // Parse XML into readable transcript.
-    $transcript = $extractor->parse_xml($subxml);
     $charcount = strlen($transcript);
     cli_writeln("  Downloaded {$charcount} characters of transcript.");
-
-    if ($charcount < 100) {
-        cli_writeln("  ERROR: Transcript too short ({$charcount} chars), skipping.");
-        $errors++;
-        continue;
-    }
 
     if ($dryrun) {
         cli_writeln("  DRY-RUN: Would save transcript and run AI analysis.");
@@ -284,9 +231,9 @@ foreach ($recordings as $recording) {
             'summary' => $result->summary,
             'keypoints' => json_encode($result->keypoints),
             'topics' => json_encode($result->topics),
-            'language' => $result->language ?? 'es',
+            'language' => $result->language,
             'status' => 'completed',
-            'aimodel' => $client->get_model(),
+            'aimodel' => $client->get_last_used_model() ?? $client->get_model(),
             'error' => null,
             'retrycount' => 0,
             'nextretry' => 0,
@@ -298,41 +245,20 @@ foreach ($recordings as $recording) {
         $topicscount = count($result->topics);
         cli_writeln("  AI analysis complete: summary={$summarylen} chars, {$keypointscount} key points, {$topicscount} topics.");
     } catch (\mod_googlemeet\gemini_transient_exception $e) {
-        // Transient error (rate limit / high demand) → schedule retry with back-off.
-        $newrc = $rc + 1;
-        if ($newrc >= MAX_RETRIES) {
-            // Retries exhausted: no nextretry, and the retrycount check above skips the row from now on.
-            $nextunix = 0;
-            $newrc = MAX_RETRIES; // Capped: no further escalation.
-            $logsuffix = "Max retries reached, giving up.";
-        } else {
-            $backoff = TRANSIENT_BACKOFF[$newrc - 1] ?? 24 * 3600;
-            $nextunix = $now + $backoff;
-            $logsuffix = sprintf("Will retry at %s (in %d min).", userdate($nextunix, '%Y-%m-%d %H:%M'), (int)($backoff / 60));
-        }
-        $DB->update_record('googlemeet_ai_analysis', (object)[
-            'id' => $analysisid,
-            'status' => 'failed',
-            'error' => $e->getMessage(),
-            'retrycount' => $newrc,
-            'nextretry' => $nextunix,
-            'timemodified' => $now,
-        ]);
-        cli_writeln("  TRANSIENT ERROR (retrycount={$newrc}): " . $e->getMessage());
-        cli_writeln("  " . $logsuffix);
+        // Rate limit or overload: the cron retry policy applies (ai_service::TRANSIENT_BACKOFF).
+        $aiservice->record_transient_failure((int)$analysisid, $rc, $e->getMessage());
+        $retry = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid], 'retrycount, nextretry');
+        cli_writeln("  TRANSIENT ERROR (retrycount={$retry->retrycount}): " . $e->getMessage());
+        $retrynote = empty($retry->nextretry)
+            ? 'Max retries reached, giving up.'
+            : 'Will retry at ' . userdate((int)$retry->nextretry, '%Y-%m-%d %H:%M') . '.';
+        cli_writeln('  ' . $retrynote);
         // Not a fatal error: the transcript is already saved.
-    } catch (\moodle_exception $e) {
-        // Permanent error → mark and don't retry.
-        $DB->update_record('googlemeet_ai_analysis', (object)[
-            'id' => $analysisid,
-            'status' => 'failed',
-            'error' => $e->getMessage(),
-            'retrycount' => PERMANENT_RETRYCOUNT,
-            'nextretry' => 0,
-            'timemodified' => $now,
-        ]);
-        cli_writeln("  PERMANENT ERROR (no retry): " . $e->getMessage());
-        // Don't count as error - transcript was saved successfully.
+    } catch (\Throwable $e) {
+        // Anything else is permanent: mark it, never retry. The transcript is already saved.
+        $message = $e instanceof \mod_googlemeet\gemini_safety_exception ? $e->get_user_message() : $e->getMessage();
+        $aiservice->record_permanent_failure((int)$analysisid, $message);
+        cli_writeln("  PERMANENT ERROR (no retry): " . $message);
     }
 
     $processed++;

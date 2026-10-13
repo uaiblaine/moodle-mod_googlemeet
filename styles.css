@@ -24,11 +24,6 @@
     white-space: break-spaces;
 }
 
-#page-mod-googlemeet-mod #fgroup_id_generateurlgroup .form-group.fitem[data-groupname="timeopen"],
-#page-mod-googlemeet-mod #fgroup_id_generateurlgroup .form-group.fitem[data-groupname="timeclose"] {
-    width: 100%;
-}
-
 #googlemeet_auth-info {
     display: flex;
     align-items: center;

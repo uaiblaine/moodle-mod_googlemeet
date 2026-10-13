@@ -198,6 +198,34 @@ final class attendance_test extends \advanced_testcase {
     }
 
     /**
+     * Row kinds, match methods and fetch statuses each have a label; an unknown value is shown as safe text.
+     */
+    public function test_labels(): void {
+        $this->assertSame(get_string('attendance_kind_present', 'googlemeet'), report::kind_label(report::ROW_PRESENT));
+        $this->assertSame(get_string('attendance_kind_unmatched', 'googlemeet'), report::kind_label(report::ROW_UNMATCHED));
+        $this->assertSame(get_string('attendance_kind_absent', 'googlemeet'), report::kind_label(report::ROW_ABSENT));
+        $this->assertSame('late', report::kind_label('late<'));
+
+        $methods = ['email' => 'attendance_matchedby_email', 'googleuser' => 'attendance_matchedby_googleuser',
+            'name' => 'attendance_matchedby_name', service::MATCH_MANUAL => 'attendance_matchedby_manual',
+            service::MATCH_UNLINKED => 'attendance_matchedby_unlinked'];
+        foreach ($methods as $method => $key) {
+            $this->assertSame(get_string($key, 'googlemeet'), report::matchedby_label($method));
+        }
+        $this->assertSame('', report::matchedby_label(''));
+        $this->assertSame('phone', report::matchedby_label('phone&'));
+
+        $statuses = [service::STATUS_PENDING => 'attendance_status_pending', service::STATUS_DONE => 'attendance_status_done',
+            service::STATUS_NODATA => 'attendance_status_nodata', service::STATUS_SCOPE => 'attendance_status_scope',
+            service::STATUS_ERROR => 'attendance_status_error'];
+        foreach ($statuses as $status => $key) {
+            $this->assertSame(get_string($key, 'googlemeet'), report::status_label($status));
+        }
+        $this->assertSame(get_string('attendance_status_none', 'googlemeet'), report::status_label(null));
+        $this->assertSame(get_string('attendance_status_none', 'googlemeet'), report::status_label('other'));
+    }
+
+    /**
      * Processing stores one row per participant, matched by name only when unambiguous, and the sync counters.
      */
     public function test_process_stores_matched_and_unmatched_participants(): void {
@@ -548,7 +576,7 @@ final class attendance_test extends \advanced_testcase {
     public function test_instance_deletion_removes_attendance(): void {
         global $DB;
         service::process($this->googlemeet, $this->sync_row(), $this->double($this->start), time());
-        course_delete_module($this->cm->id);
+        \core_courseformat\formatactions::cm($this->googlemeet->course)->delete($this->cm->id);
         $this->assertFalse($DB->record_exists('googlemeet_attendance', ['googlemeetid' => $this->googlemeet->id]));
         $this->assertFalse($DB->record_exists('googlemeet_attendance_sync', ['googlemeetid' => $this->googlemeet->id]));
     }

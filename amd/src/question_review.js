@@ -180,7 +180,6 @@ const publishBatch = ids => {
             recordingid: settings.recordingid,
             coursemoduleid: settings.cmid,
             questionids: ids,
-            sesskey: settings.sesskey,
         },
     }])[0].then(response => {
         showStatus('success', escapeHtml(fill(strings.question_published_count, response.count)));
@@ -237,7 +236,6 @@ const publishActivity = () => {
         methodname: 'mod_googlemeet_publish_activity_drafts',
         args: {
             coursemoduleid: settings.cmid,
-            sesskey: settings.sesskey,
         },
     }])[0].then(response => {
         setBusy(false);
@@ -301,7 +299,6 @@ const bindEvents = () => {
                     recordingid: settings.recordingid,
                     coursemoduleid: settings.cmid,
                     questionids: ids,
-                    sesskey: settings.sesskey,
                 },
             }])[0];
         }).then(reloadHub).catch(error => {
@@ -332,7 +329,6 @@ const bindEvents = () => {
  * @param {Object} config Configuration.
  * @param {number} config.cmid Course module ID.
  * @param {number} config.recordingid Recording ID.
- * @param {string} config.sesskey Session key.
  * @returns {void}
  */
 export const init = config => {
@@ -343,7 +339,6 @@ export const init = config => {
     settings = {
         cmid: parseInt(config.cmid, 10),
         recordingid: parseInt(config.recordingid, 10),
-        sesskey: config.sesskey || '',
         busy: false,
     };
 

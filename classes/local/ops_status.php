@@ -31,9 +31,6 @@ class ops_status {
     /** @var int Look-back window for failures. */
     public const WINDOW_DAYS = 7;
 
-    /** @var int Not read: stuck_ai_analyses() uses ai_service::get_stuck_threshold() (googlemeet/aistuckminutes). */
-    public const STUCK_PROCESSING_SECONDS = HOURSECS;
-
     /** @var int A "pending" analysis older than this is considered stuck (process_ai_analysis runs every 10 min). */
     public const STUCK_PENDING_SECONDS = 6 * HOURSECS;
 
@@ -197,10 +194,11 @@ class ops_status {
                JOIN {course_modules} cm ON cm.instance = gm.id AND cm.module = m.id
               WHERE r.deleted = 0
                 AND ((a.status = :processing AND a.timemodified < :t1)
-                  OR (a.status = :pending AND a.timemodified < :t2 AND a.retrycount < 99))
+                  OR (a.status = :pending AND a.timemodified < :t2 AND a.retrycount < :permanent))
            ORDER BY a.timemodified ASC",
             ['modname' => 'googlemeet', 'processing' => 'processing', 'pending' => 'pending',
-                't1' => $now - \mod_googlemeet\ai_service::get_stuck_threshold(), 't2' => $now - self::STUCK_PENDING_SECONDS],
+                't1' => $now - \mod_googlemeet\ai_service::get_stuck_threshold(), 't2' => $now - self::STUCK_PENDING_SECONDS,
+                'permanent' => \mod_googlemeet\ai_service::PERMANENT_RETRYCOUNT],
             0,
             200
         );
@@ -278,5 +276,38 @@ class ops_status {
             0,
             200
         );
+    }
+
+    /**
+     * Label of a sync_log status, safe to print as HTML.
+     *
+     * @param string $status sync_log::STATUS_* value, or '' when the activity never ran.
+     * @return string The localised label; '-' for ''; an unknown value cleaned to PARAM_ALPHANUMEXT.
+     */
+    public static function status_label(string $status): string {
+        return match ($status) {
+            '' => '-',
+            sync_log::STATUS_QUEUED => get_string('adminstatus_status_queued', 'googlemeet'),
+            sync_log::STATUS_RUNNING => get_string('adminstatus_status_running', 'googlemeet'),
+            sync_log::STATUS_SUCCESS => get_string('adminstatus_status_success', 'googlemeet'),
+            sync_log::STATUS_RETRY => get_string('adminstatus_status_retry', 'googlemeet'),
+            sync_log::STATUS_EXHAUSTED => get_string('adminstatus_status_exhausted', 'googlemeet'),
+            sync_log::STATUS_ERROR => get_string('adminstatus_status_error', 'googlemeet'),
+            default => clean_param($status, PARAM_ALPHANUMEXT),
+        };
+    }
+
+    /**
+     * Label of a Calendar sync_log kind (the rows calendar_failures() returns), safe to print as HTML.
+     *
+     * @param string $kind sync_log::KIND_CALENDAR_* value.
+     * @return string The localised label; any other value cleaned to PARAM_ALPHANUMEXT.
+     */
+    public static function kind_label(string $kind): string {
+        return match ($kind) {
+            sync_log::KIND_CALENDAR_UPDATE => get_string('adminstatus_kind_calupdate', 'googlemeet'),
+            sync_log::KIND_CALENDAR_DELETE => get_string('adminstatus_kind_caldelete', 'googlemeet'),
+            default => clean_param($kind, PARAM_ALPHANUMEXT),
+        };
     }
 }

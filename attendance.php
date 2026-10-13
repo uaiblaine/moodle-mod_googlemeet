@@ -281,12 +281,10 @@ if ($session) {
                 $form .= html_writer::end_tag('form');
                 $name .= $form;
             }
-            $status = get_string('attendance_kind_' . $row['kind'], 'googlemeet');
-            if ($row['matchedby'] !== '') {
-                $status .= html_writer::tag('small', ' (' . get_string(
-                    'attendance_matchedby_' . $row['matchedby'],
-                    'googlemeet'
-                ) . ')', ['class' => 'text-muted']);
+            $status = report::kind_label((string)$row['kind']);
+            $matchedby = report::matchedby_label((string)$row['matchedby']);
+            if ($matchedby !== '') {
+                $status .= html_writer::tag('small', ' (' . $matchedby . ')', ['class' => 'text-muted']);
             }
             $table->data[] = [
                 $name,

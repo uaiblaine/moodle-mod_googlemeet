@@ -33,13 +33,12 @@ use mod_googlemeet\local\file_serving;
  * @return mixed True or false, the archetype or purpose value, or null when the feature is unknown.
  */
 function googlemeet_supports($feature) {
-    // The AI practice questions live in a private question bank in the module context, as in
-    // mod_quiz: FEATURE_USES_QUESTIONS without FEATURE_PUBLISHES_QUESTIONS. Core then creates the
-    // module's default question category on add and counts it among the activities with private questions.
-    if (defined('FEATURE_USES_QUESTIONS') && $feature === FEATURE_USES_QUESTIONS) {
-        return true;
-    }
     switch ($feature) {
+        case FEATURE_USES_QUESTIONS:
+            // The AI practice questions live in a private question bank in the module context, as in
+            // mod_quiz: FEATURE_USES_QUESTIONS without FEATURE_PUBLISHES_QUESTIONS. Core then creates the
+            // module's default question category on add and counts it among the activities with private questions.
+            return true;
         case FEATURE_MOD_ARCHETYPE:
             return MOD_ARCHETYPE_RESOURCE;
         case FEATURE_GROUPS:
@@ -1499,10 +1498,10 @@ function googlemeet_sync_recordings($googlemeetid, $files, bool $deferenrichment
         }
     }
 
+    // No 'deleted' counter: a recording gone from Drive is trashed, never hard-deleted, here.
     $stats = [
         'inserted' => 0,
         'updated' => 0,
-        'deleted' => 0,
         'trashed' => 0,
         'restored' => 0,
     ];
@@ -1886,20 +1885,6 @@ function googlemeet_extend_settings_navigation(settings_navigation $settingsnav,
             new pix_icon('i/users', '')
         );
     }
-}
-
-/**
- * Delete everything that depends on the given recordings, not the recording rows.
- *
- * Thin wrapper of {@see \mod_googlemeet\local\recording_cleanup::delete_dependents()}; use
- * recording_cleanup::purge_recordings() to also delete the recordings themselves.
- *
- * @param int[] $recordingids Recording ids of the activity of $context.
- * @param context_module $context Module context.
- * @return array Counters by kind.
- */
-function googlemeet_delete_recording_dependents(array $recordingids, context_module $context): array {
-    return \mod_googlemeet\local\recording_cleanup::delete_dependents($recordingids, $context);
 }
 
 /**

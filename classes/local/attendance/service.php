@@ -75,9 +75,16 @@ class service {
              LEFT JOIN {googlemeet_attendance_sync} s ON s.eventid = ge.id
                  WHERE gm.attendanceenabled = 1
                    AND s.id IS NULL
+                   AND ge.eventdate <= :startlatest
                    AND ge.eventdate + ge.duration <= :latest
                    AND ge.eventdate + ge.duration >= :earliest";
-        $rows = $DB->get_records_sql($sql, ['latest' => $now - self::FETCH_DELAY, 'earliest' => $now - self::LOOKBACK]);
+        // The plain eventdate bound is implied by the end bound (durations are never negative) and
+        // lets the googlemeet_events eventdate index narrow the scan.
+        $rows = $DB->get_records_sql($sql, [
+            'startlatest' => $now - self::FETCH_DELAY,
+            'latest' => $now - self::FETCH_DELAY,
+            'earliest' => $now - self::LOOKBACK,
+        ]);
 
         $created = 0;
         $cancelled = [];
@@ -140,7 +147,6 @@ class service {
     public static function process(\stdClass $googlemeet, \stdClass $sync, source $source, ?int $now = null): string {
         $now = $now ?? time();
         $counts = ['conferences' => 0, 'participants' => 0, 'matched' => 0];
-        $message = null;
 
         $meetingcode = \mod_googlemeet\client::extract_meeting_code((string)($googlemeet->url ?? ''));
         if ($meetingcode === null) {

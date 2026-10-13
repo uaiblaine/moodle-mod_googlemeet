@@ -134,10 +134,10 @@ class process_video_analysis extends adhoc_task {
             $analysis->summary = $result->summary;
             $analysis->keypoints = json_encode($result->keypoints);
             $analysis->topics = json_encode($result->topics);
-            if (array_key_exists('chapters', $DB->get_columns('googlemeet_ai_analysis'))) {
-                $analysis->chapters = json_encode($result->chapters ?? []);
-            }
-            $analysis->transcript = $result->transcript ?? $recording->transcripttext ?? '';
+            $analysis->chapters = json_encode($result->chapters ?? []);
+            // The analysis transcript is Gemini's (empty for a transcript-based analysis); readers fall
+            // back to the recording's own transcript, which is not copied here.
+            $analysis->transcript = $result->transcript;
             $analysis->language = $result->language;
             $analysis->status = 'completed';
             $analysis->error = null;
@@ -166,10 +166,11 @@ class process_video_analysis extends adhoc_task {
             mtrace("Blocked by Gemini safety filters: " . ($e->debuginfo ?? ''));
             $aiservice = new ai_service();
             $aiservice->record_permanent_failure($analysisid, $e->get_user_message());
-        } catch (\Exception $e) {
+        } catch (\Throwable $e) {
             mtrace("Error: " . $e->getMessage());
 
-            // Permanent error: mark failed and do not retry automatically.
+            // Permanent error, PHP errors included (they would leave the row 'processing' until the stuck
+            // check): mark failed and do not retry automatically.
             $aiservice = new ai_service();
             $aiservice->record_permanent_failure($analysisid, $e->getMessage());
         }

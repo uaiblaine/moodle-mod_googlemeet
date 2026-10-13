@@ -472,6 +472,15 @@ final class locallib_test extends \advanced_testcase {
         $this->assertNull(googlemeet_clear_url('https://meet.google.com/abcd-ef-ghij'));  // 4-2-4.
     }
 
+    /**
+     * The host is matched literally and the result is always rebuilt on meet.google.com.
+     */
+    public function test_clear_url_pins_the_host(): void {
+        // Unescaped dots used to accept any character, and the match was returned as the URL.
+        $this->assertNull(googlemeet_clear_url('https://meetXgoogleYcom/abc-defg-hij'));
+        $this->assertSame('https://meet.google.com/abc-defg-hij', googlemeet_clear_url('https://MEET.google.com/abc-defg-hij'));
+    }
+
     // Tests of DB-backed code: googlemeet_construct_events_data_for_add() reads googlemeet_holidays.
 
     /**
@@ -479,11 +488,8 @@ final class locallib_test extends \advanced_testcase {
      *
      */
     public function test_construct_events_single_no_holiday(): void {
-        global $DB, $CFG;
+        global $DB;
 
-        if (!defined('HOURSECS')) {
-            $this->markTestSkipped('Moodle constants not available; run inside a full Moodle PHPUnit bootstrap.');
-        }
         $this->resetAfterTest();
 
         // A real instance id for googlemeet_get_holidays() to query.
@@ -519,9 +525,6 @@ final class locallib_test extends \advanced_testcase {
     public function test_construct_events_single_on_holiday(): void {
         global $DB;
 
-        if (!defined('HOURSECS')) {
-            $this->markTestSkipped('Moodle constants not available; run inside a full Moodle PHPUnit bootstrap.');
-        }
         $this->resetAfterTest();
 
         $googlemeetid = $DB->insert_record('googlemeet', (object)[
@@ -560,9 +563,6 @@ final class locallib_test extends \advanced_testcase {
     public function test_construct_events_recurring_weekly(): void {
         global $DB, $CFG;
 
-        if (!defined('HOURSECS')) {
-            $this->markTestSkipped('Moodle constants not available; run inside a full Moodle PHPUnit bootstrap.');
-        }
         $this->resetAfterTest();
 
         // Ensure week starts on Monday (standard European setting).
@@ -611,9 +611,6 @@ final class locallib_test extends \advanced_testcase {
     public function test_construct_events_biweekly(): void {
         global $DB, $CFG;
 
-        if (!defined('HOURSECS')) {
-            $this->markTestSkipped('Moodle constants not available; run inside a full Moodle PHPUnit bootstrap.');
-        }
         $this->resetAfterTest();
 
         $CFG->calendar_startwday = '1';
@@ -652,9 +649,6 @@ final class locallib_test extends \advanced_testcase {
     public function test_construct_events_recurring_holiday_excluded(): void {
         global $DB, $CFG;
 
-        if (!defined('HOURSECS')) {
-            $this->markTestSkipped('Moodle constants not available; run inside a full Moodle PHPUnit bootstrap.');
-        }
         $this->resetAfterTest();
 
         $CFG->calendar_startwday = '1';
@@ -776,6 +770,7 @@ final class locallib_test extends \advanced_testcase {
         $created = mktime(12, 0, 0, 6, 8, 2026); // 2 days earlier.
         $this->assertTrue(googlemeet_recording_is_new($created, $now, 7));
     }
+
     /**
      * A recording older than the threshold is not new.
      */
@@ -784,6 +779,7 @@ final class locallib_test extends \advanced_testcase {
         $created = mktime(12, 0, 0, 5, 20, 2026); // About 21 days earlier.
         $this->assertFalse(googlemeet_recording_is_new($created, $now, 7));
     }
+
     /**
      * The date group heading is a month and year label.
      */
@@ -869,6 +865,7 @@ final class locallib_test extends \advanced_testcase {
         $this->assertSame(['a', 'b', 'c'], $p['visible']);
         $this->assertSame(2, $p['overflow']);
     }
+
     /**
      * A list within the cap has no overflow.
      */
@@ -885,9 +882,6 @@ final class locallib_test extends \advanced_testcase {
     public function test_construct_events_duration(): void {
         global $DB;
 
-        if (!defined('HOURSECS')) {
-            $this->markTestSkipped('Moodle constants not available; run inside a full Moodle PHPUnit bootstrap.');
-        }
         $this->resetAfterTest();
 
         $googlemeetid = $DB->insert_record('googlemeet', (object)[

@@ -16,12 +16,6 @@
 
 namespace mod_googlemeet;
 
-defined('MOODLE_INTERNAL') || die();
-
-// The curl class lives in lib/filelib.php, which is not autoloaded and is not always loaded in task runs.
-global $CFG;
-require_once($CFG->libdir . '/filelib.php');
-
 /**
  * Extracts auto-generated subtitles from Google Drive video recordings.
  *
@@ -36,6 +30,9 @@ require_once($CFG->libdir . '/filelib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class subtitle_extractor {
+    /** @var int Seconds a yt-dlp run may take before it is killed (a subtitle-only run takes a few seconds). */
+    protected const YTDLP_TIMEOUT = 120;
+
     /** @var string|null Path to the yt-dlp binary */
     private ?string $ytdlppath = null;
 
@@ -54,7 +51,9 @@ class subtitle_extractor {
      * @param string $language The subtitle language code (default: 'es')
      */
     public function __construct(string $language = 'es') {
-        $this->language = $language;
+        // A language tag only (es, pt-BR, en_US): the value is passed to yt-dlp as an argument, and
+        // anything else (a leading '-' would read as an option) falls back to the default.
+        $this->language = preg_match('/^[A-Za-z]{2,3}(?:[_-][A-Za-z0-9]{2,8})*$/', $language) ? $language : 'es';
         $this->ytdlppath = $this->find_ytdlp();
     }
 
@@ -97,12 +96,13 @@ class subtitle_extractor {
         $baseurl = preg_replace('/&type=track.*$/', '', $timedtexturl);
 
         // Try ASR (auto-generated) track first.
-        $suburl = $baseurl . '&type=track&lang=' . $this->language . '&kind=asr&fmt=1';
+        $lang = rawurlencode($this->language);
+        $suburl = $baseurl . '&type=track&lang=' . $lang . '&kind=asr&fmt=1';
         $xml = $this->download_subtitle($suburl);
 
         if (empty($xml)) {
             // Fallback: try named track "1".
-            $suburl = $baseurl . '&type=track&lang=' . $this->language . '&name=1&fmt=1';
+            $suburl = $baseurl . '&type=track&lang=' . $lang . '&name=1&fmt=1';
             $xml = $this->download_subtitle($suburl);
         }
 
@@ -167,8 +167,8 @@ class subtitle_extractor {
      * The yt-dlp verbose log of a subtitle-only run contains the timedtext URL, with the
      * authpayload parameter needed for authentication.
      *
-     * Public, like download_subtitle() and parse_xml(), so cli/process_transcripts.php can run
-     * the pipeline steps one by one with progress output between them.
+     * yt-dlp only ever sees an https drive.google.com URL ({@see self::is_drive_url()}), after "--" so
+     * it is never read as an option, and it is killed after {@see self::YTDLP_TIMEOUT} seconds.
      *
      * @param string $driveurl The Google Drive video URL
      * @return string|null The timedtext URL or null on failure
@@ -180,14 +180,30 @@ class subtitle_extractor {
             return null;
         }
 
-        $cmd = escapeshellarg($this->ytdlppath)
-             . ' --ignore-config --no-playlist'
-             . ' -v --write-sub --sub-lang ' . escapeshellarg($this->language)
-             . ' --skip-download --sub-format srv3'
-             . ' -o /dev/null '
-             . escapeshellarg($driveurl) . ' 2>&1';
+        if (!self::is_drive_url($driveurl)) {
+            debugging('subtitle_extractor: not an https drive.google.com URL; yt-dlp not run', DEBUG_DEVELOPER);
+            return null;
+        }
 
-        $output = shell_exec($cmd);
+        $output = $this->run_with_timeout([
+            $this->ytdlppath,
+            '--ignore-config',
+            '--no-playlist',
+            '-v',
+            '--write-sub',
+            '--sub-lang',
+            $this->language,
+            '--skip-download',
+            '--sub-format',
+            'srv3',
+            '-o',
+            '/dev/null',
+            '--',
+            $driveurl,
+        ], static::YTDLP_TIMEOUT);
+        if ($output === null) {
+            return null;
+        }
 
         if (preg_match('/Invoking http downloader on "(https:\/\/drive\.google\.com\/timedtext\?[^"]+)"/', $output, $matches)) {
             return $matches[1];
@@ -197,11 +213,98 @@ class subtitle_extractor {
     }
 
     /**
+     * Whether a URL is an https link on drive.google.com, the only kind yt-dlp is started with.
+     *
+     * @param string $url Candidate URL.
+     * @return bool
+     */
+    public static function is_drive_url(string $url): bool {
+        if ($url === '' || preg_match('~[\s\\\\]~', $url)) {
+            return false;
+        }
+        $parts = parse_url($url);
+        return is_array($parts)
+            && strtolower($parts['scheme'] ?? '') === 'https'
+            && strtolower($parts['host'] ?? '') === 'drive.google.com'
+            && !isset($parts['user'])
+            && !isset($parts['pass'])
+            && !isset($parts['port']);
+    }
+
+    /**
+     * Run a command without a shell and return its combined output, killing it at a deadline.
+     *
+     * Core has no helper with a time limit, and shell_exec() waits for ever on a hung process. The
+     * command is an argument list (proc_open() then runs it without a shell), stderr is merged into
+     * stdout, and the output is read without blocking until the process ends or the deadline passes.
+     *
+     * @param string[] $command Program and arguments.
+     * @param int $timeout Seconds before the process is killed.
+     * @return string|null The output, or null when the process could not start or was killed.
+     */
+    private function run_with_timeout(array $command, int $timeout): ?string {
+        $descriptors = [
+            0 => ['file', '/dev/null', 'r'],
+            1 => ['pipe', 'w'],
+            2 => ['redirect', 1],
+        ];
+        $process = proc_open($command, $descriptors, $pipes);
+        if (!is_resource($process)) {
+            debugging('subtitle_extractor: yt-dlp could not be started', DEBUG_DEVELOPER);
+            return null;
+        }
+        stream_set_blocking($pipes[1], false);
+
+        $output = '';
+        $timedout = false;
+        $deadline = microtime(true) + $timeout;
+        while (!feof($pipes[1])) {
+            $left = $deadline - microtime(true);
+            if ($left <= 0) {
+                $timedout = true;
+                break;
+            }
+            $read = [$pipes[1]];
+            $write = null;
+            $except = null;
+            $seconds = (int)floor($left);
+            $ready = stream_select($read, $write, $except, $seconds, (int)(($left - $seconds) * 1000000));
+            if ($ready === false) {
+                break;
+            }
+            if ($ready > 0) {
+                $output .= (string)fread($pipes[1], 8192);
+            }
+        }
+        fclose($pipes[1]);
+
+        // A child that closed its output may still be running: wait for it within the same deadline,
+        // so proc_close() below never blocks the task.
+        while (!$timedout && proc_get_status($process)['running']) {
+            if (microtime(true) >= $deadline) {
+                $timedout = true;
+                break;
+            }
+            usleep(100000);
+        }
+        if ($timedout) {
+            // SIGKILL (9): the pcntl SIG* constants are not always compiled in. Only the direct child is
+            // killed; ytdlppath is an admin-set binary, not a wrapper expected to fork.
+            proc_terminate($process, 9);
+        }
+        proc_close($process);
+
+        if ($timedout) {
+            debugging("subtitle_extractor: yt-dlp killed after {$timeout} seconds", DEBUG_DEVELOPER);
+            return null;
+        }
+        return $output;
+    }
+
+    /**
      * Download subtitle XML from the timedtext URL.
      *
      * The Referer header is required: without it, Google returns empty responses.
-     *
-     * Public for cli/process_transcripts.php ({@see self::get_timedtext_url()}).
      *
      * @param string $url The timedtext URL with track parameters
      * @return string The subtitle XML content, or empty string on failure
@@ -229,8 +332,6 @@ class subtitle_extractor {
      * Output format: "2:28\nHola\nbuen texto\n3:01\nmás texto..."
      *
      * A timestamp line (the cue's own start time) precedes the first cue of each new minute.
-     *
-     * Public for cli/process_transcripts.php ({@see self::get_timedtext_url()}).
      *
      * @param string $xml The subtitle XML content
      * @return string The parsed transcript with timestamps

@@ -478,9 +478,8 @@ final class ai_review_test extends \advanced_testcase {
                                         FROM {googlemeet_ai_analysis} a
                                         JOIN {googlemeet_recordings} r ON r.id = a.recordingid
                                        WHERE r.googlemeetid = ?", [$newgm->id]);
-        if (!$rows) {
-            $this->markTestSkipped('AI analyses are not part of this backup configuration.');
-        }
+        // A backup with user data carries the AI analyses: both must come back, or the review state is untested.
+        $this->assertCount(2, $rows);
         $this->assertEquals(1, $rows['Publicado']->reviewed);
         $this->assertEquals($this->teacher->id, $rows['Publicado']->reviewedby);
         $this->assertEquals(0, $rows['Pendiente']->reviewed);

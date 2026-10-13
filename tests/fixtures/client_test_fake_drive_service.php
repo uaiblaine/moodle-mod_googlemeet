@@ -33,7 +33,8 @@ class client_test_fake_drive_service {
     /**
      * Queue the responses that call() returns, in order.
      *
-     * @param array $responses Responses returned by call().
+     * @param array $responses Responses returned by call(): an array becomes a stdClass (a JSON
+     *     answer), any other value (a downloaded file body) is returned as it is.
      */
     public function __construct(array $responses) {
         $this->responses = $responses;
@@ -45,10 +46,11 @@ class client_test_fake_drive_service {
      * @param string $api API name.
      * @param array $params Request params.
      * @param mixed $rawpost Raw body.
-     * @return \stdClass
+     * @return mixed
      */
-    public function call($api, $params, $rawpost = false): \stdClass {
+    public function call($api, $params, $rawpost = false): mixed {
         $this->calls[] = ['api' => $api, 'params' => $params, 'rawpost' => $rawpost];
-        return (object)array_shift($this->responses);
+        $response = array_shift($this->responses);
+        return is_array($response) ? (object)$response : $response;
     }
 }

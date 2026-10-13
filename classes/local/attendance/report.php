@@ -197,8 +197,47 @@ class report {
      * @return string
      */
     public static function status_label(?string $status): string {
-        $status = in_array($status, ['pending', 'done', 'nodata', 'scope', 'error'], true) ? $status : 'none';
-        return get_string('attendance_status_' . $status, 'googlemeet');
+        return match ($status) {
+            service::STATUS_PENDING => get_string('attendance_status_pending', 'googlemeet'),
+            service::STATUS_DONE => get_string('attendance_status_done', 'googlemeet'),
+            service::STATUS_NODATA => get_string('attendance_status_nodata', 'googlemeet'),
+            service::STATUS_SCOPE => get_string('attendance_status_scope', 'googlemeet'),
+            service::STATUS_ERROR => get_string('attendance_status_error', 'googlemeet'),
+            default => get_string('attendance_status_none', 'googlemeet'),
+        };
+    }
+
+    /**
+     * Label of a report row kind, safe in HTML and in an export.
+     *
+     * @param string $kind self::ROW_* value.
+     * @return string The localised label; an unknown value cleaned to PARAM_ALPHANUMEXT.
+     */
+    public static function kind_label(string $kind): string {
+        return match ($kind) {
+            self::ROW_PRESENT => get_string('attendance_kind_present', 'googlemeet'),
+            self::ROW_UNMATCHED => get_string('attendance_kind_unmatched', 'googlemeet'),
+            self::ROW_ABSENT => get_string('attendance_kind_absent', 'googlemeet'),
+            default => clean_param($kind, PARAM_ALPHANUMEXT),
+        };
+    }
+
+    /**
+     * Label of how a participant was matched to a user ({@see service} sets the values), safe in HTML.
+     *
+     * @param string $matchedby Match method; '' when the row was never matched.
+     * @return string The localised label; '' for ''; an unknown value cleaned to PARAM_ALPHANUMEXT.
+     */
+    public static function matchedby_label(string $matchedby): string {
+        return match ($matchedby) {
+            '' => '',
+            'email' => get_string('attendance_matchedby_email', 'googlemeet'),
+            'googleuser' => get_string('attendance_matchedby_googleuser', 'googlemeet'),
+            'name' => get_string('attendance_matchedby_name', 'googlemeet'),
+            service::MATCH_MANUAL => get_string('attendance_matchedby_manual', 'googlemeet'),
+            service::MATCH_UNLINKED => get_string('attendance_matchedby_unlinked', 'googlemeet'),
+            default => clean_param($matchedby, PARAM_ALPHANUMEXT),
+        };
     }
 
     /**
@@ -244,7 +283,7 @@ class report {
             $line = [
                 self::safe_cell((string)$row['name']),
                 self::safe_cell((string)$row['email']),
-                get_string('attendance_kind_' . $row['kind'], 'googlemeet'),
+                self::kind_label((string)$row['kind']),
                 self::safe_cell((string)$row['meetname']),
                 $row['timejoined'] ? userdate($row['timejoined'], '%Y-%m-%d %H:%M') : '',
                 $row['timeleft'] ? userdate($row['timeleft'], '%Y-%m-%d %H:%M') : '',

@@ -165,6 +165,7 @@ final class backup_ai_analysis_test extends \advanced_testcase {
         $analysis = $this->copied_analysis((int)$newgooglemeet->id, 'done');
         $this->assertSame('Summary of done', $analysis->summary);
         $this->assertSame('AI transcript with student voices', $analysis->transcript);
-        $this->assertNotEmpty($this->copied_analysis((int)$newgooglemeet->id, 'queued'));
+        // A queued analysis is not copied with user data either: the copy would run its own paid AI job.
+        $this->assertFalse($this->copied_analysis((int)$newgooglemeet->id, 'queued'));
     }
 }

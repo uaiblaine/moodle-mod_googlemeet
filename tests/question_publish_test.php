@@ -58,6 +58,19 @@ final class question_publish_test extends \advanced_testcase {
     }
 
     /**
+     * Call a web service the way the AJAX layer does: the session key travels in the request, not in the arguments.
+     *
+     * @param string $function Web service name.
+     * @param array $args Arguments.
+     * @param string|null $sesskey Session key the request carries (null: the user's own).
+     * @return array call_external_function() result.
+     */
+    private function ws(string $function, array $args, ?string $sesskey = null): array {
+        $_POST['sesskey'] = $sesskey ?? sesskey();
+        return external_api::call_external_function($function, $args);
+    }
+
+    /**
      * Insert a recording.
      *
      * @param int $googlemeetid Activity instance id.
@@ -268,18 +281,16 @@ final class question_publish_test extends \advanced_testcase {
         \question_bank::notify_question_edited($leaky);
         $b1 = $this->create_draft($service, $activity, $recb);
 
-        try {
-            \mod_googlemeet_external::publish_questions($reca, $cm->id, [$clean, $leaky], sesskey());
-            $this->fail('A leaky question must block the batch.');
-        } catch (\moodle_exception $e) {
-            $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($clean));
-            $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($leaky));
-        }
+        $refused = $this->ws('mod_googlemeet_publish_questions', [
+            'recordingid' => $reca, 'coursemoduleid' => $cm->id, 'questionids' => [$clean, $leaky],
+        ]);
+        $this->assertTrue($refused['error'], 'A leaky question must block the batch.');
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($clean));
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($leaky));
 
-        $result = external_api::clean_returnvalue(
-            \mod_googlemeet_external::publish_activity_drafts_returns(),
-            \mod_googlemeet_external::publish_activity_drafts($cm->id, sesskey())
-        );
+        $response = $this->ws('mod_googlemeet_publish_activity_drafts', ['coursemoduleid' => $cm->id]);
+        $this->assertFalse($response['error'], json_encode($response['exception'] ?? null));
+        $result = $response['data'];
         $this->assertFalse($result['success']);
         $this->assertSame(1, $result['published']);
         $this->assertSame(2, $result['failed']);
@@ -288,7 +299,8 @@ final class question_publish_test extends \advanced_testcase {
     }
 
     /**
-     * The activity WS requires managequestions and a valid sesskey; teachers can use it.
+     * The activity WS requires managequestions; teachers can use it. It takes no sesskey argument: core
+     * checks the session key of the request, so a request with a wrong one is still refused.
      */
     public function test_ws_publish_activity_drafts_capabilities(): void {
         $this->resetAfterTest();
@@ -303,32 +315,29 @@ final class question_publish_test extends \advanced_testcase {
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
 
+        $args = ['coursemoduleid' => $cm->id];
+
         $this->setUser($student);
-        try {
-            \mod_googlemeet_external::publish_activity_drafts($cm->id, sesskey());
-            $this->fail('Students must not publish questions.');
-        } catch (\required_capability_exception $e) {
-            $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($draft));
-        }
+        $refused = $this->ws('mod_googlemeet_publish_activity_drafts', $args);
+        $this->assertTrue($refused['error'], 'Students must not publish questions.');
+        $this->assertSame('nopermissions', $refused['exception']->errorcode);
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($draft));
 
         $this->setUser($teacher);
-        try {
-            \mod_googlemeet_external::publish_activity_drafts($cm->id, 'not-the-sesskey');
-            $this->fail('An invalid sesskey must be rejected.');
-        } catch (\moodle_exception $e) {
-            $this->assertSame('invalidsesskey', $e->errorcode);
-        }
+        $refused = $this->ws('mod_googlemeet_publish_activity_drafts', $args, 'not-the-sesskey');
+        $this->assertTrue($refused['error'], 'A request with a wrong session key must be refused.');
+        $this->assertSame('invalidsesskey', $refused['exception']->errorcode);
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($draft));
 
-        $result = external_api::clean_returnvalue(
-            \mod_googlemeet_external::publish_activity_drafts_returns(),
-            \mod_googlemeet_external::publish_activity_drafts($cm->id, sesskey())
-        );
+        $response = $this->ws('mod_googlemeet_publish_activity_drafts', $args);
+        $this->assertFalse($response['error'], json_encode($response['exception'] ?? null));
+        $result = $response['data'];
         $this->assertTrue($result['success']);
         $this->assertSame(1, $result['published']);
         $this->assertSame(question_version_status::QUESTION_STATUS_READY, $this->status_of($draft));
 
         // Nothing left: a second run is a no-op.
-        $again = \mod_googlemeet_external::publish_activity_drafts($cm->id, sesskey());
+        $again = $this->ws('mod_googlemeet_publish_activity_drafts', $args)['data'];
         $this->assertTrue($again['success']);
         $this->assertSame(0, $again['published']);
         $this->assertSame([], $again['results']);
@@ -354,24 +363,23 @@ final class question_publish_test extends \advanced_testcase {
         $student = $this->getDataGenerator()->create_and_enrol($course, 'student');
         $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
 
+        $base = ['recordingid' => $reca, 'coursemoduleid' => $cm->id];
+
         $this->setUser($student);
-        try {
-            \mod_googlemeet_external::publish_questions($reca, $cm->id, [$a1], sesskey());
-            $this->fail('Students must not publish questions.');
-        } catch (\required_capability_exception $e) {
-            $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($a1));
-        }
+        $refused = $this->ws('mod_googlemeet_publish_questions', $base + ['questionids' => [$a1]]);
+        $this->assertTrue($refused['error'], 'Students must not publish questions.');
+        $this->assertSame('nopermissions', $refused['exception']->errorcode);
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($a1));
 
         $this->setUser($teacher);
-        try {
-            \mod_googlemeet_external::publish_questions($reca, $cm->id, [$a1, $b1], sesskey());
-            $this->fail('A question of another recording must reject the batch.');
-        } catch (\moodle_exception $e) {
-            $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($a1));
-            $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($b1));
-        }
+        $refused = $this->ws('mod_googlemeet_publish_questions', $base + ['questionids' => [$a1, $b1]]);
+        $this->assertTrue($refused['error'], 'A question of another recording must reject the batch.');
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($a1));
+        $this->assertSame(question_version_status::QUESTION_STATUS_DRAFT, $this->status_of($b1));
 
-        $result = \mod_googlemeet_external::publish_questions($reca, $cm->id, [$a1, $a2], sesskey());
+        $response = $this->ws('mod_googlemeet_publish_questions', $base + ['questionids' => [$a1, $a2]]);
+        $this->assertFalse($response['error'], json_encode($response['exception'] ?? null));
+        $result = $response['data'];
         $this->assertSame(2, $result['count']);
         $this->assertSame(question_version_status::QUESTION_STATUS_READY, $this->status_of($a1));
         $this->assertSame(question_version_status::QUESTION_STATUS_READY, $this->status_of($a2));

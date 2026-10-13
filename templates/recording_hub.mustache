@@ -25,7 +25,6 @@
   {
     "cmid": 5,
     "recordingid": 12,
-    "sesskey": "abc123",
     "name": "Tema 4: el acto administrativo",
     "originalname": "Clases - 2026/11/10 09:00 CET - Recording",
     "hassubtitle": true,
@@ -98,6 +97,7 @@
     "hasdrafts": true,
     "activitydraftcount": 3,
     "generationqueued": false,
+    "cangeneratequestions": true,
     "questions": [
       {
         "id": 31,
@@ -384,7 +384,7 @@
           {{#activitydraftcount}}
           <button type="button" class="btn btn-outline-secondary btn-sm googlemeet-question-publish-activity" data-count="{{activitydraftcount}}">{{# str }} question_publish_activity_count, mod_googlemeet, {{activitydraftcount}} {{/ str }}</button>
           {{/activitydraftcount}}
-          {{#aienabled}}
+          {{#cangeneratequestions}}
           <button type="button" class="btn btn-primary btn-sm googlemeet-question-generate" data-count="10" {{#generationqueued}}disabled{{/generationqueued}}>
             {{#generationqueued}}{{# str }} question_generating, mod_googlemeet {{/ str }}{{/generationqueued}}
             {{^generationqueued}}
@@ -392,7 +392,7 @@
               {{^hasquestions}}{{# str }} question_generate_ai, mod_googlemeet {{/ str }}{{/hasquestions}}
             {{/generationqueued}}
           </button>
-          {{/aienabled}}
+          {{/cangeneratequestions}}
           </div>
         </div>
         {{#generationqueued}}
@@ -623,7 +623,6 @@ require(['mod_googlemeet/recording_hub'], function(m) {
   m.init({
     cmid: {{cmid}},
     recordingid: {{recordingid}},
-    sesskey: {{# quote }}{{sesskey}}{{/ quote }},
     caneditrecording: {{#caneditrecording}}true{{/caneditrecording}}{{^caneditrecording}}false{{/caneditrecording}},
     canmanagequestions: {{#canmanagequestions}}true{{/canmanagequestions}}{{^canmanagequestions}}false{{/canmanagequestions}},
     hasquestions: {{#hasquestions}}true{{/hasquestions}}{{^hasquestions}}false{{/hasquestions}},
@@ -635,7 +634,7 @@ require(['mod_googlemeet/recording_hub'], function(m) {
 });
 {{#canmanagequestions}}
 require(['mod_googlemeet/question_review'], function(q) {
-  q.init({cmid: {{cmid}}, recordingid: {{recordingid}}, sesskey: {{# quote }}{{sesskey}}{{/ quote }}});
+  q.init({cmid: {{cmid}}, recordingid: {{recordingid}}});
 });
 {{/canmanagequestions}}
 {{/js}}

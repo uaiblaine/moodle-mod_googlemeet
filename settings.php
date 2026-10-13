@@ -81,14 +81,14 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configcheckbox(
         'googlemeet/notificationexpanded',
         get_string('notificationexpanded', 'googlemeet'),
-        get_string('notifycationexpanded_desc', 'googlemeet'),
+        get_string('notificationexpanded_desc', 'googlemeet'),
         0
     ));
 
     $settings->add(new admin_setting_configcheckbox(
         'googlemeet/notify',
         get_string('notify', 'googlemeet'),
-        get_string('notify_help', 'googlemeet'),
+        get_string('notify_desc', 'googlemeet'),
         1
     ));
 
@@ -100,7 +100,7 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_configselect(
         'googlemeet/minutesbefore',
         get_string('minutesbefore', 'googlemeet'),
-        get_string('minutesbefore_help', 'googlemeet'),
+        get_string('minutesbefore_desc', 'googlemeet'),
         10,
         $minutes
     ));
@@ -117,7 +117,7 @@ if ($ADMIN->fulltree) {
     $settings->add(new admin_setting_confightmleditor(
         'googlemeet/emailcontent',
         get_string('emailcontent', 'googlemeet'),
-        get_string('emailcontent_help', 'googlemeet'),
+        get_string('emailcontent_desc', 'googlemeet'),
         get_string('emailcontent_default', 'googlemeet'),
         PARAM_RAW
     ));
@@ -168,15 +168,19 @@ if ($ADMIN->fulltree) {
     ));
 
     // Keep in step with the private constants gemini_client::DEFAULT_MODEL (this setting's default)
-    // and FALLBACK_MODEL (the option labelled fallback).
-    $aimodels = [
-        'gemini-3.5-flash' => 'Gemini 3.5 Flash (Stable, default)',
-        'gemini-3.1-flash-lite' => 'Gemini 3.1 Flash Lite (Stable, cheap/fast, fallback)',
-        'gemini-3.1-pro-preview' => 'Gemini 3.1 Pro (Preview, most capable)',
-        'gemini-3-flash-preview' => 'Gemini 3 Flash (Preview)',
-        'gemini-2.5-flash' => 'Gemini 2.5 Flash (Fast)',
-        'gemini-2.5-pro' => 'Gemini 2.5 Pro (More capable)',
+    // and FALLBACK_MODEL (the option labelled fallback). Product names stay untranslated; the note is a string.
+    $aimodelnotes = [
+        'gemini-3.5-flash' => ['Gemini 3.5 Flash', get_string('aimodel_note_default', 'googlemeet')],
+        'gemini-3.1-flash-lite' => ['Gemini 3.1 Flash Lite', get_string('aimodel_note_fallback', 'googlemeet')],
+        'gemini-3.1-pro-preview' => ['Gemini 3.1 Pro', get_string('aimodel_note_previewcapable', 'googlemeet')],
+        'gemini-3-flash-preview' => ['Gemini 3 Flash', get_string('aimodel_note_preview', 'googlemeet')],
+        'gemini-2.5-flash' => ['Gemini 2.5 Flash', get_string('aimodel_note_fast', 'googlemeet')],
+        'gemini-2.5-pro' => ['Gemini 2.5 Pro', get_string('aimodel_note_capable', 'googlemeet')],
     ];
+    $aimodels = [];
+    foreach ($aimodelnotes as $model => [$name, $note]) {
+        $aimodels[$model] = get_string('aimodel_option', 'googlemeet', (object)['name' => $name, 'note' => $note]);
+    }
 
     $settings->add(new admin_setting_configselect(
         'googlemeet/aimodel',

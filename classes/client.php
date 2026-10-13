@@ -663,7 +663,6 @@ class client {
                         if (!$deferenrichment && (!isset($existingids[$recording->id]) || empty($existingnotestext))) {
                             $notesdata = $this->find_notes_for_recording(
                                 $service,
-                                $parents,
                                 $recording->name,
                                 $recordings[$i]->createdTime
                             );
@@ -706,7 +705,7 @@ class client {
     /**
      * Build a user-friendly sync feedback message.
      *
-     * @param array $stats Array with inserted, updated, deleted, trashed and restored counts.
+     * @param array $stats Array with inserted, updated, trashed and restored counts.
      * @param int $totalfound Total recordings found in Drive.
      * @return string The feedback message.
      */
@@ -724,9 +723,6 @@ class client {
         }
         if (($stats['restored'] ?? 0) > 0) {
             $parts[] = get_string('sync_restored_recordings', 'googlemeet', $stats['restored']);
-        }
-        if (($stats['deleted'] ?? 0) > 0) {
-            $parts[] = get_string('sync_deleted_recordings', 'googlemeet', $stats['deleted']);
         }
 
         if (empty($parts)) {
@@ -877,11 +873,11 @@ class client {
             $files = $this->list_all_pages($service, $transcriptparams);
 
             if (!empty($files)) {
-                // Prefer .sbv or .vtt files, then .txt.
+                // Prefer timed captions (.sbv, .vtt, .srt: parse_transcript() drops their times), then .txt.
                 $transcriptfile = null;
                 foreach ($files as $file) {
                     $ext = strtolower(pathinfo($file->name, PATHINFO_EXTENSION));
-                    if ($ext === 'sbv' || $ext === 'vtt') {
+                    if ($ext === 'sbv' || $ext === 'vtt' || $ext === 'srt') {
                         $transcriptfile = $file;
                         break;
                     }
@@ -919,13 +915,14 @@ class client {
      * the user owns are listed once per client instance and the match is chosen by
      * {@see self::select_notes_candidate_for_recording()}.
      *
+     * Notes are searched across the whole Drive, not only the Meet Recordings folders.
+     *
      * @param rest $service The REST service
-     * @param string $parents Unused: notes are searched across the whole Drive
      * @param string $videoname The video filename
      * @param int $recordingcreatedtime Recording creation timestamp.
      * @return array|null ['docid' => string, 'content' => string] or null
      */
-    private function find_notes_for_recording($service, $parents, $videoname, int $recordingcreatedtime) {
+    private function find_notes_for_recording($service, $videoname, int $recordingcreatedtime) {
         if (self::recording_notes_prefix($videoname) === '' || $recordingcreatedtime <= 0) {
             return null;
         }
@@ -1053,7 +1050,6 @@ class client {
             if (empty($recording->notestext)) {
                 $notesdata = $this->find_notes_for_recording(
                     $service,
-                    $parents,
                     $recording->name,
                     (int)$recording->createdtime
                 );
@@ -1279,7 +1275,7 @@ class client {
      * Parse transcript content to extract plain text.
      *
      * @param string $content The raw transcript content
-     * @param string $format The file format (sbv, vtt, txt)
+     * @param string $format The file format (sbv, vtt, srt, txt)
      * @return string The parsed text content
      */
     private function parse_transcript($content, $format) {
@@ -1290,7 +1286,7 @@ class client {
             return trim($content);
         }
 
-        // For SBV and VTT formats, remove timestamps and keep only text.
+        // For SBV, VTT and SubRip formats, remove timestamps and cue numbers and keep only text.
         $lines = explode("\n", $content);
         $text = [];
         $skipnext = false;

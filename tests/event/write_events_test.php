@@ -494,17 +494,15 @@ final class write_events_test extends \advanced_testcase {
     public function test_question_actions(): void {
         $recording = $this->recording();
         $ids = $this->drafts((int)$recording->id, 3);
-        $base = ['recordingid' => $recording->id, 'coursemoduleid' => $this->cm->id, 'sesskey' => sesskey()];
+        $base = ['recordingid' => $recording->id, 'coursemoduleid' => $this->cm->id];
 
         $this->setUser($this->student);
-        $base['sesskey'] = sesskey();
         $sink = $this->redirectEvents();
         $this->assertTrue($this->ws('mod_googlemeet_publish_questions', $base + ['questionids' => $ids])['error']);
         $this->assert_none($sink);
         $sink->close();
 
         $this->setUser($this->teacher);
-        $base['sesskey'] = sesskey();
         $sink = $this->redirectEvents();
         $this->ws_ok('mod_googlemeet_publish_questions', $base + ['questionids' => [$ids[0], $ids[1]]]);
         $this->assert_one($sink, questions_changed::class, (int)$recording->id, 'u', ['action' => 'published', 'count' => 2]);
@@ -546,9 +544,7 @@ final class write_events_test extends \advanced_testcase {
         $this->drafts((int)$two->id, 1);
 
         $sink = $this->redirectEvents();
-        $result = $this->ws_ok('mod_googlemeet_publish_activity_drafts', [
-            'coursemoduleid' => $this->cm->id, 'sesskey' => sesskey(),
-        ]);
+        $result = $this->ws_ok('mod_googlemeet_publish_activity_drafts', ['coursemoduleid' => $this->cm->id]);
         $this->assertSame(3, $result['published']);
         $events = $this->plugin_events($sink);
         $sink->close();
@@ -563,7 +559,7 @@ final class write_events_test extends \advanced_testcase {
 
         // No drafts left: nothing logged.
         $sink = $this->redirectEvents();
-        $this->ws_ok('mod_googlemeet_publish_activity_drafts', ['coursemoduleid' => $this->cm->id, 'sesskey' => sesskey()]);
+        $this->ws_ok('mod_googlemeet_publish_activity_drafts', ['coursemoduleid' => $this->cm->id]);
         $this->assert_none($sink);
         $sink->close();
         $this->resetDebugging();
@@ -579,7 +575,7 @@ final class write_events_test extends \advanced_testcase {
 
         $sink = $this->redirectEvents();
         $this->ws_ok('mod_googlemeet_queue_generate_questions', [
-            'recordingid' => $recording->id, 'coursemoduleid' => $this->cm->id, 'count' => 50, 'sesskey' => sesskey(),
+            'recordingid' => $recording->id, 'coursemoduleid' => $this->cm->id, 'count' => 50,
         ]);
         $this->assert_one($sink, questions_changed::class, (int)$recording->id, 'u', ['action' => 'queued', 'count' => 20]);
         $sink->close();
