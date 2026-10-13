@@ -36,9 +36,11 @@ Feature: Live countdowns of the classroom hero
     And I should see "Starts in 2h" in the ".googlemeet-hero-countdown" "css_element"
 
   Scenario: The room button turns live when the countdown reaches zero
-    Given a googlemeet session of "Live class" starts in "20" seconds
+    Given a googlemeet session of "Live class" starts in "12" seconds
     And I log in as "student1"
     When I am on the "Live class" "googlemeet activity" page
+    # The element wait gives up after a few seconds, so first sit out the rest of the countdown.
+    And I wait "12" seconds
     Then I wait until ".googlemeet-room-cta-live" "css_element" exists
     And I should see "LIVE · Join the class" in the ".googlemeet-room-cta-live" "css_element"
     And ".googlemeet-room-cta-countdown" "css_element" should not be visible
