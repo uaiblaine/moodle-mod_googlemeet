@@ -132,6 +132,7 @@ class sync_manager {
                 'logid' => $logid,
             ]);
             \core\task\manager::queue_adhoc_task($task);
+            \mod_googlemeet\event\sync_requested::create(['context' => \context_module::instance($cm->id)])->trigger();
             return true;
         } finally {
             $lock->release();

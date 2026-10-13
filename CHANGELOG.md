@@ -3,6 +3,33 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.5 (unreleased)
+- Privacy: a user's reminders of one activity are exported together, each with its session and
+  kind ("Minutes before" or "Early reminder"); before, each reminder overwrote the previous one and
+  the export kept only the last.
+- Privacy: deleting all the data of an activity still removes its AI analyses whole (they are
+  generated from the participants' speech and may name them; course reset keeps them as course
+  content). It now also removes the sync log rows of the activity and empties the attendance fetch
+  state, so those sessions are not read from Google again.
+- Privacy: unmatched Meet participants (no Moodle user) are declared; they go with the activity, a
+  course reset or a context-wide deletion. Per-user requests follow the recorded user only, never
+  an e-mail match. The sync log message, the AI error text and every attendance column are declared,
+  and the sync log stores e-mail addresses masked (`***@domain`).
+- Tests: a privacy provider test covers every user-linked table and asserts
+  `component_is_compliant()`.
+- Events: teacher writes are now logged. Renaming or hiding a recording (`recording_updated`),
+  trashing it (`recording_trashed`, one per recording for "Delete all"), restoring it
+  (`recording_restored`) and purging it (`recording_deleted`); saving, (re)generating or analysing
+  an AI analysis (`ai_analysis_updated`) and publishing it to students (`ai_analysis_reviewed`, one
+  per analysis for "Publish all"); queueing a Drive sync (`sync_requested`); publishing,
+  unpublishing, editing, discarding or queueing practice questions (`questions_changed`, one per
+  recording). A request that writes nothing (already published, sync already queued, analysis
+  already completed or processing) logs nothing.
+- "Delete all recordings" trashes the recordings it listed, by id, instead of every live row of the
+  activity at the time of the update.
+- `mod_googlemeet_generate_ai_analysis` returns the stored `timecreated` on a regeneration instead of
+  reading a missing property (a PHP warning).
+
 ## 2.30.1+uai.4 (unreleased)
 - Neither Gemini upload request follows redirects (the API key would travel with them); the Drive
   confirm-token probe fetches only the first MiB; multi-account Drive links (`/u/<n>/file/d/...`) parse.

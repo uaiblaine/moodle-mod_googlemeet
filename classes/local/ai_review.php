@@ -138,7 +138,7 @@ class ai_review {
     public static function mark_reviewed(int $analysisid, int $userid, int $seen = 0): bool {
         global $DB;
 
-        $row = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid], 'id, status, reviewed, timemodified');
+        $row = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid], 'id, recordingid, status, reviewed, timemodified');
         if (!$row || $row->status !== 'completed') {
             return false;
         }
@@ -160,7 +160,35 @@ class ai_review {
         $DB->execute("UPDATE {googlemeet_ai_analysis}
                          SET reviewed = :reviewed, timereviewed = :timereviewed, reviewedby = :reviewedby
                        WHERE {$where}", $params);
-        return (bool)$DB->get_field('googlemeet_ai_analysis', 'reviewed', ['id' => $analysisid]);
+        $reviewed = (bool)$DB->get_field('googlemeet_ai_analysis', 'reviewed', ['id' => $analysisid]);
+        if ($reviewed) {
+            $googlemeetid = (int)$DB->get_field('googlemeet_recordings', 'googlemeetid', ['id' => $row->recordingid]);
+            self::trigger_reviewed($googlemeetid, [(int)$row->id => (int)$row->recordingid], false);
+        }
+        return $reviewed;
+    }
+
+    /**
+     * Log the publication of analyses of one activity, one event per analysis.
+     *
+     * @param int $googlemeetid Instance id.
+     * @param array $recordingids Map analysis id => recording id of the analyses just published.
+     * @param bool $all Whether they were published by "Publish all".
+     * @return void
+     */
+    protected static function trigger_reviewed(int $googlemeetid, array $recordingids, bool $all): void {
+        $cm = $recordingids ? get_coursemodule_from_instance('googlemeet', $googlemeetid, 0, false, IGNORE_MISSING) : false;
+        if (!$cm) {
+            return;
+        }
+        $context = context_module::instance($cm->id);
+        foreach ($recordingids as $analysisid => $recordingid) {
+            \mod_googlemeet\event\ai_analysis_reviewed::create([
+                'context' => $context,
+                'objectid' => $analysisid,
+                'other' => ['all' => $all, 'recordingid' => $recordingid],
+            ])->trigger();
+        }
     }
 
     /**
@@ -210,10 +238,17 @@ class ai_review {
                 $where .= ' AND timemodified <= :seenbefore';
                 $params['seenbefore'] = $seenbefore;
             }
-            $published += $DB->count_records_select('googlemeet_ai_analysis', $where, $params);
+            // The rows are read first so each published analysis gets its own event.
+            $rows = $DB->get_records_select_menu('googlemeet_ai_analysis', $where, $params, 'id', 'id, recordingid');
+            if (!$rows) {
+                continue;
+            }
+            [$rowsql, $rowparams] = $DB->get_in_or_equal(array_keys($rows), SQL_PARAMS_NAMED, 'row');
             $DB->execute("UPDATE {googlemeet_ai_analysis}
                              SET reviewed = 1, timereviewed = :now, reviewedby = :userid
-                           WHERE {$where}", $params);
+                           WHERE {$where} AND id {$rowsql}", $params + $rowparams);
+            $published += count($rows);
+            self::trigger_reviewed($googlemeetid, array_map('intval', $rows), true);
         }
         return $published;
     }
