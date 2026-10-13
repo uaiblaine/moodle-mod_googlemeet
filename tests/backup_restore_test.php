@@ -237,7 +237,7 @@ final class backup_restore_test extends \advanced_testcase {
 
         [$course, $googlemeet, $cm, $context, $recs] = $this->create_fixture();
 
-        $newcm = duplicate_module($course, get_fast_modinfo($course)->get_cm($cm->id));
+        $newcm = \core_courseformat\formatactions::cm((int)$course->id)->duplicate((int)$cm->id);
         $newgooglemeet = $DB->get_record('googlemeet', ['id' => $newcm->instance], '*', MUST_EXIST);
 
         $this->assert_copy_bound($newgooglemeet);

@@ -29,6 +29,27 @@ use stdClass;
  */
 class recording_search {
     /**
+     * URL parameters that keep the list's search and topic filter when a link leaves the list.
+     *
+     * Used by the links into a recording hub and by the hub's way back, so the teacher returns to the
+     * same filtered list. Empty filters add nothing.
+     *
+     * @param string $query Free-text search (the `rq` parameter).
+     * @param string $topic Topic filter (the `topic` parameter).
+     * @return array Map of parameter name => value.
+     */
+    public static function list_filter_params(string $query, string $topic): array {
+        $params = [];
+        if (trim($query) !== '') {
+            $params['rq'] = $query;
+        }
+        if (trim($topic) !== '') {
+            $params['topic'] = $topic;
+        }
+        return $params;
+    }
+
+    /**
      * Filter recordings by a free-text query against the title, AI topics/summary and (teachers) notes/transcript.
      *
      * Non-title matches set matchsource/matchsnippet so the list can say where the term was found.

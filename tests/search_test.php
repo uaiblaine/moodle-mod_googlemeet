@@ -240,4 +240,15 @@ final class search_test extends \advanced_testcase {
         $this->assertFalse(property_exists($recordings[0], 'notestext'));
         $this->assertFalse(property_exists($recordings[0], 'transcripttext'));
     }
+
+    /**
+     * Only the filters that are set travel in a link out of the list.
+     */
+    public function test_list_filter_params(): void {
+        $this->assertSame([], recording_search::list_filter_params('', ''));
+        $this->assertSame([], recording_search::list_filter_params('  ', ' '));
+        $this->assertSame(['rq' => 'ley'], recording_search::list_filter_params('ley', ''));
+        $this->assertSame(['topic' => 'Tema'], recording_search::list_filter_params('', 'Tema'));
+        $this->assertSame(['rq' => 'a', 'topic' => 'b'], recording_search::list_filter_params('a', 'b'));
+    }
 }

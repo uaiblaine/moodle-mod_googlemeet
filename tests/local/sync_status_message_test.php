@@ -78,7 +78,7 @@ final class sync_status_message_test extends \advanced_testcase {
         $this->assertDebuggingCalled();
         $this->assertFalse($result['error'], json_encode($result));
         $this->assertSame('error', $result['data']['status']);
-        $this->assertSame(get_string('servererror'), $result['data']['message']);
+        $this->assertSame(get_string('sync_status_failed', 'googlemeet'), $result['data']['message']);
         $this->assertStringNotContainsString('Backend Error', json_encode($result));
     }
 

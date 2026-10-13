@@ -29,14 +29,14 @@ use PHPUnit\Framework\Attributes\CoversClass;
 #[CoversClass(gemini_client::class)]
 final class ai_context_test extends \advanced_testcase {
     /**
-     * Build the video analysis prompt through reflection.
+     * Read the context line every prompt starts with, through reflection.
      *
      * @return string
      */
-    private function analysis_prompt(): string {
+    private function prompt_context_line(): string {
         $client = new gemini_client();
-        $method = new \ReflectionMethod($client, 'build_analysis_prompt');
-        return $method->invoke($client, 'Unit 3', '1:00:00', 'https://example.com/video');
+        $method = new \ReflectionMethod($client, 'context_line');
+        return $method->invoke($client);
     }
 
     /**
@@ -46,7 +46,7 @@ final class ai_context_test extends \advanced_testcase {
         $this->resetAfterTest();
         unset_config('aicontext', 'googlemeet');
         $this->assertSame(gemini_client::DEFAULT_AI_CONTEXT, gemini_client::get_ai_context());
-        $this->assertStringContainsString('Teaching context: ' . gemini_client::DEFAULT_AI_CONTEXT, $this->analysis_prompt());
+        $this->assertStringContainsString('Teaching context: ' . gemini_client::DEFAULT_AI_CONTEXT, $this->prompt_context_line());
     }
 
     /**
@@ -56,7 +56,7 @@ final class ai_context_test extends \advanced_testcase {
         $this->resetAfterTest();
         set_config('aicontext', "  Nursing   licensing\n exam preparation ", 'googlemeet');
         $this->assertSame('Nursing licensing exam preparation', gemini_client::get_ai_context());
-        $this->assertStringContainsString('Teaching context: Nursing licensing exam preparation', $this->analysis_prompt());
+        $this->assertStringContainsString('Teaching context: Nursing licensing exam preparation', $this->prompt_context_line());
     }
 
     /**
@@ -66,7 +66,7 @@ final class ai_context_test extends \advanced_testcase {
         $this->resetAfterTest();
         set_config('aicontext', '', 'googlemeet');
         $this->assertSame('', gemini_client::get_ai_context());
-        $this->assertStringNotContainsString('Teaching context:', $this->analysis_prompt());
+        $this->assertStringNotContainsString('Teaching context:', $this->prompt_context_line());
     }
 
     /**

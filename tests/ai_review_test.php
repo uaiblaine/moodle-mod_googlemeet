@@ -179,6 +179,32 @@ final class ai_review_test extends \advanced_testcase {
     }
 
     /**
+     * Only the call that flips the row claims it and logs the publication; a second one changes and logs nothing.
+     */
+    public function test_second_publish_claims_nothing_and_logs_nothing(): void {
+        global $DB;
+
+        $recording = $this->create_recording();
+        $other = $this->getDataGenerator()->create_and_enrol($this->course, 'editingteacher');
+
+        $sink = $this->redirectEvents();
+        $this->assertTrue(ai_review::mark_reviewed($recording->analysisid, (int)$this->teacher->id));
+        $this->assertTrue(ai_review::mark_reviewed($recording->analysisid, (int)$other->id));
+        $events = array_filter(
+            $sink->get_events(),
+            fn($event) => $event instanceof \mod_googlemeet\event\ai_analysis_reviewed
+        );
+        $sink->close();
+
+        $this->assertCount(1, $events);
+        $reviewer = fn() => (int)$DB->get_field('googlemeet_ai_analysis', 'reviewedby', ['id' => $recording->analysisid]);
+        $this->assertSame((int)$this->teacher->id, $reviewer());
+        // A request that raced past the unlocked check finds the row reviewed inside the lock.
+        $this->assertFalse(ai_review::claim_review($recording->analysisid, (int)$other->id));
+        $this->assertSame((int)$this->teacher->id, $reviewer());
+    }
+
+    /**
      * With the setting off, unreviewed content is visible and no banner is shown.
      */
     public function test_hub_setting_off(): void {

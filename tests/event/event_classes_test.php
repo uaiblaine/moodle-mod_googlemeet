@@ -29,6 +29,7 @@ use PHPUnit\Framework\Attributes\DataProvider;
  */
 #[CoversClass(recording_updated::class)]
 #[CoversClass(recording_trashed::class)]
+#[CoversClass(recordings_bulk_trashed::class)]
 #[CoversClass(recording_restored::class)]
 #[CoversClass(recording_deleted::class)]
 #[CoversClass(ai_analysis_updated::class)]
@@ -45,6 +46,7 @@ final class event_classes_test extends \advanced_testcase {
         return [
             'recording_updated' => ['recording_updated', 'recording', ['field' => 'name'], ['field' => 'notes']],
             'recording_trashed' => ['recording_trashed', 'recording', ['bulk' => false], []],
+            'recordings_bulk_trashed' => ['recordings_bulk_trashed', null, ['count' => 3], []],
             'recording_restored' => ['recording_restored', 'recording', [], null],
             'recording_deleted' => ['recording_deleted', 'recording', [], null],
             'ai_analysis_updated' => ['ai_analysis_updated', 'analysis', ['action' => 'saved'], ['action' => 'deleted']],

@@ -255,7 +255,7 @@ class sync_manager {
             return $e->getMessage();
         }
         debugging('mod_googlemeet manual sync failed: ' . $e->getMessage(), DEBUG_DEVELOPER);
-        return get_string('servererror');
+        return get_string('sync_status_failed', 'googlemeet');
     }
 
     /**

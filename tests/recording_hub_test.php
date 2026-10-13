@@ -75,6 +75,47 @@ final class recording_hub_test extends \advanced_testcase {
     }
 
     /**
+     * The hub's way back (and previous/next) returns to the list with the same search and topic.
+     */
+    public function test_back_link_keeps_list_filters(): void {
+        global $DB;
+        $this->resetAfterTest();
+
+        $course = $this->getDataGenerator()->create_course();
+        $googlemeet = $this->getDataGenerator()->create_module('googlemeet', ['course' => $course->id]);
+        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+        $now = time();
+        $ids = [];
+        foreach ([0, 1] as $offset) {
+            $ids[] = $DB->insert_record('googlemeet_recordings', (object)[
+                'googlemeetid' => $googlemeet->id, 'recordingid' => uniqid('drive-', true), 'name' => 'Clase ' . $offset,
+                'createdtime' => $now + $offset, 'duration' => '01:00:00',
+                'webviewlink' => 'https://drive.google.com/file/d/x/view', 'visible' => 1, 'timemodified' => $now,
+            ]);
+        }
+        $recording = $DB->get_record('googlemeet_recordings', ['id' => $ids[0]]);
+        $this->setUser($teacher);
+
+        $_GET['rq'] = 'ley & sanidad';
+        $_GET['topic'] = 'Tema A';
+        $html = $this->render_hub($googlemeet, $recording);
+        unset($_GET['rq'], $_GET['topic']);
+
+        preg_match('/<a href="([^"]*)" class="googlemeet-hub-back"/', $html, $back);
+        $this->assertNotEmpty($back, 'The back link is rendered.');
+        parse_str((string)parse_url(html_entity_decode($back[1], ENT_QUOTES), PHP_URL_QUERY), $params);
+        $this->assertSame('ley & sanidad', $params['rq'] ?? null);
+        $this->assertSame('Tema A', $params['topic'] ?? null);
+        $this->assertArrayNotHasKey('recording', $params);
+
+        // Without filters the way back adds none.
+        $html = $this->render_hub($googlemeet, $recording);
+        preg_match('/<a href="([^"]*)" class="googlemeet-hub-back"/', $html, $back);
+        $this->assertStringNotContainsString('rq=', $back[1]);
+        $this->assertStringNotContainsString('topic=', $back[1]);
+    }
+
+    /**
      * A completed analysis with an empty transcript shows the Meet transcript to teachers only;
      * with no transcript at all the tab explains it instead of showing an empty search box.
      */

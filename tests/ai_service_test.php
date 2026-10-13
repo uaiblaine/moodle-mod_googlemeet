@@ -111,6 +111,9 @@ final class ai_service_test extends \advanced_testcase {
 
         $service = new ai_service();
 
+        // Every entry is reachable: the failure that exhausts the retries schedules none.
+        $this->assertCount(ai_service::MAX_TRANSIENT_RETRIES - 1, ai_service::TRANSIENT_BACKOFF);
+
         foreach (ai_service::TRANSIENT_BACKOFF as $previousretrycount => $backoff) {
             $analysisid = $this->create_analysis(['status' => 'processing', 'retrycount' => $previousretrycount]);
             $before = time();
@@ -138,6 +141,36 @@ final class ai_service_test extends \advanced_testcase {
         $this->assertEquals('failed', $analysis->status);
         $this->assertEquals(ai_service::MAX_TRANSIENT_RETRIES, (int)$analysis->retrycount);
         $this->assertEquals(0, (int)$analysis->nextretry);
+    }
+
+    /**
+     * The last transient failure before exhaustion still gets the final back-off entry.
+     */
+    public function test_last_scheduled_retry_uses_last_backoff_entry(): void {
+        global $DB;
+
+        $this->resetAfterTest();
+
+        $service = new ai_service();
+        $previous = ai_service::MAX_TRANSIENT_RETRIES - 2;
+        $analysisid = $this->create_analysis(['status' => 'processing', 'retrycount' => $previous]);
+        $before = time();
+        $service->record_transient_failure($analysisid, $previous, 'Late');
+
+        $analysis = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid], '*', MUST_EXIST);
+        $lastbackoff = ai_service::TRANSIENT_BACKOFF[count(ai_service::TRANSIENT_BACKOFF) - 1];
+        $this->assertGreaterThanOrEqual($before + $lastbackoff, (int)$analysis->nextretry);
+    }
+
+    /**
+     * The requested question count is kept within the range one request accepts.
+     */
+    public function test_clamp_question_count(): void {
+        $this->assertSame(1, ai_service::clamp_question_count(-5));
+        $this->assertSame(1, ai_service::clamp_question_count(0));
+        $this->assertSame(7, ai_service::clamp_question_count(7));
+        $this->assertSame(20, ai_service::clamp_question_count(21));
+        $this->assertSame(20, ai_service::clamp_question_count(500));
     }
 
     /**
