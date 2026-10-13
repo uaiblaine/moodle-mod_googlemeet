@@ -273,8 +273,7 @@ class sync_manager {
     public static function build_message(array $stats): string {
         $parts = [];
         $map = ['inserted' => 'sync_new_recordings', 'updated' => 'sync_updated_recordings',
-            'trashed' => 'sync_trashed_recordings', 'restored' => 'sync_restored_recordings',
-            'deleted' => 'sync_deleted_recordings'];
+            'trashed' => 'sync_trashed_recordings', 'restored' => 'sync_restored_recordings'];
         foreach ($map as $key => $string) {
             if ((int)($stats[$key] ?? 0) > 0) {
                 $parts[] = get_string($string, 'googlemeet', (int)$stats[$key]);
@@ -339,7 +338,7 @@ class sync_manager {
             'lastsync' => $lastsync ? userdate($lastsync, get_string('timedate', 'googlemeet'))
                 : get_string('never', 'googlemeet'),
             'haschanges' => ((int)($stats['inserted'] ?? 0) + (int)($stats['restored'] ?? 0)
-                + (int)($stats['trashed'] ?? 0) + (int)($stats['deleted'] ?? 0)) > 0,
+                + (int)($stats['trashed'] ?? 0)) > 0,
         ];
     }
 }

@@ -625,8 +625,17 @@ class calendar_sync {
         $message->name = 'notification';
         $message->userfrom = \core_user::get_noreply_user();
         $message->userto = $editor;
-        $message->subject = get_string('calsync_failed_subject_' . $op, 'googlemeet', $a);
-        $message->fullmessage = get_string('calsync_failed_body_' . $op, 'googlemeet', $a);
+        // Anything but a deletion is reported as a failed update, the operation every caller but delete runs.
+        [$message->subject, $message->fullmessage] = match ($op) {
+            'delete' => [
+                get_string('calsync_failed_subject_delete', 'googlemeet', $a),
+                get_string('calsync_failed_body_delete', 'googlemeet', $a),
+            ],
+            default => [
+                get_string('calsync_failed_subject_update', 'googlemeet', $a),
+                get_string('calsync_failed_body_update', 'googlemeet', $a),
+            ],
+        };
         $message->fullmessageformat = FORMAT_PLAIN;
         $message->fullmessagehtml = text_to_html($message->fullmessage, false, false, true);
         $message->smallmessage = $message->subject;

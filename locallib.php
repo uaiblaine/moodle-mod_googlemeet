@@ -169,47 +169,6 @@ function googlemeet_handle_subscription_action($googlemeet, $cm) {
 }
 
 /**
- * Print googlemeet heading.
- * @param object $googlemeet
- * @param object $cm
- * @param object $course
- * @param bool $notused This variable is no longer used.
- * @return void
- */
-function googlemeet_print_heading($googlemeet, $cm, $course, $notused = false) {
-    global $OUTPUT;
-    echo $OUTPUT->heading(format_string($googlemeet->name), 2);
-}
-
-/**
- * Print googlemeet introduction.
- * @param object $googlemeet
- * @param object $cm
- * @param object $course
- * @param bool $ignoresettings print even if not specified in modedit
- * @return void
- */
-function googlemeet_print_intro($googlemeet, $cm, $course, $ignoresettings = false) {
-    global $OUTPUT;
-
-    $options = [];
-    if (!empty($googlemeet->displayoptions)) {
-        // JSON-encoded display options; the googlemeet table has no such column.
-        $decoded = json_decode($googlemeet->displayoptions, true);
-        if ($decoded !== null) {
-            $options = $decoded;
-        }
-    }
-    if ($ignoresettings || !empty($options['printintro'])) {
-        if (trim(strip_tags($googlemeet->intro))) {
-            echo $OUTPUT->box_start('mod_introbox', 'googlemeetintro');
-            echo format_module_intro('googlemeet', $googlemeet, $cm->id);
-            echo $OUTPUT->box_end();
-        }
-    }
-}
-
-/**
  * Build the unsaved googlemeet_events rows from the date, time and recurrence settings.
  *
  * Holiday periods are read from the database, so googlemeet_save_holidays() must run first.
@@ -1664,6 +1623,9 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
         'activitydraftcount' => $canmanagequestions
             ? $questionservice->count_activity_drafts($googlemeet, $cm, $context) : 0,
         'generationqueued' => $questionservice->is_generation_queued($recording->id),
+        // Generating questions is a paid Gemini call: the button follows the web service's gate.
+        'cangeneratequestions' => $aienabled && $canmanagequestions
+            && has_capability('mod/googlemeet:generateai', $context),
         'summaryactive' => $summaryactive,
         // The Questions tab is never initially active (Summary is, or Materials with tab=materials).
         'questionsactive' => false,
@@ -1856,26 +1818,12 @@ function googlemeet_get_recording_seek_url(string $webviewlink, int $seconds): s
  * @return string|null The normalised URL, or null when the text holds no Meet room code.
  */
 function googlemeet_clear_url($url) {
-    $pattern = "/meet.google.com\/[a-zA-Z0-9]{3}-[a-zA-Z0-9]{4}-[a-zA-Z0-9]{3}/";
-    preg_match($pattern, $url, $matches, PREG_OFFSET_CAPTURE);
-
-    if ($matches) {
-        return 'https://' . $matches[0][0];
+    // Literal dots and a URL rebuilt from the code alone: the host of the result is always meet.google.com.
+    if (preg_match('~meet\.google\.com/([a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3})~i', (string)$url, $matches)) {
+        return 'https://meet.google.com/' . $matches[1];
     }
 
     return null;
-}
-
-/**
- * Whether the activity has any recording outside the trash.
- *
- * @param int $googlemeetid
- * @return boolean
- */
-function googlemeet_has_recording($googlemeetid) {
-    global $DB;
-
-    return $DB->record_exists('googlemeet_recordings', ['googlemeetid' => $googlemeetid, 'deleted' => 0]);
 }
 
 /**
@@ -1964,15 +1912,6 @@ function googlemeet_get_users_to_notify($eventid, int $kind = 0) {
 }
 
 /**
- * Returns the sessions with a reminder due now (one entry per session and reminder kind).
- *
- * @return stdClass[]
- */
-function googlemeet_get_future_events() {
-    return \mod_googlemeet\local\reminders::get_due_events(time());
-}
-
-/**
  * Find googlemeet instances whose recurrence looks abandoned: they still schedule future
  * sessions and have recorded at least once, but have had no recording in the last $weeks weeks.
  *
@@ -2055,17 +1994,6 @@ function googlemeet_send_stale_alert(stdClass $info): void {
         $message->contexturlname = get_string('stalerecurrence_editlink', 'mod_googlemeet');
         message_send($message);
     }
-}
-
-/**
- * Send a reminder to a student about the event (see \mod_googlemeet\local\reminders).
- *
- * @param object $user
- * @param object $event due reminder row (optionally with ->kind)
- * @return void
- */
-function googlemeet_send_notification($user, $event) {
-    \mod_googlemeet\local\reminders::send($user, $event);
 }
 
 /**
@@ -2190,16 +2118,15 @@ function googlemeet_get_upcoming_events($googlemeetid, $maxevents = 3, bool $nol
 
     // Ensure maxevents is within bounds unless the full schedule explicitly requests all rows.
     $maxevents = max(1, min(10, (int)$maxevents));
-    $limitclause = $nolimit ? '' : ' LIMIT ' . $maxevents;
 
     // Get events that are upcoming or currently in progress (started less than duration ago).
     $sql = "SELECT id, eventdate, duration
               FROM {googlemeet_events}
              WHERE googlemeetid = :googlemeetid
                AND (eventdate + duration) > :now
-          ORDER BY eventdate ASC" . $limitclause;
+          ORDER BY eventdate ASC";
 
-    $events = $DB->get_records_sql($sql, ['googlemeetid' => $googlemeetid, 'now' => $now]);
+    $events = $DB->get_records_sql($sql, ['googlemeetid' => $googlemeetid, 'now' => $now], 0, $nolimit ? 0 : $maxevents);
     $upcomingevents = [];
 
     if ($events) {

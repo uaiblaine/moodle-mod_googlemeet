@@ -192,4 +192,33 @@ final class ops_status_test extends \advanced_testcase {
         $this->assertInstanceOf(\admin_externalpage::class, $page);
         $this->assertSame(['moodle/site:config'], $page->req_capability);
     }
+
+    /**
+     * Every recorded status and Calendar kind has its own label; an unknown value is shown as safe text.
+     */
+    public function test_status_and_kind_labels(): void {
+        $statuses = [
+            sync_log::STATUS_QUEUED => 'adminstatus_status_queued',
+            sync_log::STATUS_RUNNING => 'adminstatus_status_running',
+            sync_log::STATUS_SUCCESS => 'adminstatus_status_success',
+            sync_log::STATUS_RETRY => 'adminstatus_status_retry',
+            sync_log::STATUS_EXHAUSTED => 'adminstatus_status_exhausted',
+            sync_log::STATUS_ERROR => 'adminstatus_status_error',
+        ];
+        foreach ($statuses as $status => $key) {
+            $this->assertSame(get_string($key, 'googlemeet'), ops_status::status_label($status));
+        }
+        $this->assertSame('-', ops_status::status_label(''));
+        $this->assertSame('weird_value', ops_status::status_label('weird_value<>'));
+
+        $this->assertSame(
+            get_string('adminstatus_kind_calupdate', 'googlemeet'),
+            ops_status::kind_label(sync_log::KIND_CALENDAR_UPDATE)
+        );
+        $this->assertSame(
+            get_string('adminstatus_kind_caldelete', 'googlemeet'),
+            ops_status::kind_label(sync_log::KIND_CALENDAR_DELETE)
+        );
+        $this->assertSame('manual', ops_status::kind_label('manual"'));
+    }
 }

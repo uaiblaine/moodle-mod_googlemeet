@@ -164,6 +164,25 @@ final class client_test extends \advanced_testcase {
     }
 
     /**
+     * A SubRip transcript, which the Drive query lists, is selected and its cue numbers and times dropped.
+     */
+    public function test_subrip_transcript_is_selected(): void {
+        $client = $this->make_client();
+        $srt = "1\n00:00:01,000 --> 00:00:04,000\nHola a todos.\n\n2\n00:00:05,000 --> 00:00:08,000\nEmpezamos.\n";
+        $service = new client_test_fake_drive_service([
+            ['files' => [(object)['id' => 'srt-1', 'name' => 'Class.srt', 'mimeType' => 'application/x-subrip']]],
+            $srt,
+        ]);
+
+        $method = new \ReflectionMethod(client::class, 'find_transcript_for_recording');
+        $result = $method->invoke($client, $service, '', 'Class.mp4');
+
+        $this->assertSame(['fileid' => 'srt-1', 'content' => 'Hola a todos. Empezamos.'], $result);
+        $this->assertCount(2, $service->calls);
+        $this->assertSame('media', $service->calls[1]['params']['alt']);
+    }
+
+    /**
      * Userinfo is fetched once per session and served from the session cache afterwards.
      */
     public function test_userinfo_is_cached_per_session(): void {

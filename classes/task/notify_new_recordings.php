@@ -315,14 +315,18 @@ class notify_new_recordings extends \core\task\adhoc_task {
                 'user' => (string)($user->firstname ?? ''),
             ];
 
-            $subject = get_string('recordingavailable_subject' . ($isone ? '_one' : '_many'), 'googlemeet', $a);
+            $subject = $isone
+                ? get_string('recordingavailable_subject_one', 'googlemeet', $a)
+                : get_string('recordingavailable_subject_many', 'googlemeet', $a);
             $greeting = $a->user !== ''
                 ? get_string('recordingnotice_greeting', 'googlemeet', $a->user)
                 : get_string('recordingnotice_greeting_noname', 'googlemeet');
             $intro = $isone
                 ? get_string('recordingnotice_intro_one', 'googlemeet', $name)
                 : get_string('recordingnotice_intro_many', 'googlemeet', $a);
-            $buttonlabel = get_string('recordingnotice_button' . ($isone ? '_one' : '_many'), 'googlemeet');
+            $buttonlabel = $isone
+                ? get_string('recordingnotice_button_one', 'googlemeet')
+                : get_string('recordingnotice_button_many', 'googlemeet');
             $closing = get_string('recordingnotice_closing', 'googlemeet');
             $title = $isone
                 ? get_string('recordingnotice_title_one', 'googlemeet')

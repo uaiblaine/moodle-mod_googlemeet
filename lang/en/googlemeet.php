@@ -140,6 +140,13 @@ $string['aicontext'] = 'Teaching context for AI';
 $string['aicontext_desc'] = 'Short description of the kind of classes on this site (subject area, audience, exam or qualification being prepared). It is added to every Gemini prompt so summaries, topics, chapters and practice questions use the right focus and terminology. Example: "Live preparation classes for nursing licensing exams". Leave empty to send no context. Maximum 500 characters.';
 $string['aimodel'] = 'AI Model';
 $string['aimodel_desc'] = 'Select the Gemini model to use for analysis. Flash is faster and has a generous free tier, Pro is more capable but has lower free limits.';
+$string['aimodel_note_capable'] = 'More capable';
+$string['aimodel_note_default'] = 'Stable, default';
+$string['aimodel_note_fallback'] = 'Stable, cheap/fast, fallback';
+$string['aimodel_note_fast'] = 'Fast';
+$string['aimodel_note_preview'] = 'Preview';
+$string['aimodel_note_previewcapable'] = 'Preview, most capable';
+$string['aimodel_option'] = '{$a->name} ({$a->note})';
 $string['aireview_bulk_hint'] = 'Open each lesson to review it, or publish them all at once if you have already checked them.';
 $string['aireview_bulk_message'] = '{$a} AI summaries are waiting for your review: students cannot see them yet.';
 $string['aireview_bulk_message_one'] = '1 AI summary is waiting for your review: students cannot see it yet.';
@@ -308,7 +315,7 @@ $string['emailcontent_default'] = '<p>Hi %userfirstname%,</p>
 <p><b>%googlemeetname%</b></p>
 <p>When: %eventdate% %duration% %timezone%</p>
 <p>Access link: %url%</p>';
-$string['emailcontent_help'] = 'When a notification is sent to a student, it takes the email content from this field. The following wildcards can be used:
+$string['emailcontent_desc'] = 'When a notification is sent to a student, it takes the email content from this field. The following wildcards can be used:
 <ul>
 <li>%userfirstname%</li>
 <li>%userlastname%</li>
@@ -465,6 +472,7 @@ $string['messageprovider:notification'] = 'Google Meet event start reminder';
 $string['messageprovider:recordingavailable'] = 'Google Meet recording available';
 $string['messageprovider:stalerecurrence'] = 'Abandoned live-class recurrence alert';
 $string['minutesbefore'] = 'Minutes before';
+$string['minutesbefore_desc'] = 'Default for new activities: how many minutes before each session the reminder is sent.';
 $string['minutesbefore_help'] = 'Number of minutes before the start of the event when the notification should be send.';
 $string['mobile_chapters'] = 'Chapters';
 $string['mobile_keypoints'] = 'Key points';
@@ -487,9 +495,10 @@ $string['noeventswithperiod'] = 'With the selected days and "Repeat every N week
 $string['noholidayperiods'] = 'No exclusion periods defined';
 $string['notification'] = 'Notification';
 $string['notificationexpanded'] = 'Notification expanded';
+$string['notificationexpanded_desc'] = 'Show the "Notification" settings as expanded by default when creating new Room.';
 $string['notify'] = 'Send notification to the student';
+$string['notify_desc'] = 'Default for new activities: send students a reminder before each session starts.';
 $string['notify_help'] = 'If checked, a notification will be sent to the student about the start date of the event.';
-$string['notifycationexpanded_desc'] = 'Show the "Notification" settings as expanded by default when creating new Room.';
 $string['notifyhoursbefore'] = 'Early reminder';
 $string['notifyhoursbefore_desc'] = 'Default for new activities: send a second reminder this many hours before each session, in addition to the "Minutes before" one. "Off" disables it.';
 $string['notifyhoursbefore_help'] = 'Sends a second reminder this many hours before each session (for example the day before), in addition to the reminder sent "Minutes before". Each reminder is sent once per student and session. Requires "Send notification to the student".';
@@ -700,7 +709,6 @@ $string['recording_watch_cta'] = 'Open class';
 $string['recordingavailable_body'] = '{$a->count} new recording(s) are available in {$a->name}.' . "\n\n" . 'Open the activity: {$a->url}';
 $string['recordingavailable_body_many'] = 'Hi {$a->user},' . "\n\n" . '{$a->count} new recordings are now available in "{$a->name}".' . "\n\n" . 'Watch them here: {$a->url}';
 $string['recordingavailable_body_one'] = 'Hi {$a->user},' . "\n\n" . 'A new recording is now available in "{$a->name}".' . "\n\n" . 'Watch it here: {$a->url}';
-$string['recordingavailable_subject'] = '{$a->count} new recording(s) available: {$a->name}';
 $string['recordingavailable_subject_many'] = '{$a->count} new recordings available in {$a->name}';
 $string['recordingavailable_subject_one'] = 'New recording available in {$a->name}';
 $string['recordingfilter'] = 'Recording name filter';
@@ -846,7 +854,6 @@ $string['subscriberecordings'] = 'Get alerts';
 $string['subtitlelanguage'] = 'Subtitle language';
 $string['subtitlelanguage_desc'] = 'Language code used when extracting auto-generated subtitles from Google Drive recordings (e.g. es, en, pt-BR). Defaults to es.';
 $string['sync_already_running'] = 'Sync already in progress. Try again in a few minutes.';
-$string['sync_deleted_recordings'] = '{$a} recording(s) removed';
 $string['sync_enrichment_queued'] = 'Transcripts, notes and permissions are being processed in the background.';
 $string['sync_help_title'] = 'How sync works';
 $string['sync_info'] = 'Wait at least 10 minutes for the recording file to be generated and saved in "My Drive > Meet Recordings" of the organizer.

@@ -295,7 +295,9 @@ final class calendar_sync_test extends \advanced_testcase {
         $creator = $this->getDataGenerator()->create_user(['email' => 'profe@example.com']);
         [$record, $cm] = $this->make_linked_activity($creator);
 
+        // The legacy entry point, deprecated since 5.2 but still a path deletion_context() must recognise.
         course_delete_module($cm->id);
+        $this->assertDebuggingCalled();
         $this->assertFalse($DB->record_exists('googlemeet', ['id' => $record->id]));
         $tasks = \core\task\manager::get_adhoc_tasks(calendar_delete_event::class);
         $this->assertCount(1, $tasks);

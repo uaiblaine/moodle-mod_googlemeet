@@ -250,7 +250,7 @@ final class delete_cascade_test extends \advanced_testcase {
         $a = $this->create_recording($googlemeet->id);
         $this->add_dependents($googlemeet, $cm, $context, $a, $student->id);
 
-        course_delete_module($cm->id);
+        \core_courseformat\formatactions::cm($googlemeet->course)->delete($cm->id);
 
         $this->assertFalse($DB->record_exists('googlemeet', ['id' => $googlemeet->id]));
         $this->assertFalse($DB->record_exists('googlemeet_recordings', ['id' => $a]));

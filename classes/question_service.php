@@ -786,7 +786,8 @@ class question_service {
             $rows = $group['rows'];
             $result = [
                 'recordingid' => (int)$recordingid,
-                'name' => format_string($group['recording']->name, true, ['context' => $context]),
+                // Plain spelling: question_review.js escapes the name itself.
+                'name' => format_string($group['recording']->name, true, ['context' => $context, 'escape' => false]),
                 'count' => count($rows),
                 'published' => 0,
                 'success' => true,

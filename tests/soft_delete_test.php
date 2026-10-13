@@ -153,7 +153,8 @@ final class soft_delete_test extends \advanced_testcase {
         $this->assertSame(\mod_googlemeet\local\recording_cleanup::TRASH_SYNC, $old->trashreason);
         $this->assertTrue($DB->record_exists('googlemeet_ai_analysis', ['id' => $analysisid, 'recordingid' => $oldid]));
         $this->assertSame(1, (int)$result['stats']['trashed']);
-        $this->assertSame(0, (int)$result['stats']['deleted']);
+        // Sync never hard-deletes a recording, so it reports no 'deleted' counter.
+        $this->assertArrayNotHasKey('deleted', $result['stats']);
     }
 
     /**
@@ -230,7 +231,7 @@ final class soft_delete_test extends \advanced_testcase {
         ]);
         try {
             \mod_googlemeet_external::restore_recording($otherid, $cm->id);
-            $this->fail('Expected invalidrecord for a recording from another instance.');
+            $this->fail('Expected recordingnotfound for a recording from another instance.');
         } catch (\moodle_exception $e) {
             $this->assertSame('recordingnotfound', $e->errorcode);
             $this->assertStringNotContainsString('{$a}', $e->getMessage());
@@ -261,7 +262,7 @@ final class soft_delete_test extends \advanced_testcase {
         $otherid = $this->create_recording($othergooglemeet->id, 'drive-other-trash');
         try {
             \mod_googlemeet_external::trash_recording($otherid, $cm->id);
-            $this->fail('Expected invalidrecord for a recording from another instance.');
+            $this->fail('Expected recordingnotfound for a recording from another instance.');
         } catch (\moodle_exception $e) {
             $this->assertSame('recordingnotfound', $e->errorcode);
             $this->assertStringNotContainsString('{$a}', $e->getMessage());
@@ -275,7 +276,7 @@ final class soft_delete_test extends \advanced_testcase {
         ]);
         try {
             \mod_googlemeet_external::trash_recording($alreadydeletedid, $cm->id);
-            $this->fail('Expected invalidrecord for an already-deleted recording.');
+            $this->fail('Expected recordingnotfound for an already-deleted recording.');
         } catch (\moodle_exception $e) {
             $this->assertSame('recordingnotfound', $e->errorcode);
             $this->assertStringNotContainsString('{$a}', $e->getMessage());
@@ -307,7 +308,7 @@ final class soft_delete_test extends \advanced_testcase {
         ]);
         try {
             \mod_googlemeet_external::purge_recording($otherid, $cm->id);
-            $this->fail('Expected invalidrecord for a recording from another instance.');
+            $this->fail('Expected recordingnotfound for a recording from another instance.');
         } catch (\moodle_exception $e) {
             $this->assertSame('recordingnotfound', $e->errorcode);
             $this->assertStringNotContainsString('{$a}', $e->getMessage());

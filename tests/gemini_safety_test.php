@@ -39,7 +39,6 @@ final class gemini_safety_test extends \advanced_testcase {
     private function parse(string $method, $response) {
         $client = new gemini_client();
         $reflection = new \ReflectionMethod($client, $method);
-        $reflection->setAccessible(true);
         return $reflection->invoke($client, json_encode($response));
     }
 

@@ -38,9 +38,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class mod_googlemeet_mod_form extends moodleform_mod {
-    /** @var array Options for date_time_selector fields (not referenced by this form). */
-    public static $datefieldoptions = ['optional' => true];
-
     /**
      * Defines forms elements
      */
@@ -270,8 +267,8 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             $repeatno = $DB->count_records('googlemeet_holidays', ['googlemeetid' => $this->current->instance]);
         }
 
-        // Use repeat_elements for dynamic holiday periods.
-        $this->repeat_elements(
+        // Use repeat_elements for dynamic holiday periods; it returns the rows shown, those added with "Add" included.
+        $holidayrows = $this->repeat_elements(
             $holidayelements,
             $repeatno,
             [
@@ -286,7 +283,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         );
 
         // Disable holiday fields if recurrence is not enabled.
-        for ($i = 0; $i < max($repeatno, 1); $i++) {
+        for ($i = 0; $i < $holidayrows; $i++) {
             $mform->disabledIf("holidayname[$i]", 'addmultiply', 'notchecked');
             $mform->disabledIf("holidaystartdate[$i]", 'addmultiply', 'notchecked');
             $mform->disabledIf("holidayenddate[$i]", 'addmultiply', 'notchecked');
@@ -881,7 +878,6 @@ class mod_googlemeet_mod_form extends moodleform_mod {
      */
     private function validate_url(string $url, array $errors) {
         if (googlemeet_clear_url($url) == null) {
-            $errors['generateurlgroup'] = get_string('url_failed', 'googlemeet');
             $errors['url'] = get_string('url_failed', 'googlemeet');
         }
         return $errors;

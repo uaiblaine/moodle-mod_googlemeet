@@ -94,6 +94,39 @@ final class hub_ui_test extends \advanced_testcase {
     }
 
     /**
+     * The "Generate questions" button follows the web service's gate: managequestions alone, which
+     * non-editing teachers hold, does not show it; generateai does.
+     */
+    public function test_generate_questions_button_needs_generateai(): void {
+        global $DB;
+        $this->resetAfterTest();
+        set_config('enableai', 1, 'googlemeet');
+        set_config('geminiapikey', 'test-key', 'googlemeet');
+
+        $course = $this->getDataGenerator()->create_course();
+        $googlemeet = $this->getDataGenerator()->create_module('googlemeet', ['course' => $course->id]);
+        $editor = $this->getDataGenerator()->create_and_enrol($course, 'editingteacher');
+        $teacher = $this->getDataGenerator()->create_and_enrol($course, 'teacher');
+        $now = time();
+        $id = $DB->insert_record('googlemeet_recordings', (object)[
+            'googlemeetid' => $googlemeet->id, 'recordingid' => uniqid('drive-', true), 'name' => 'Clase',
+            'createdtime' => $now, 'duration' => '01:00:00', 'webviewlink' => 'https://drive.google.com/file/d/x/view',
+            'visible' => 1, 'timemodified' => $now,
+        ]);
+        $recording = $DB->get_record('googlemeet_recordings', ['id' => $id]);
+
+        $this->setUser($teacher);
+        $html = $this->render_hub($googlemeet, $recording);
+        $this->assertStringContainsString('id="googlemeet-questions-tab"', $html);
+        $this->assertStringNotContainsString('googlemeet-question-generate', $html);
+
+        // Control: the editing teacher holds generateai and gets the button.
+        $this->setUser($editor);
+        $html = $this->render_hub($googlemeet, $recording);
+        $this->assertStringContainsString('googlemeet-question-generate', $html);
+    }
+
+    /**
      * The continue label names the chapter when the remembered second is a chapter start.
      */
     public function test_resume_label(): void {

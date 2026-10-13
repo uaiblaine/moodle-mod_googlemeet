@@ -117,7 +117,7 @@ final class sync_manager_test extends \advanced_testcase {
      */
     public function test_task_runs_as_teacher_and_reports_result(): void {
         [$gm, , $teacher] = $this->make_activity();
-        $this->fake_runner(['inserted' => 2, 'updated' => 0, 'deleted' => 0, 'trashed' => 0, 'restored' => 0, 'found' => 5]);
+        $this->fake_runner(['inserted' => 2, 'updated' => 0, 'trashed' => 0, 'restored' => 0, 'found' => 5]);
         $this->setUser($teacher);
         sync_manager::request($gm, (int)$teacher->id);
 

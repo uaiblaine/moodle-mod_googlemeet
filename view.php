@@ -139,8 +139,7 @@ if ($hasinvalidmeeturl && has_capability('moodle/course:manageactivities', $cont
 // Asks the organiser to link Google again when the Meet attendance scope is missing (other
 // teachers only get an informative note).
 echo \mod_googlemeet\local\attendance\scope::relink_notice($googlemeet, $context);
-// The activity header already shows the title and description: no googlemeet_print_heading()
-// or googlemeet_print_intro() here.
+// The activity header already shows the title and description: this page prints neither.
 
 if ($recording) {
     googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording);

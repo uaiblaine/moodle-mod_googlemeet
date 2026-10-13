@@ -145,6 +145,18 @@ final class subtitle_extractor_test extends \advanced_testcase {
     }
 
     /**
+     * Entities left after the XML parse (a double-encoded caption) are decoded as HTML.
+     */
+    public function test_parse_xml_double_encoded_entities(): void {
+        $xml = '<transcript>'
+            . '<text start="5.0" dur="2">It&amp;#39;s &amp;quot;fine&amp;quot;</text>'
+            . '</transcript>';
+        $extractor = $this->make_extractor();
+
+        $this->assertSame("0:05\nIt's \"fine\"", $extractor->parse_xml($xml));
+    }
+
+    /**
      * Nodes with empty text content are silently skipped.
      *
      */
@@ -157,11 +169,8 @@ final class subtitle_extractor_test extends \advanced_testcase {
         $extractor = $this->make_extractor();
         $result = $extractor->parse_xml($xml);
 
-        $this->assertStringContainsString('Real text', $result);
-
-        // Empty and whitespace-only nodes add no lines: only the timestamp and "Real text" remain.
-        $lines = array_filter(explode("\n", $result), fn($l) => trim($l) !== '');
-        $this->assertCount(2, array_values($lines));
+        // Empty and whitespace-only nodes add no line and no timestamp: the first marker is the 0:15 of "Real text".
+        $this->assertSame("0:15\nReal text", $result);
     }
 
     /**

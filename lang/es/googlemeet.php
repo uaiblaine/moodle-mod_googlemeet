@@ -141,6 +141,13 @@ $string['aicontext'] = 'Contexto docente para la IA';
 $string['aicontext_desc'] = 'Descripción breve del tipo de clases de este sitio (materia, público, examen o titulación que se prepara). Se añade a cada petición a Gemini para que los resúmenes, temas, capítulos y preguntas de práctica usen el enfoque y la terminología adecuados. Ejemplo: "Clases en directo de preparación de exámenes de enfermería". Déjalo vacío para no enviar contexto. Máximo 500 caracteres.';
 $string['aimodel'] = 'Modelo de IA';
 $string['aimodel_desc'] = 'Selecciona el modelo de Gemini que se usará para el análisis. Flash es más rápido y tiene un nivel gratuito generoso; Pro ofrece mayor capacidad, pero tiene límites gratuitos más bajos.';
+$string['aimodel_note_capable'] = 'Más capaz';
+$string['aimodel_note_default'] = 'Estable, por defecto';
+$string['aimodel_note_fallback'] = 'Estable, barato/rápido, alternativa';
+$string['aimodel_note_fast'] = 'Rápido';
+$string['aimodel_note_preview'] = 'Vista previa';
+$string['aimodel_note_previewcapable'] = 'Vista previa, el más capaz';
+$string['aimodel_option'] = '{$a->name} ({$a->note})';
 $string['aireview_bulk_hint'] = 'Abre cada clase para revisarlo o publícalos todos a la vez si ya los has comprobado.';
 $string['aireview_bulk_message'] = '{$a} resúmenes IA esperan tu revisión: los alumnos aún no los ven.';
 $string['aireview_bulk_message_one'] = '1 resumen IA espera tu revisión: los alumnos aún no lo ven.';
@@ -309,7 +316,7 @@ $string['emailcontent_default'] = '<p>Hola %userfirstname%,</p>
 <p><b>%googlemeetname%</b></p>
 <p>Cuándo: %eventdate% %duration% %timezone%</p>
 <p>Enlace de acceso: %url%</p>';
-$string['emailcontent_help'] = 'Cuando se envía una notificación a estudiantes, el contenido del correo se toma de este campo. Se pueden usar los siguientes comodines:
+$string['emailcontent_desc'] = 'Cuando se envía una notificación a estudiantes, el contenido del correo se toma de este campo. Se pueden usar los siguientes comodines:
 <ul>
 <li>%userfirstname%</li>
 <li>%userlastname%</li>
@@ -466,6 +473,7 @@ $string['messageprovider:notification'] = 'Recordatorio de inicio de clase';
 $string['messageprovider:recordingavailable'] = 'Grabación de Google Meet disponible';
 $string['messageprovider:stalerecurrence'] = 'Aviso de recurrencia de clases en directo abandonada';
 $string['minutesbefore'] = 'Minutos antes';
+$string['minutesbefore_desc'] = 'Valor por defecto para las nuevas actividades: cuántos minutos antes de cada sesión se envía el recordatorio.';
 $string['minutesbefore_help'] = 'Número de minutos antes del inicio de la sesión en que debe enviarse la notificación.';
 $string['mobile_chapters'] = 'Capítulos';
 $string['mobile_keypoints'] = 'Puntos clave';
@@ -488,9 +496,10 @@ $string['noeventswithperiod'] = 'Con los días seleccionados y el período de "R
 $string['noholidayperiods'] = 'No hay períodos de exclusión definidos';
 $string['notification'] = 'Recordatorio de clase';
 $string['notificationexpanded'] = 'Notificación expandida';
+$string['notificationexpanded_desc'] = 'Mostrar la configuración de "Notificación" expandida por defecto al crear una sala nueva.';
 $string['notify'] = 'Enviar notificación a estudiantes';
+$string['notify_desc'] = 'Valor por defecto para las nuevas actividades: enviar a estudiantes un recordatorio antes del inicio de cada sesión.';
 $string['notify_help'] = 'Si se marca, se enviará una notificación a estudiantes sobre la fecha de inicio de la sesión.';
-$string['notifycationexpanded_desc'] = 'Mostrar la configuración de "Notificación" expandida por defecto al crear una sala nueva.';
 $string['notifyhoursbefore'] = 'Recordatorio anticipado';
 $string['notifyhoursbefore_desc'] = 'Valor por defecto para las nuevas actividades: enviar un segundo recordatorio estas horas antes de cada sesión, además del de «Minutos antes». «Desactivado» lo anula.';
 $string['notifyhoursbefore_help'] = 'Envía un segundo recordatorio estas horas antes de cada sesión (por ejemplo, el día anterior), además del que se envía «Minutos antes». Cada recordatorio se envía una sola vez por alumno y sesión. Requiere «Enviar notificación a estudiantes».';
@@ -701,7 +710,6 @@ $string['recording_watch_cta'] = 'Abrir clase';
 $string['recordingavailable_body'] = 'Hay {$a->count} nueva(s) grabación(es) disponible(s) en {$a->name}.' . "\n\n" . 'Abre la actividad: {$a->url}';
 $string['recordingavailable_body_many'] = 'Hola {$a->user},' . "\n\n" . 'Tienes {$a->count} grabaciones nuevas esperándote en «{$a->name}», perfectas para repasar a tu ritmo.' . "\n\n" . 'Verlas ahora: {$a->url}';
 $string['recordingavailable_body_one'] = 'Hola {$a->user},' . "\n\n" . '¿No pudiste asistir o quieres repasar con calma? Ya tienes disponible la grabación de la clase en «{$a->name}».' . "\n\n" . 'Verla ahora: {$a->url}';
-$string['recordingavailable_subject'] = '{$a->count} nueva(s) grabación(es) disponible(s): {$a->name}';
 $string['recordingavailable_subject_many'] = '{$a->count} grabaciones nuevas te esperan en {$a->name}';
 $string['recordingavailable_subject_one'] = 'Ya puedes ver la grabación de {$a->name}';
 $string['recordingfilter'] = 'Filtro de nombre de grabación';
@@ -847,7 +855,6 @@ $string['subscriberecordings'] = 'Recibir avisos';
 $string['subtitlelanguage'] = 'Idioma de los subtítulos';
 $string['subtitlelanguage_desc'] = 'Código de idioma usado al extraer los subtítulos generados automáticamente de las grabaciones de Google Drive (p. ej. es, en, pt-BR). El valor por defecto es es.';
 $string['sync_already_running'] = 'Sincronización ya en curso, inténtalo en unos minutos.';
-$string['sync_deleted_recordings'] = '{$a} grabación(es) eliminada(s)';
 $string['sync_enrichment_queued'] = 'Las transcripciones, notas y permisos se están procesando en segundo plano.';
 $string['sync_help_title'] = 'Cómo funciona la sincronización';
 $string['sync_info'] = 'Esperar al menos 10 minutos para que el archivo de la grabación se genere y se guarde en "Mi unidad > Meet Recordings" del organizador.

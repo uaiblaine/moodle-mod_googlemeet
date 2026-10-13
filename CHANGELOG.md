@@ -3,6 +3,73 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.6 (unreleased)
+- Queueing AI question generation (`mod_googlemeet_queue_generate_questions`) needs
+  `mod/googlemeet:generateai` as well as `managequestions`, like every other paid Gemini call, and the
+  recording hub hides the "Generate questions" button from users without it (non-editing teachers by
+  default).
+- Pasted or detected-language-less analyses no longer default to Spanish; readers fall back to the
+  current language.
+- The attendance session query bounds the session start directly, so the new `eventdate` index can
+  serve it.
+
+- Web services: the question actions (publish, unpublish, discard, update, queue generation and
+  "Publish all drafts") no longer take a `sesskey` argument. Core already checks the session key of
+  every AJAX request, and the argument kept token clients (and the Moodle App) out. A caller that
+  still sends it gets an "invalid parameter" error.
+- Web services: `analyze_transcript` sends the pasted transcript to Gemini, a paid call, so it now
+  requires `mod/googlemeet:generateai` as well as `mod/googlemeet:editrecording`, like
+  `generate_ai_analysis`. A Gemini safety block now returns its user message without the debug
+  detail.
+- Web services: plain-text returns are typed. The recording name and display name and the question
+  name are `PARAM_TEXT`; the display name goes through `format_string()` first, so a name that ends
+  in a bare `<` no longer fails the whole response. The visibility flag returned when a recording
+  is shown or hidden is a boolean. Every legacy function reads its validated parameters, not the
+  raw arguments.
+- Tests: the web service tests call through `call_external_function()`, as the AJAX layer does.
+- Capabilities: `mod/googlemeet:generateai` is flagged as a personal-data risk (it sends
+  transcripts, and with the video fallback the video, to Google Gemini) and
+  `mod/googlemeet:removerecording` as a data-loss risk.
+- Database: indexes for the cron queries that scan every activity: `googlemeet_events(eventdate)`
+  (reminders, past-event cleanup), `googlemeet_recordings(deleted, trashreason, timedeleted)` (trash
+  purge) and `googlemeet_ai_analysis(status, nextretry)` (due analyses), which replaces the
+  single-column `status` index.
+- Backup and restore: a restore with user data no longer recreates pending, processing or failed AI
+  analyses either, so a course copy never queues its own paid Gemini run; completed analyses travel
+  as before.
+- AI: `yt-dlp` runs without a shell, only for an https `drive.google.com` link, and is killed after
+  two minutes instead of hanging the task. The Gemini File API status poll waits 2, 4, 8, 16, then
+  30 seconds between checks within the same total budget, and waits out a 429 or 503 (honouring
+  `Retry-After`) instead of failing at once. An analysis that hits a PHP error is marked failed
+  instead of staying "processing". When Gemini names no language the analysis language is left
+  empty instead of `es`.
+- Code: dead `ai_service` methods (`generate_analysis_sync()`, `delete_analysis()`,
+  `get_pending_analyses()`, `reset_stale_processing()`, `get_status_counts()`) and the runtime
+  checks for the `chapters` column are removed. `cli/process_transcripts.php` now uses
+  `subtitle_extractor::extract()` and the `ai_service` failure policy instead of copies of them.
+- Strings: every lang string is requested by its literal id (admin status, attendance labels,
+  Calendar failure notices, new-recording notices), and an unknown status or kind is shown as plain
+  text instead of a missing-string marker. The settings `notificationexpanded`, `notify`,
+  `minutesbefore` and `emailcontent` have their own `_desc` strings (the misspelt
+  `notifycationexpanded_desc` and the unused `emailcontent_help`, `recordingavailable_subject` and
+  `sync_deleted_recordings` are gone), and the AI model notes ("Stable, default", ...) are
+  translatable.
+- Sync: SubRip (`.srt`) transcripts, which the Drive query already listed, are now used. The sync
+  result no longer carries a `deleted` counter that was never set (a recording gone from Drive is
+  trashed).
+- Activity settings: holiday rows added with the "Add" button are disabled with the recurrence off,
+  like the saved ones. The room URL is rebuilt on `meet.google.com` from its code, so a text such as
+  `meetXgoogleYcom/abc-defg-hij` is rejected instead of stored.
+- Questions: the activity-wide publish reports recording names in their plain spelling, so
+  "A & B" no longer shows as "A &amp; B" in the review panel.
+- Code: dead functions (`googlemeet_print_heading()`, `googlemeet_print_intro()`,
+  `googlemeet_has_recording()`, `googlemeet_get_future_events()`, `googlemeet_send_notification()`,
+  `googlemeet_delete_recording_dependents()`), the empty `db/install.php`, an unused form property,
+  `ops_status::STUCK_PROCESSING_SECONDS` and unused parameters are removed; the upcoming sessions
+  query uses the DML limit argument instead of a hand-written `LIMIT`.
+- Tests: the backup review-state test fails instead of skipping when the analyses are missing; the
+  deprecated `course_delete_module()` is only called where its path is under test.
+
 ## 2.30.1+uai.5 (unreleased)
 - Privacy: a user's reminders of one activity are exported together, each with its session and
   kind ("Minutes before" or "Early reminder"); before, each reminder overwrote the previous one and
