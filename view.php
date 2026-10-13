@@ -100,9 +100,8 @@ if ($rview === 'cards' || $rview === 'list') {
 // An empty or invalid stored Meet URL must not make the activity (recordings included) unusable:
 // it only hides the join CTA, and an invalid one is reported to the users who can fix it.
 $url = trim((string)$googlemeet->url);
-$pattern = "/^https:\/\/meet.google.com\/[-a-zA-Z0-9@:%._\+~#=]{3}-[-a-zA-Z0-9@:%._\+~#=]{4}-[-a-zA-Z0-9@:%._\+~#=]{3}$/";
-$hasinvalidmeeturl = ($url !== '' && !preg_match($pattern, $url));
-$hasvalidmeeturl = ($url !== '' && !$hasinvalidmeeturl);
+$hasvalidmeeturl = \mod_googlemeet\local\room_entry::room_url($googlemeet) !== null;
+$hasinvalidmeeturl = ($url !== '' && !$hasvalidmeeturl);
 unset($url);
 
 // Resolve the requested recording before any output so a stale or trashed link
