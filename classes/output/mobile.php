@@ -23,10 +23,10 @@
  */
 namespace mod_googlemeet\output;
 
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recording_media;
+use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\schedule;
 
 /**
  * Mobile app (Moodle App site plugin) views.
@@ -84,13 +84,13 @@ class mobile {
             'courseid' => (int)$course->id,
             'intro' => format_module_intro('googlemeet', $googlemeet, $cm->id),
             'hasroom' => $roomurl !== null,
-            'upcomingevent' => googlemeet_get_upcoming_events($googlemeet->id, $googlemeet->maxupcomingevents ?? 3),
+            'upcomingevent' => schedule::get_upcoming_events($googlemeet->id, $googlemeet->maxupcomingevents ?? 3),
             'recording' => $list,
         ];
 
         // Completion and trigger events (first page only: paging is not a new view).
         if ($page === 0) {
-            googlemeet_view($googlemeet, $course, $cm, $context);
+            recordings::view($googlemeet, $course, $cm, $context);
         }
 
         return [
@@ -119,13 +119,13 @@ class mobile {
         global $DB, $USER;
 
         $params = ['googlemeetid' => $googlemeet->id, 'visible' => 1];
-        $total = googlemeet_count_recordings($params + ['deleted' => 0]);
+        $total = recordings::count_recordings($params + ['deleted' => 0]);
         $pages = max(1, (int)ceil($total / self::PERPAGE));
         $page = min($page, $pages - 1);
         $order = ($googlemeet->recordingsorder ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
-        $recordings = googlemeet_list_recordings($params, false, $order, self::PERPAGE, $page * self::PERPAGE);
+        $recordings = recordings::list_recordings($params, false, $order, self::PERPAGE, $page * self::PERPAGE);
 
-        $titles = googlemeet_get_lesson_titles($googlemeet, false);
+        $titles = recordings::get_lesson_titles($googlemeet, false);
         $watched = [];
         if ($recordings) {
             [$insql, $inparams] = $DB->get_in_or_equal(array_column($recordings, 'id'), SQL_PARAMS_NAMED);
@@ -258,20 +258,20 @@ class mobile {
 
         [$cm, $context, $googlemeet] = self::load($args);
         $recordingid = (int)(((array)$args)['recordingid'] ?? 0);
-        $recording = googlemeet_get_accessible_recording($googlemeet, $context, $recordingid);
+        $recording = recordings::get_accessible_recording($googlemeet, $context, $recordingid);
         if (!$recording || empty($recording->visible)) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
-        $titles = googlemeet_get_lesson_titles($googlemeet, false);
-        $title = $titles[$recording->id]['title'] ?? googlemeet_display_name((string)$recording->name);
+        $titles = recordings::get_lesson_titles($googlemeet, false);
+        $title = $titles[$recording->id]['title'] ?? recordings::display_name((string)$recording->name);
 
         $analysis = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recording->id]);
         $summary = [];
         $keypoints = [];
         $chapters = [];
         if (self::ai_visible($analysis, $context)) {
-            foreach (googlemeet_summary_paragraphs((string)$analysis->summary) as $paragraph) {
+            foreach (recording_format::summary_paragraphs((string)$analysis->summary) as $paragraph) {
                 $summary[] = ['text' => format_text($paragraph, FORMAT_PLAIN, ['context' => $context])];
             }
             // Plain spelling, as in recordings_page(): the template escapes key points and titles once.
@@ -280,12 +280,15 @@ class mobile {
                     $keypoints[] = ['text' => format_string((string)$keypoint, true, ['context' => $context, 'escape' => false])];
                 }
             }
-            foreach (googlemeet_normalise_chapters($analysis->chapters ?? '') as $index => $chapter) {
+            foreach (recording_format::normalise_chapters($analysis->chapters ?? '') as $index => $chapter) {
                 $chapters[] = [
                     'index' => $index,
                     'title' => format_string($chapter['title'], true, ['context' => $context, 'escape' => false]),
                     'start' => $chapter['start'],
-                    'url' => googlemeet_get_recording_seek_url((string)$recording->webviewlink, (int)$chapter['startseconds']),
+                    'url' => recording_media::get_recording_seek_url(
+                        (string)$recording->webviewlink,
+                        (int)$chapter['startseconds']
+                    ),
                 ];
             }
         }

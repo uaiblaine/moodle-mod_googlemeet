@@ -520,7 +520,7 @@ function xmldb_googlemeet_upgrade($oldversion) {
         $rs = $DB->get_recordset_select('googlemeet_recordings', 'durationseconds IS NULL', null, '', 'id, duration');
         $unparsed = 0;
         foreach ($rs as $row) {
-            $seconds = googlemeet_recording_duration_to_seconds($row->duration);
+            $seconds = \mod_googlemeet\local\recording_format::recording_duration_to_seconds($row->duration);
             if ($seconds > 0) {
                 $DB->set_field('googlemeet_recordings', 'durationseconds', $seconds, ['id' => $row->id]);
             } else {

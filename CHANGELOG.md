@@ -3,6 +3,28 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.9 (unreleased)
+- The recording helpers moved out of `lib.php` into autoloaded classes under `classes/local/`, with
+  the same behaviour: `recordings` (listing, counts, the Drive sync, display names, lesson titles and
+  the course-module-viewed event), `recording_format` (durations, timestamps, chapters, date chips,
+  truncation, accent folding, AI status flags), `recording_progress` (completion threshold, progress
+  state, key points checklist and the user preference names) and `recording_search` (query and topic
+  filters, search text, snippets, topic lists). The `googlemeet_*` functions are gone, no wrappers.
+- The session schedule and notification helpers moved out of `lib.php` and `locallib.php` the same
+  way: `schedule` (holiday periods, cancelled dates, the session day, building, setting, merging and
+  deleting the session rows with their calendar mirrors, the cancelled-date reconciliation, upcoming
+  sessions, the auto-sync retry reset, the time-difference label), `stale_recurrence` (abandoned
+  recurrences and the admin alert), and `reminders`, which now also holds the recipient list, the
+  sent-reminder log and its cleanup, and the reminder e-mail body. No wrappers are left.
+- The page builders of `locallib.php` moved into autoloaded classes with the same output, and
+  `locallib.php` is gone: `local\view_page` (page header, logout/sync and subscription actions),
+  `output\hero` (classroom hero, room button, continue watching, progress summary),
+  `output\recordings_list` (recordings panel, students' counts), `output\recording_hub` (hub, teacher
+  transcript, resume label), `local\materials` (recording materials, activity attachments) and
+  `local\recording_media` (Drive embed and seek URLs); `get_accessible_recording()` joined
+  `local\recordings`, `summary_paragraphs()` `local\recording_format` and `clear_url()`
+  `local\room_entry`. No wrappers are left.
+
 ## 2.30.1+uai.8 (unreleased)
 - The recordings list's sort toggle and page links are built in PHP with each parameter once: the
   toggle used to add a second `rorder` to a URL that already had one, so the order did not change.

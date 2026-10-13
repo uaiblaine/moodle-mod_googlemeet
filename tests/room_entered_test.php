@@ -19,6 +19,7 @@ namespace mod_googlemeet;
 use core_external\external_api;
 use mod_googlemeet\external\log_room_entered;
 use mod_googlemeet\local\room_entry;
+use mod_googlemeet\output\hero;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 /**
@@ -176,13 +177,11 @@ final class room_entered_test extends \advanced_testcase {
      * The hero room button links to enter.php with a sesskey, not straight to Meet, so the entry is logged.
      */
     public function test_hero_room_cta_goes_through_entry_endpoint(): void {
-        global $CFG;
-        require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
         [$googlemeet, $cm] = $this->setup_activity();
         $this->setAdminUser();
 
         $context = \context_module::instance($cm->id);
-        $cta = googlemeet_get_room_cta_context($googlemeet, $context, null, true);
+        $cta = hero::get_room_cta_context($googlemeet, $context, null, true);
         $this->assertTrue($cta['hasroomcta']);
         $this->assertStringContainsString('/mod/googlemeet/enter.php?id=' . $cm->id, $cta['roomurl']);
         $this->assertStringContainsString('sesskey=' . sesskey(), $cta['roomurl']);

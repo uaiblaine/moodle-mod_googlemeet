@@ -18,6 +18,7 @@ namespace mod_googlemeet\external;
 
 use core_external\external_api;
 use mod_googlemeet\completion\custom_completion;
+use mod_googlemeet\local\recording_progress;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
@@ -97,7 +98,7 @@ final class mark_recording_progress_test extends \advanced_testcase {
      * @return array Data of the last response.
      */
     private function heartbeat_to_threshold(): array {
-        $threshold = googlemeet_recording_completion_threshold($this->recording->duration);
+        $threshold = recording_progress::recording_completion_threshold($this->recording->duration);
         $data = [];
         for ($beat = 0; $beat <= intdiv($threshold, 60) + 1 && empty($data['completed']); $beat++) {
             $this->age_progress(MINSECS);
@@ -170,7 +171,7 @@ final class mark_recording_progress_test extends \advanced_testcase {
         $this->assertSame([COMPLETION_INCOMPLETE, COMPLETION_INCOMPLETE], $this->completion_states());
 
         // The student's own badge shows the recording as viewed.
-        $state = googlemeet_recording_progress_state($this->recording, $row);
+        $state = recording_progress::recording_progress_state($this->recording, $row);
         $this->assertTrue($state['progresscompleted']);
         $this->assertFalse($state['progressmeasuredcompleted']);
     }
@@ -185,7 +186,7 @@ final class mark_recording_progress_test extends \advanced_testcase {
         $data = $this->heartbeat_to_threshold();
 
         $this->assertGreaterThanOrEqual(
-            googlemeet_recording_completion_threshold($this->recording->duration),
+            recording_progress::recording_completion_threshold($this->recording->duration),
             $data['watchedseconds']
         );
         $this->assertTrue($data['completed']);

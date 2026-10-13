@@ -50,7 +50,7 @@ class process_recording_enrichment extends \core\task\adhoc_task {
         $googlemeetid = (int)($data->googlemeetid ?? 0);
         $recordingids = array_values(array_unique(array_filter(array_map('intval', $data->recordingids ?? []))));
         // Only inserts trigger AI analysis and "new recording" notifications; see
-        // googlemeet_sync_recordings(). Tasks queued without newrecordingids treat every id as new.
+        // \mod_googlemeet\local\recordings::sync_recordings(). Tasks queued without newrecordingids treat every id as new.
         $newrecordingids = property_exists($data, 'newrecordingids')
             ? array_values(array_unique(array_filter(array_map('intval', $data->newrecordingids ?? []))))
             : $recordingids;

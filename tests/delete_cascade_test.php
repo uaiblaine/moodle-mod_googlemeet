@@ -18,13 +18,13 @@ namespace mod_googlemeet;
 
 use core_question\local\bank\question_version_status;
 use mod_googlemeet\local\recording_cleanup;
+use mod_googlemeet\local\recording_progress;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 require_once($CFG->dirroot . '/course/lib.php');
 
@@ -107,8 +107,8 @@ final class delete_cascade_test extends \advanced_testcase {
             'recordingid' => $recordingid, 'userid' => $userid, 'watchedseconds' => 60, 'completed' => 1,
             'timecreated' => time(), 'timemodified' => time(),
         ]);
-        set_user_preference(googlemeet_lastjump_preference_name($recordingid), 120, $userid);
-        set_user_preference(googlemeet_keypoints_preference_name($recordingid), '1a2b3c4d:10', $userid);
+        set_user_preference(recording_progress::lastjump_preference_name($recordingid), 120, $userid);
+        set_user_preference(recording_progress::keypoints_preference_name($recordingid), '1a2b3c4d:10', $userid);
         get_file_storage()->create_file_from_string([
             'contextid' => $context->id, 'component' => 'mod_googlemeet', 'filearea' => 'recordingmaterial',
             'itemid' => $recordingid, 'filepath' => '/', 'filename' => 'notes-' . $recordingid . '.txt',
@@ -158,7 +158,9 @@ final class delete_cascade_test extends \advanced_testcase {
                 [$recordingid]
             ),
             'preferences' => $DB->count_records_select('user_preferences', 'name = ? OR name = ?', [
-                googlemeet_lastjump_preference_name($recordingid), googlemeet_keypoints_preference_name($recordingid)]),
+                recording_progress::lastjump_preference_name($recordingid),
+                recording_progress::keypoints_preference_name($recordingid),
+            ]),
             'tagged' => $DB->count_records_sql(
                 "SELECT COUNT(1) FROM {tag_instance} ti JOIN {tag} t ON t.id = ti.tagid
                   WHERE ti.component = 'core_question' AND t.name = ?",

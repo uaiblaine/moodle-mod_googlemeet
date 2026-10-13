@@ -17,13 +17,15 @@
 namespace mod_googlemeet;
 
 use mod_googlemeet\local\list_aggregates;
+use mod_googlemeet\local\materials;
+use mod_googlemeet\output\recording_hub;
+use mod_googlemeet\output\recordings_list;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * The recordings list and the hub run a constant number of DB queries.
@@ -146,12 +148,12 @@ final class list_query_count_test extends \advanced_testcase {
         $PAGE->set_context($context);
         // Warm caches that are not per recording (capabilities, strings, config).
         ob_start();
-        googlemeet_print_recordings($googlemeet, $cm, $context);
+        recordings_list::print_recordings($googlemeet, $cm, $context);
         ob_end_clean();
 
         $before = $DB->perf_get_queries();
         ob_start();
-        googlemeet_print_recordings($googlemeet, $cm, $context);
+        recordings_list::print_recordings($googlemeet, $cm, $context);
         $html = ob_get_clean();
         return [$html, $DB->perf_get_queries() - $before];
     }
@@ -175,7 +177,7 @@ final class list_query_count_test extends \advanced_testcase {
             $PAGE->set_cm($cm);
             $PAGE->set_context($context);
             ob_start();
-            googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording);
+            recording_hub::print_recording_hub($googlemeet, $cm, $context, $recording);
             return ob_get_clean();
         };
         $render();
@@ -285,7 +287,7 @@ final class list_query_count_test extends \advanced_testcase {
         [, , $context, , $ids] = $this->make_activity(2);
         $grouped = list_aggregates::materials_by_recording($context, array_merge($ids, [999999]));
         foreach ($ids as $id) {
-            $this->assertSame(googlemeet_get_recording_materials($context, $id), $grouped[$id]);
+            $this->assertSame(materials::get_recording_materials($context, $id), $grouped[$id]);
             $this->assertSame(['esquema.pdf', 'tema.pdf'], array_column($grouped[$id], 'name'));
         }
         $this->assertSame([], $grouped[999999]);

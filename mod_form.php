@@ -26,9 +26,10 @@ defined('MOODLE_INTERNAL') || die();
 
 use mod_googlemeet\client;
 use mod_googlemeet\local\creator;
+use mod_googlemeet\local\room_entry;
+use mod_googlemeet\local\schedule;
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Module instance settings form.
@@ -253,14 +254,14 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             'date_selector',
             'holidaystartdate',
             get_string('holidaystartdate', 'googlemeet'),
-            // A day of the site calendar, compared through googlemeet_session_day().
+            // A day of the site calendar, compared through schedule::session_day().
             ['timezone' => core_date::get_server_timezone()]
         );
         $holidayelements[] = $mform->createElement(
             'date_selector',
             'holidayenddate',
             get_string('holidayenddate', 'googlemeet'),
-            // A day of the site calendar, compared through googlemeet_session_day().
+            // A day of the site calendar, compared through schedule::session_day().
             ['timezone' => core_date::get_server_timezone()]
         );
 
@@ -311,7 +312,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
             'date_selector',
             'cancelleddate',
             get_string('cancelleddate', 'googlemeet'),
-            // A day of the site calendar, compared through googlemeet_session_day().
+            // A day of the site calendar, compared through schedule::session_day().
             ['timezone' => core_date::get_server_timezone()]
         );
         $cancelledelements[] = $mform->createElement(
@@ -474,11 +475,11 @@ class mod_googlemeet_mod_form extends moodleform_mod {
                 'cancelleddate ASC, id ASC'
             );
             $cancelleddates = array_values($cancelleddates);
-            $today = googlemeet_session_day(time());
+            $today = schedule::session_day(time());
             // Today and upcoming dates first (soonest first), then past dates (most recent first).
             usort($cancelleddates, static function ($a, $b) use ($today) {
-                $aday = googlemeet_session_day((int)$a->cancelleddate);
-                $bday = googlemeet_session_day((int)$b->cancelleddate);
+                $aday = schedule::session_day((int)$a->cancelleddate);
+                $bday = schedule::session_day((int)$b->cancelleddate);
                 $agroup = $aday >= $today ? 0 : 1;
                 $bgroup = $bday >= $today ? 0 : 1;
                 if ($agroup !== $bgroup) {
@@ -618,7 +619,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
      *
      * The logout link of {@see client::print_user_info()} carries sesskey; without it a cross-site
      * link to the settings page would unlink the teacher's account. Mirrors the view page's check in
-     * googlemeet_handle_view_actions().
+     * \mod_googlemeet\local\view_page::handle_view_actions().
      *
      * @return bool
      */
@@ -668,7 +669,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     /**
      * Whether the submitted recurrence would produce at least one session.
      *
-     * Runs the event-generation loop of {@see googlemeet_construct_events_data_for_add()} (keep in
+     * Runs the event-generation loop of {@see schedule::construct_events_data_for_add()} (keep in
      * step) over the form data: period, selected weekdays and the holiday periods being submitted.
      *
      * @param array $data Validated form data.
@@ -696,7 +697,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $enddate        = $data['eventenddate'] + $eventendtime;
 
         // Build a lightweight in-memory holiday list from the submitted form data
-        // (mirrors what googlemeet_get_holidays() would return from the DB).
+        // (mirrors what schedule::get_holidays() would return from the DB).
         $holidays = [];
         if (!empty($data['holiday_repeats'])) {
             for ($i = 0; $i < $data['holiday_repeats']; $i++) {
@@ -712,11 +713,11 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         }
 
         // Check the first event (eventdate itself).
-        if (!googlemeet_is_holiday($eventdate, $holidays)) {
+        if (!schedule::is_holiday($eventdate, $holidays)) {
             return true;
         }
 
-        // Mirror the recurrence loop from googlemeet_construct_events_data_for_add().
+        // Mirror the recurrence loop from schedule::construct_events_data_for_add().
         $wdaydesc = [0 => 'Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 
         $sdate   = $eventdate + DAYSECS;
@@ -729,7 +730,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         }
 
         // Convert the submitted days array to an object for property_exists() checks
-        // (same access pattern used in googlemeet_construct_events_data_for_add).
+        // (same access pattern used in schedule::construct_events_data_for_add).
         $daysobj = (object)$data['days'];
 
         while ($sdate < $enddate) {
@@ -743,7 +744,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
                         $starthour,
                         $startminute
                     );
-                    if (!googlemeet_is_holiday($eventtime, $holidays)) {
+                    if (!schedule::is_holiday($eventtime, $holidays)) {
                         return true;
                     }
                 }
@@ -873,7 +874,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     }
 
     /**
-     * Add an error when the URL holds no Google Meet code (see googlemeet_clear_url()).
+     * Add an error when the URL holds no Google Meet code (see room_entry::clear_url()).
      *
      * @param string $url Url to validate.
      * @param array $errors Form errors.
@@ -881,7 +882,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
      * @return array Form errors.
      */
     private function validate_url(string $url, array $errors) {
-        if (googlemeet_clear_url($url) == null) {
+        if (room_entry::clear_url($url) == null) {
             $errors['url'] = get_string('url_failed', 'googlemeet');
         }
         return $errors;

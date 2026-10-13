@@ -16,15 +16,14 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\stale_recurrence;
 use mod_googlemeet\task\check_stale_recurrence;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Tests for the abandoned-recurrence detector + alert task.
@@ -34,8 +33,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_get_stale_recurrences')]
-#[CoversFunction('googlemeet_send_stale_alert')]
+#[CoversClass(stale_recurrence::class)]
 #[CoversClass(check_stale_recurrence::class)]
 final class stale_recurrence_test extends \advanced_testcase {
     /**
@@ -104,7 +102,7 @@ final class stale_recurrence_test extends \advanced_testcase {
         $this->add_event($gm->id, $now + DAYSECS);
         $this->add_recording($gm->id, $now - 30 * DAYSECS);
 
-        $stale = googlemeet_get_stale_recurrences(3, $now);
+        $stale = stale_recurrence::get_stale_recurrences(3, $now);
 
         $this->assertCount(1, $stale);
         $this->assertEquals($gm->id, $stale[0]->id);
@@ -121,7 +119,7 @@ final class stale_recurrence_test extends \advanced_testcase {
         $gm = $this->make_module();
         $this->add_event($gm->id, $now + DAYSECS);
         $this->add_recording($gm->id, $now - 5 * DAYSECS);
-        $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
+        $this->assertCount(0, stale_recurrence::get_stale_recurrences(3, $now));
     }
 
     /**
@@ -133,7 +131,7 @@ final class stale_recurrence_test extends \advanced_testcase {
         $gm = $this->make_module();
         $this->add_event($gm->id, $now - 10 * DAYSECS);
         $this->add_recording($gm->id, $now - 60 * DAYSECS);
-        $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
+        $this->assertCount(0, stale_recurrence::get_stale_recurrences(3, $now));
     }
 
     /**
@@ -144,7 +142,7 @@ final class stale_recurrence_test extends \advanced_testcase {
         $now = 1800000000;
         $gm = $this->make_module();
         $this->add_event($gm->id, $now + DAYSECS);
-        $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
+        $this->assertCount(0, stale_recurrence::get_stale_recurrences(3, $now));
     }
 
     /**
@@ -156,7 +154,7 @@ final class stale_recurrence_test extends \advanced_testcase {
         $gm = $this->make_module();
         $this->add_event($gm->id, $now + DAYSECS);
         $this->add_recording($gm->id, $now - 60 * DAYSECS, 1);
-        $this->assertCount(0, googlemeet_get_stale_recurrences(3, $now));
+        $this->assertCount(0, stale_recurrence::get_stale_recurrences(3, $now));
     }
 
     /**
@@ -177,7 +175,7 @@ final class stale_recurrence_test extends \advanced_testcase {
             'futurecount' => 3,
         ];
 
-        googlemeet_send_stale_alert($info);
+        stale_recurrence::send_stale_alert($info);
 
         $messages = $sink->get_messages();
         $this->assertCount(count(get_admins()), $messages);

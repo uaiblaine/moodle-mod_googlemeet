@@ -21,13 +21,9 @@ use mod_googlemeet\external\get_sync_status;
 use mod_googlemeet\external\request_sync;
 use mod_googlemeet\local\sync_log;
 use mod_googlemeet\local\sync_manager;
+use mod_googlemeet\local\view_page;
 use mod_googlemeet\task\sync_recordings_task;
 use PHPUnit\Framework\Attributes\CoversClass;
-
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * A manual Drive sync needs mod/googlemeet:syncgoogledrive when it is asked for, not only when cron runs it.
@@ -143,7 +139,7 @@ final class sync_capability_test extends \advanced_testcase {
         $_POST = ['sync' => 1, 'sesskey' => sesskey()];
         $_SERVER['REQUEST_METHOD'] = 'POST';
         try {
-            googlemeet_handle_view_actions($this->googlemeet, $this->cm, get_course($this->cm->course));
+            view_page::handle_view_actions($this->googlemeet, $this->cm, get_course($this->cm->course));
             $this->fail('The view action returned without a redirect.');
         } catch (\required_capability_exception $e) {
             $this->assertFalse($this->queued());

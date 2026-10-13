@@ -23,10 +23,16 @@
  */
 
 use mod_googlemeet\client;
+use mod_googlemeet\local\materials;
+use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\schedule;
+use mod_googlemeet\local\view_page;
+use mod_googlemeet\output\hero;
+use mod_googlemeet\output\recording_hub;
+use mod_googlemeet\output\recordings_list;
 
 require(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
-require_once(__DIR__ . '/locallib.php');
 
 $config = get_config('googlemeet');
 
@@ -59,8 +65,8 @@ $PAGE->set_context($context);
 
 // Process the view write actions (logout / sync). The handler enforces the
 // editrecording capability, the sesskey check and (for sync) a POST request.
-googlemeet_handle_view_actions($googlemeet, $cm, $course);
-googlemeet_handle_subscription_action($googlemeet, $cm);
+view_page::handle_view_actions($googlemeet, $cm, $course);
+view_page::handle_subscription_action($googlemeet, $cm);
 
 // The `rview` param (cards|list) saves the recordings view preference, then redirects to the same
 // list state without it. No sesskey: it only sets the viewer's own preference and is idempotent.
@@ -103,7 +109,7 @@ unset($url);
 // can redirect back to the activity instead of showing a raw error.
 $recording = null;
 if ($recordingid > 0) {
-    $recording = googlemeet_get_accessible_recording($googlemeet, $context, $recordingid);
+    $recording = recordings::get_accessible_recording($googlemeet, $context, $recordingid);
     if (!$recording) {
         redirect(
             new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id]),
@@ -115,7 +121,7 @@ if ($recordingid > 0) {
 }
 
 // Completion and trigger events.
-googlemeet_view($googlemeet, $course, $cm, $context);
+recordings::view($googlemeet, $course, $cm, $context);
 
 if ($recording) {
     // Recording pages: the activity description (often a raw Meet link) belongs to the
@@ -124,7 +130,7 @@ if ($recording) {
     $PAGE->add_body_class('googlemeet-hub-page');
 }
 
-googlemeet_print_header($googlemeet, $cm, $course);
+view_page::print_header($googlemeet, $cm, $course);
 
 if ($hasinvalidmeeturl && has_capability('moodle/course:manageactivities', $context)) {
     echo $OUTPUT->notification(
@@ -142,15 +148,15 @@ echo \mod_googlemeet\local\attendance\scope::relink_notice($googlemeet, $context
 // The activity header already shows the title and description: this page prints neither.
 
 if ($recording) {
-    googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording);
+    recording_hub::print_recording_hub($googlemeet, $cm, $context, $recording);
     echo $OUTPUT->footer();
     exit;
 }
 
 $maxevents = $googlemeet->maxupcomingevents ?? 3;
-$upcomingeventscontext = googlemeet_get_upcoming_events($googlemeet->id, $maxevents);
-$scheduleeventscontext = googlemeet_get_upcoming_events($googlemeet->id, 0, true);
-$herocontext = googlemeet_get_classroom_hero_context(
+$upcomingeventscontext = schedule::get_upcoming_events($googlemeet->id, $maxevents);
+$scheduleeventscontext = schedule::get_upcoming_events($googlemeet->id, 0, true);
+$herocontext = hero::get_classroom_hero_context(
     $googlemeet,
     $cm,
     $context,
@@ -174,7 +180,7 @@ if (has_capability('mod/googlemeet:editrecording', $context)) {
 }
 
 // Teacher attachments: files the teacher provided for students to download.
-googlemeet_print_attachments($context);
+materials::print_attachments($context);
 
 // Get pagination and order parameters.
 $recordingspage = optional_param('rpage', 0, PARAM_INT);
@@ -183,7 +189,7 @@ $recordingquery = optional_param('rq', '', PARAM_TEXT);
 $recordingtopic = optional_param('topic', '', PARAM_TEXT);
 $recordingpending = optional_param('rpending', 0, PARAM_BOOL);
 
-googlemeet_print_recordings(
+recordings_list::print_recordings(
     $googlemeet,
     $cm,
     $context,

@@ -26,7 +26,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
 /**
  * Data builder for the teacher viewing report: students x recordings.
  *
- * Percentages mirror the student UI, {@see googlemeet_recording_progress_state()}; keep in step:
+ * Percentages mirror the student UI, {@see recording_progress::recording_progress_state()}; keep in step:
  * 100 when completed, 0 when nothing was watched, otherwise watchedseconds / completion threshold
  * clamped to 1-99.
  *
@@ -205,7 +205,7 @@ class report_builder {
 
         $thresholds = [];
         foreach ($recordings as $recording) {
-            $thresholds[(int)$recording->id] = googlemeet_recording_completion_threshold($recording->duration ?? '');
+            $thresholds[(int)$recording->id] = recording_progress::recording_completion_threshold($recording->duration ?? '');
         }
 
         $cutoff = $now - self::INACTIVE_DAYS * DAYSECS;
@@ -303,7 +303,7 @@ class report_builder {
         $columns['completed'] = get_string('report_col_completed', 'googlemeet');
         $columns['lastaccess'] = get_string('report_col_lastaccess', 'googlemeet');
         foreach ($data['recordings'] as $recording) {
-            $columns['rec' . $recording->id] = googlemeet_display_name((string)$recording->name)
+            $columns['rec' . $recording->id] = recordings::display_name((string)$recording->name)
                 . ' (' . userdate($recording->createdtime, get_string('strftimedatefullshort', 'langconfig')) . ')';
         }
 

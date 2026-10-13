@@ -18,14 +18,16 @@ namespace mod_googlemeet;
 
 use core_external\external_api;
 use mod_googlemeet\local\ai_review;
+use mod_googlemeet\local\recording_search;
+use mod_googlemeet\local\recordings;
+use mod_googlemeet\output\hero;
+use mod_googlemeet\output\recording_hub;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
@@ -41,10 +43,9 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversClass(ai_review::class)]
 #[CoversClass(\mod_googlemeet\external\review_ai_analysis::class)]
 #[CoversClass(\mod_googlemeet\privacy\provider::class)]
-#[CoversFunction('googlemeet_list_recordings')]
-#[CoversFunction('googlemeet_get_lesson_titles')]
-#[CoversFunction('googlemeet_print_recording_hub')]
-#[CoversFunction('googlemeet_get_continue_watching_context')]
+#[CoversClass(recordings::class)]
+#[CoversClass(recording_hub::class)]
+#[CoversClass(hero::class)]
 final class ai_review_test extends \advanced_testcase {
     /** @var \stdClass */
     private $course;
@@ -113,7 +114,7 @@ final class ai_review_test extends \advanced_testcase {
         $PAGE->set_cm($this->cm);
         $PAGE->set_context($this->context);
         ob_start();
-        googlemeet_print_recording_hub($this->googlemeet, $this->cm, $this->context, $recording);
+        recording_hub::print_recording_hub($this->googlemeet, $this->cm, $this->context, $recording);
         return ob_get_clean();
     }
 
@@ -197,7 +198,7 @@ final class ai_review_test extends \advanced_testcase {
         $shown = $this->create_recording(['summary' => 'Resumen publicado', 'topics' => '["Tema publicado"]', 'reviewed' => 1]);
 
         $this->setUser($this->student);
-        $list = googlemeet_list_recordings(['googlemeetid' => $this->googlemeet->id, 'visible' => true], true);
+        $list = recordings::list_recordings(['googlemeetid' => $this->googlemeet->id, 'visible' => true], true);
         $byid = array_column(array_map(fn($r) => ['id' => $r->id, 'r' => $r], $list), 'r', 'id');
         $this->assertFalse($byid[$hidden->id]->hasai);
         $this->assertSame('', $byid[$hidden->id]->aisummary);
@@ -205,23 +206,23 @@ final class ai_review_test extends \advanced_testcase {
         $this->assertFalse($byid[$hidden->id]->aipendingreview);
         $this->assertTrue($byid[$shown->id]->hasai);
 
-        $this->assertCount(0, googlemeet_filter_recordings_by_query($list, 'Sanidad', false));
-        $this->assertCount(0, googlemeet_filter_recordings_by_topic($list, 'Tema oculto'));
-        $this->assertSame(['Tema publicado'], googlemeet_collect_topics($list));
+        $this->assertCount(0, recording_search::filter_recordings_by_query($list, 'Sanidad', false));
+        $this->assertCount(0, recording_search::filter_recordings_by_topic($list, 'Tema oculto'));
+        $this->assertSame(['Tema publicado'], recording_search::collect_topics($list));
 
         // Generic recording names take the first AI topic as lesson title: not for unreviewed topics.
-        $titles = googlemeet_get_lesson_titles($this->googlemeet, false);
+        $titles = recordings::get_lesson_titles($this->googlemeet, false);
         $this->assertStringNotContainsString('Tema oculto', $titles[$hidden->id]['title']);
         $this->assertStringContainsString('Tema publicado', $titles[$shown->id]['title']);
 
         $this->setUser($this->teacher);
-        $list = googlemeet_list_recordings(['googlemeetid' => $this->googlemeet->id], true);
+        $list = recordings::list_recordings(['googlemeetid' => $this->googlemeet->id], true);
         $byid = array_column(array_map(fn($r) => ['id' => $r->id, 'r' => $r], $list), 'r', 'id');
         $this->assertTrue($byid[$hidden->id]->hasai);
         $this->assertTrue($byid[$hidden->id]->aipendingreview);
         $this->assertFalse($byid[$shown->id]->aipendingreview);
-        $this->assertCount(1, googlemeet_filter_recordings_by_query($list, 'Sanidad', true));
-        $titles = googlemeet_get_lesson_titles($this->googlemeet, true);
+        $this->assertCount(1, recording_search::filter_recordings_by_query($list, 'Sanidad', true));
+        $titles = recordings::get_lesson_titles($this->googlemeet, true);
         $this->assertStringContainsString('Tema oculto', $titles[$hidden->id]['title']);
     }
 
@@ -231,12 +232,12 @@ final class ai_review_test extends \advanced_testcase {
     public function test_continue_watching_snippet(): void {
         $this->create_recording();
         $this->setUser($this->student);
-        $ctx = googlemeet_get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
+        $ctx = hero::get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
         $this->assertTrue($ctx['hascontinue']);
         $this->assertSame('', $ctx['continuesummary']);
 
         $this->setUser($this->teacher);
-        $ctx = googlemeet_get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
+        $ctx = hero::get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
         $this->assertStringContainsString('Resumen secreto', $ctx['continuesummary']);
     }
 

@@ -16,13 +16,14 @@
 
 namespace mod_googlemeet;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\output\recording_hub;
+use PHPUnit\Framework\Attributes\CoversClass;
+
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Recording hub transcript tab: source selection and rendering.
@@ -32,8 +33,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_hub_transcript')]
-#[CoversFunction('googlemeet_print_recording_hub')]
+#[CoversClass(recording_hub::class)]
 final class recording_hub_test extends \advanced_testcase {
     /**
      * Analysis transcript wins; an empty one falls back to the recording transcript.
@@ -42,16 +42,16 @@ final class recording_hub_test extends \advanced_testcase {
         $recording = (object)['transcripttext' => "0:08\nMeet transcript"];
         $done = fn(string $t) => (object)['status' => 'completed', 'transcript' => $t];
 
-        $this->assertSame('AI transcript', googlemeet_hub_transcript($done('AI transcript'), $recording));
-        $this->assertSame("0:08\nMeet transcript", googlemeet_hub_transcript($done(''), $recording));
-        $this->assertSame("0:08\nMeet transcript", googlemeet_hub_transcript($done("  \n"), $recording));
-        $this->assertSame("0:08\nMeet transcript", googlemeet_hub_transcript(false, $recording));
+        $this->assertSame('AI transcript', recording_hub::hub_transcript($done('AI transcript'), $recording));
+        $this->assertSame("0:08\nMeet transcript", recording_hub::hub_transcript($done(''), $recording));
+        $this->assertSame("0:08\nMeet transcript", recording_hub::hub_transcript($done("  \n"), $recording));
+        $this->assertSame("0:08\nMeet transcript", recording_hub::hub_transcript(false, $recording));
         $this->assertSame(
             "0:08\nMeet transcript",
-            googlemeet_hub_transcript((object)['status' => 'pending', 'transcript' => 'partial'], $recording)
+            recording_hub::hub_transcript((object)['status' => 'pending', 'transcript' => 'partial'], $recording)
         );
-        $this->assertSame('', googlemeet_hub_transcript($done(''), (object)['transcripttext' => null]));
-        $this->assertSame('', googlemeet_hub_transcript($done(''), (object)[]));
+        $this->assertSame('', recording_hub::hub_transcript($done(''), (object)['transcripttext' => null]));
+        $this->assertSame('', recording_hub::hub_transcript($done(''), (object)[]));
     }
 
     /**
@@ -70,7 +70,7 @@ final class recording_hub_test extends \advanced_testcase {
         $PAGE->set_cm($cm);
         $PAGE->set_context($context);
         ob_start();
-        googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording);
+        recording_hub::print_recording_hub($googlemeet, $cm, $context, $recording);
         return ob_get_clean();
     }
 

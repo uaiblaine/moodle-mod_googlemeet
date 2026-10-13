@@ -25,7 +25,6 @@
 require(__DIR__ . '/../../config.php');
 
 require_once(__DIR__ . '/lib.php');
-require_once(__DIR__ . '/locallib.php');
 require_once($CFG->dirroot . '/course/lib.php');
 
 $id = required_param('id', PARAM_INT);
@@ -85,7 +84,7 @@ foreach ($cms as $instanceid => $cm) {
 
     // Next session: the first upcoming (or live) session that is not cancelled.
     $nextsession = get_string('index_nextsession_none', 'mod_googlemeet');
-    $upcoming = googlemeet_get_upcoming_events($googlemeet->id, 10);
+    $upcoming = \mod_googlemeet\local\schedule::get_upcoming_events($googlemeet->id, 10);
     foreach ($upcoming['upcomingevents'] as $event) {
         if (!empty($event->iscancelled)) {
             continue;
@@ -101,12 +100,12 @@ foreach ($cms as $instanceid => $cm) {
     if (!$isteacher) {
         $countparams['visible'] = 1;
     }
-    $recordingcount = googlemeet_count_recordings($countparams);
+    $recordingcount = \mod_googlemeet\local\recordings::count_recordings($countparams);
 
     $progress = '';
     if (!$isteacher && $recordingcount > 0) {
         $showprogress = true;
-        $summary = googlemeet_get_progress_summary($googlemeet, $context);
+        $summary = \mod_googlemeet\output\hero::get_progress_summary($googlemeet, $context);
         $progress = get_string('index_myprogress_value', 'mod_googlemeet', (object)[
             'watched' => $summary['watched'],
             'total' => $summary['total'],

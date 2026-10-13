@@ -28,6 +28,7 @@ defined('MOODLE_INTERNAL') || die();
 
 use mod_googlemeet\client;
 use mod_googlemeet\helper;
+use mod_googlemeet\local\schedule;
 use mod_googlemeet\local\sync_log;
 
 global $CFG;
@@ -161,10 +162,10 @@ class process_autosync extends \core\task\scheduled_task {
         foreach ($rows as $row) {
             $googlemeetid = (int)$row->googlemeetid;
             if (!array_key_exists($googlemeetid, $cancelledbyactivity)) {
-                $cancelledbyactivity[$googlemeetid] = \googlemeet_get_cancelled($googlemeetid);
+                $cancelledbyactivity[$googlemeetid] = schedule::get_cancelled($googlemeetid);
             }
 
-            if (\googlemeet_is_cancelled((int)$row->eventdate, $cancelledbyactivity[$googlemeetid]) !== false) {
+            if (schedule::is_cancelled((int)$row->eventdate, $cancelledbyactivity[$googlemeetid]) !== false) {
                 $this->close_event((int)$row->eventid, (int)$row->syncattempts + 1, $now);
                 mtrace("mod_googlemeet autosync: event #{$row->eventid} is cancelled; closed without sync.");
                 continue;

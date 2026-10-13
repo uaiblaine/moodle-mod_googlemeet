@@ -16,7 +16,10 @@
 
 namespace mod_googlemeet;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recording_search;
+use mod_googlemeet\local\recordings;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
@@ -31,11 +34,9 @@ require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_fold')]
-#[CoversFunction('googlemeet_filter_recordings_by_query')]
-#[CoversFunction('googlemeet_filter_recordings_by_topic')]
-#[CoversFunction('googlemeet_list_recordings')]
-#[CoversFunction('googlemeet_load_recording_search_content')]
+#[CoversClass(recording_format::class)]
+#[CoversClass(recording_search::class)]
+#[CoversClass(recordings::class)]
 final class search_test extends \advanced_testcase {
     /**
      * Build a minimal recording stdClass for pure filter tests.
@@ -107,15 +108,15 @@ final class search_test extends \advanced_testcase {
      * Folding lowercases and strips Spanish accents, and leaves plain text alone.
      */
     public function test_fold_handles_spanish_accents_and_plain_text(): void {
-        $this->assertSame('cardiologia nandu unguento arbol', googlemeet_fold('CARDIOLOGÍA ÑANDÚ UNGÜENTO Árbol'));
-        $this->assertSame('clase 123 sin cambios', googlemeet_fold('clase 123 sin cambios'));
+        $this->assertSame('cardiologia nandu unguento arbol', recording_format::fold('CARDIOLOGÍA ÑANDÚ UNGÜENTO Árbol'));
+        $this->assertSame('clase 123 sin cambios', recording_format::fold('clase 123 sin cambios'));
     }
 
     /**
      * A title match is accent-insensitive in both directions and carries no match hint.
      */
     public function test_filter_by_query_matches_names_with_and_without_accents(): void {
-        $out = googlemeet_filter_recordings_by_query(
+        $out = recording_search::filter_recordings_by_query(
             [$this->rec('Clase de Cardiología'), $this->rec('Clase de traumatología')],
             'cardiologia'
         );
@@ -123,7 +124,7 @@ final class search_test extends \advanced_testcase {
         $this->assertSame('Clase de Cardiología', $out[0]->name);
         $this->assertSame('', $out[0]->matchsource);
 
-        $out = googlemeet_filter_recordings_by_query(
+        $out = recording_search::filter_recordings_by_query(
             [$this->rec('Clase de cardiologia'), $this->rec('Clase de trauma')],
             'cardiología'
         );
@@ -140,7 +141,7 @@ final class search_test extends \advanced_testcase {
             . 'Hoy revisamos cardiología preventiva en detalle. '
             . str_repeat('despues ', 20);
 
-        $out = googlemeet_filter_recordings_by_query([$recording], 'cardiologia');
+        $out = recording_search::filter_recordings_by_query([$recording], 'cardiologia');
 
         $this->assertCount(1, $out);
         $this->assertSame(get_string('search_match_transcript', 'googlemeet'), $out[0]->matchsource);
@@ -156,7 +157,7 @@ final class search_test extends \advanced_testcase {
         $title = $this->rec('Clase 9');
         $title->displayname = 'Ley 39/2015';
 
-        $out = googlemeet_filter_recordings_by_query([$summary, $topic, $title, $this->rec('Otra')], 'ley', false);
+        $out = recording_search::filter_recordings_by_query([$summary, $topic, $title, $this->rec('Otra')], 'ley', false);
 
         $this->assertCount(3, $out);
         $this->assertSame(get_string('search_match_summary', 'googlemeet'), $out[0]->matchsource);
@@ -173,7 +174,7 @@ final class search_test extends \advanced_testcase {
         $recording = $this->rec('Clase sin pista');
         $recording->notestext = '<p>Resumen docente: la arritmía ventricular aparece en las notas.</p>';
 
-        $out = googlemeet_filter_recordings_by_query([$recording], 'arritmia');
+        $out = recording_search::filter_recordings_by_query([$recording], 'arritmia');
 
         $this->assertCount(1, $out);
         $this->assertSame(get_string('search_match_notes', 'googlemeet'), $out[0]->matchsource);
@@ -199,9 +200,9 @@ final class search_test extends \advanced_testcase {
             'timedeleted' => time(),
         ]);
 
-        $recordings = googlemeet_list_recordings(['googlemeetid' => $googlemeet->id], false);
-        $recordings = googlemeet_load_recording_search_content($recordings);
-        $out = googlemeet_filter_recordings_by_query($recordings, 'palabraunica');
+        $recordings = recordings::list_recordings(['googlemeetid' => $googlemeet->id], false);
+        $recordings = recording_search::load_recording_search_content($recordings);
+        $out = recording_search::filter_recordings_by_query($recordings, 'palabraunica');
 
         $this->assertCount(0, $out);
     }
@@ -210,14 +211,14 @@ final class search_test extends \advanced_testcase {
      * The topic filter compares exact topics accent- and case-insensitively.
      */
     public function test_filter_by_topic_matches_accents(): void {
-        $out = googlemeet_filter_recordings_by_topic(
+        $out = recording_search::filter_recordings_by_topic(
             [$this->rec('a', true, ['Cardiología']), $this->rec('b', true, ['Trauma'])],
             'cardiologia'
         );
         $this->assertCount(1, $out);
         $this->assertSame('a', $out[0]->name);
 
-        $out = googlemeet_filter_recordings_by_topic([$this->rec('a', true, ['cardiologia'])], 'Cardiología');
+        $out = recording_search::filter_recordings_by_topic([$this->rec('a', true, ['cardiologia'])], 'Cardiología');
         $this->assertCount(1, $out);
     }
 
@@ -233,7 +234,7 @@ final class search_test extends \advanced_testcase {
             'transcripttext' => 'Transcripción interna con contenido buscable.',
         ]);
 
-        $recordings = googlemeet_list_recordings(['googlemeetid' => $googlemeet->id], false);
+        $recordings = recordings::list_recordings(['googlemeetid' => $googlemeet->id], false);
 
         $this->assertCount(1, $recordings);
         $this->assertFalse(property_exists($recordings[0], 'notestext'));

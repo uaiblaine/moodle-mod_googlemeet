@@ -16,14 +16,14 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recordings;
+use mod_googlemeet\output\recording_hub;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Analyses stuck in 'processing' are visible to teachers, retryable and cleaned up by cron.
@@ -35,8 +35,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversClass(ai_service::class)]
 #[CoversClass(\mod_googlemeet\task\process_ai_analysis::class)]
-#[CoversFunction('googlemeet_list_recordings')]
-#[CoversFunction('googlemeet_print_recording_hub')]
+#[CoversClass(recordings::class)]
+#[CoversClass(recording_hub::class)]
 final class ai_stuck_test extends \advanced_testcase {
     /** @var \stdClass */
     private $course;
@@ -167,12 +167,12 @@ final class ai_stuck_test extends \advanced_testcase {
             $PAGE->set_cm($this->cm);
             $PAGE->set_context($context);
             ob_start();
-            googlemeet_print_recording_hub($this->googlemeet, $this->cm, $context, $recording);
+            recording_hub::print_recording_hub($this->googlemeet, $this->cm, $context, $recording);
             return ob_get_clean();
         };
 
         $this->setUser($teacher);
-        $list = googlemeet_list_recordings(['googlemeetid' => $this->googlemeet->id], true);
+        $list = recordings::list_recordings(['googlemeetid' => $this->googlemeet->id], true);
         $this->assertTrue($list[0]->aistatusisstuck);
         $this->assertFalse($list[0]->aistatusisprocessing);
         $html = $render();
@@ -180,7 +180,7 @@ final class ai_stuck_test extends \advanced_testcase {
         $this->assertStringContainsString(s(get_string('ai_status_stuck', 'googlemeet', 60)), $html);
 
         $this->setUser($student);
-        $list = googlemeet_list_recordings(['googlemeetid' => $this->googlemeet->id], true);
+        $list = recordings::list_recordings(['googlemeetid' => $this->googlemeet->id], true);
         $this->assertFalse($list[0]->aistatusisstuck);
         $this->assertTrue($list[0]->aistatusisprocessing);
         $this->assertStringNotContainsString('data-action="ai-stuck-retry"', $render());

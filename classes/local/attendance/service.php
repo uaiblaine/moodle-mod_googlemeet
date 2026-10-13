@@ -16,6 +16,9 @@
 
 namespace mod_googlemeet\local\attendance;
 
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\schedule;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -91,9 +94,9 @@ class service {
         foreach ($rows as $row) {
             $gid = (int)$row->googlemeetid;
             if (!array_key_exists($gid, $cancelled)) {
-                $cancelled[$gid] = googlemeet_get_cancelled($gid);
+                $cancelled[$gid] = schedule::get_cancelled($gid);
             }
-            if (googlemeet_is_cancelled((int)$row->eventdate, $cancelled[$gid]) !== false) {
+            if (schedule::is_cancelled((int)$row->eventdate, $cancelled[$gid]) !== false) {
                 continue;
             }
             $DB->insert_record('googlemeet_attendance_sync', (object)[
@@ -333,14 +336,14 @@ class service {
     }
 
     /**
-     * Normalise a person name for matching: lower case, accents folded (those of {@see googlemeet_fold()}
+     * Normalise a person name for matching: lower case, accents folded (those of {@see recording_format::fold()}
      * plus grave accents, ç and ï; others are kept), punctuation removed.
      *
      * @param string $name Name.
      * @return string
      */
     public static function normalise_name(string $name): string {
-        $name = googlemeet_fold($name);
+        $name = recording_format::fold($name);
         $name = strtr($name, ['à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u', 'ç' => 'c', 'ï' => 'i']);
         $name = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $name);
         return trim(preg_replace('/\s+/u', ' ', $name));

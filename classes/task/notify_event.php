@@ -24,9 +24,7 @@
 
 namespace mod_googlemeet\task;
 
-defined('MOODLE_INTERNAL') || die();
-
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+use mod_googlemeet\local\reminders;
 
 /**
  * Send notification about the start of the event.
@@ -69,7 +67,7 @@ class notify_event extends \core\task\scheduled_task {
                 mtrace("mod_googlemeet notify: {$sent} reminder(s) sent.");
             }
 
-            googlemeet_remove_notify_done_from_old_events();
+            reminders::remove_notify_done_from_old_events();
         } finally {
             $lock->release();
         }
