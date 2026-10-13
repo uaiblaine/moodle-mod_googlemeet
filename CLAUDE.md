@@ -68,14 +68,19 @@ Plugin CLI scripts (all `CLI_SCRIPT`, run from the Moodle root): `cli/backfill_c
 ## Code layout
 
 ```
-lib.php, locallib.php        legacy API callbacks + page builders (large; new logic goes to classes/local)
+lib.php                      Moodle callbacks only (no locallib.php; new logic goes to classes/)
 classes/client.php           Google OAuth 2 client (Calendar, Drive), per-teacher tokens
 classes/rest.php             \core\oauth2\rest endpoints for Calendar/Drive/Meet
 classes/gemini_client.php    Gemini REST + File API upload (core \curl::put, see gotchas)
 classes/ai_service.php       analysis orchestration; classes/question_service.php practice questions
 classes/external.php         legacy WS class (mod_googlemeet_external); classes/external/* newer WS
 classes/local/               sync_manager, calendar_sync, attendance/*, ai_review, report_builder,
-                             recording_cleanup (cascade delete, trash), reminders, impersonation
+                             recording_cleanup (cascade delete, trash), reminders, impersonation,
+                             recordings, recording_format/progress/search/media, schedule,
+                             stale_recurrence, materials, room_entry (+ clear_url), view_page
+                             (header, logout/sync/subscribe actions)
+classes/output/              hero (hero, room CTA, continue watching, progress summary),
+                             recordings_list, recording_hub (static builders); mobile; *_page renderables
 classes/task/                13 scheduled/adhoc tasks (autosync, notifications, AI, attendance)
 classes/privacy/provider.php metadata + request + userlist providers for all user tables
 templates/, amd/src/         recording hub, recordings table, practice, AI review UI (DOM API, no jQuery)

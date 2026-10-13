@@ -24,13 +24,9 @@
 namespace mod_googlemeet\output;
 
 use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recording_media;
 use mod_googlemeet\local\recordings;
 use mod_googlemeet\local\schedule;
-
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Mobile app (Moodle App site plugin) views.
@@ -262,7 +258,7 @@ class mobile {
 
         [$cm, $context, $googlemeet] = self::load($args);
         $recordingid = (int)(((array)$args)['recordingid'] ?? 0);
-        $recording = googlemeet_get_accessible_recording($googlemeet, $context, $recordingid);
+        $recording = recordings::get_accessible_recording($googlemeet, $context, $recordingid);
         if (!$recording || empty($recording->visible)) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
@@ -275,7 +271,7 @@ class mobile {
         $keypoints = [];
         $chapters = [];
         if (self::ai_visible($analysis, $context)) {
-            foreach (googlemeet_summary_paragraphs((string)$analysis->summary) as $paragraph) {
+            foreach (recording_format::summary_paragraphs((string)$analysis->summary) as $paragraph) {
                 $summary[] = ['text' => format_text($paragraph, FORMAT_PLAIN, ['context' => $context])];
             }
             // Plain spelling, as in recordings_page(): the template escapes key points and titles once.
@@ -289,7 +285,10 @@ class mobile {
                     'index' => $index,
                     'title' => format_string($chapter['title'], true, ['context' => $context, 'escape' => false]),
                     'start' => $chapter['start'],
-                    'url' => googlemeet_get_recording_seek_url((string)$recording->webviewlink, (int)$chapter['startseconds']),
+                    'url' => recording_media::get_recording_seek_url(
+                        (string)$recording->webviewlink,
+                        (int)$chapter['startseconds']
+                    ),
                 ];
             }
         }

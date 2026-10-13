@@ -17,20 +17,20 @@
 namespace mod_googlemeet;
 
 use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recording_media;
 use mod_googlemeet\local\recording_search;
 use mod_googlemeet\local\recordings;
+use mod_googlemeet\local\room_entry;
 use mod_googlemeet\local\schedule;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
- * Unit tests for the helper functions of lib.php and locallib.php.
+ * Unit tests for the schedule, Meet URL, recording media and recording list helpers.
  *
  * Holidays, cancelled dates, Meet URLs and event construction, plus the recording list helpers
  * (titles, summaries, timestamps, filters, topics).
@@ -41,10 +41,9 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 #[CoversClass(schedule::class)]
-#[CoversFunction('googlemeet_clear_url')]
+#[CoversClass(room_entry::class)]
 #[CoversClass(recordings::class)]
-#[CoversFunction('googlemeet_summary_paragraphs')]
-#[CoversFunction('googlemeet_get_recording_seek_url')]
+#[CoversClass(recording_media::class)]
 #[CoversClass(recording_format::class)]
 final class locallib_test extends \advanced_testcase {
     // Helpers.
@@ -145,9 +144,9 @@ final class locallib_test extends \advanced_testcase {
     public function test_summary_paragraphs(): void {
         $this->assertSame(
             ["Uno\nsigue", 'Dos & tres', 'Cuatro'],
-            googlemeet_summary_paragraphs("Uno\nsigue\n\n\nDos & tres\r\n\r\nCuatro  ")
+            recording_format::summary_paragraphs("Uno\nsigue\n\n\nDos & tres\r\n\r\nCuatro  ")
         );
-        $this->assertSame([], googlemeet_summary_paragraphs(" \n \n"));
+        $this->assertSame([], recording_format::summary_paragraphs(" \n \n"));
     }
 
     /**
@@ -157,13 +156,13 @@ final class locallib_test extends \advanced_testcase {
         $view = 'https://drive.google.com/file/d/AbC_123-x/view?usp=drive_link';
         $preview = 'https://drive.google.com/file/d/AbC_123-x/preview';
 
-        $this->assertSame($preview . '?t=90', googlemeet_get_recording_seek_url($view, 90));
-        $this->assertSame($preview, googlemeet_get_recording_seek_url($view, 0));
-        $this->assertSame($preview, googlemeet_get_recording_seek_url($view, -15));
-        $this->assertSame($preview . '?t=5', googlemeet_get_recording_seek_url($preview . '?t=300#t=1', 5));
+        $this->assertSame($preview . '?t=90', recording_media::get_recording_seek_url($view, 90));
+        $this->assertSame($preview, recording_media::get_recording_seek_url($view, 0));
+        $this->assertSame($preview, recording_media::get_recording_seek_url($view, -15));
+        $this->assertSame($preview . '?t=5', recording_media::get_recording_seek_url($preview . '?t=300#t=1', 5));
 
         $other = 'https://example.com/video.mp4';
-        $this->assertSame($other, googlemeet_get_recording_seek_url($other, 90));
+        $this->assertSame($other, recording_media::get_recording_seek_url($other, 90));
     }
 
     /**
@@ -409,7 +408,7 @@ final class locallib_test extends \advanced_testcase {
         $this->assertSame('Session cancelled', $records[1]->reason);
     }
 
-    // Tests of googlemeet_clear_url().
+    // Tests of room_entry::clear_url().
 
     /**
      * A full Meet URL is normalised to the canonical https:// form.
@@ -417,7 +416,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_clear_url_full_meet_url(): void {
         $url = 'https://meet.google.com/abc-defg-hij';
-        $this->assertEquals($url, googlemeet_clear_url($url));
+        $this->assertEquals($url, room_entry::clear_url($url));
     }
 
     /**
@@ -426,7 +425,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_clear_url_with_extra_params(): void {
         $url    = 'https://meet.google.com/xyz-abcd-efg?authuser=0&hl=es';
-        $result = googlemeet_clear_url($url);
+        $result = room_entry::clear_url($url);
         $this->assertEquals('https://meet.google.com/xyz-abcd-efg', $result);
     }
 
@@ -436,7 +435,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_clear_url_http_input(): void {
         $url    = 'http://meet.google.com/aaa-bbbb-ccc';
-        $result = googlemeet_clear_url($url);
+        $result = room_entry::clear_url($url);
         $this->assertEquals('https://meet.google.com/aaa-bbbb-ccc', $result);
     }
 
@@ -446,7 +445,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_clear_url_embedded_in_text(): void {
         $raw    = 'Join the meeting at https://meet.google.com/pqr-stuv-wxy and have fun';
-        $result = googlemeet_clear_url($raw);
+        $result = room_entry::clear_url($raw);
         $this->assertEquals('https://meet.google.com/pqr-stuv-wxy', $result);
     }
 
@@ -455,9 +454,9 @@ final class locallib_test extends \advanced_testcase {
      *
      */
     public function test_clear_url_invalid_returns_null(): void {
-        $this->assertNull(googlemeet_clear_url('https://zoom.us/j/12345'));
-        $this->assertNull(googlemeet_clear_url('not-a-url'));
-        $this->assertNull(googlemeet_clear_url(''));
+        $this->assertNull(room_entry::clear_url('https://zoom.us/j/12345'));
+        $this->assertNull(room_entry::clear_url('not-a-url'));
+        $this->assertNull(room_entry::clear_url(''));
     }
 
     /**
@@ -468,8 +467,8 @@ final class locallib_test extends \advanced_testcase {
         // The function extracts the first "meet.google.com/" followed by a 3-4-3 code anywhere
         // in the string, so a rejection case must contain no such code at all. A longer tail
         // like abc-defg-hijklm still yields abc-defg-hij, by design.
-        $this->assertNull(googlemeet_clear_url('https://meet.google.com/ab-cdef-ghi'));   // 2-4-3.
-        $this->assertNull(googlemeet_clear_url('https://meet.google.com/abcd-ef-ghij'));  // 4-2-4.
+        $this->assertNull(room_entry::clear_url('https://meet.google.com/ab-cdef-ghi'));   // 2-4-3.
+        $this->assertNull(room_entry::clear_url('https://meet.google.com/abcd-ef-ghij'));  // 4-2-4.
     }
 
     /**
@@ -477,8 +476,8 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_clear_url_pins_the_host(): void {
         // Unescaped dots used to accept any character, and the match was returned as the URL.
-        $this->assertNull(googlemeet_clear_url('https://meetXgoogleYcom/abc-defg-hij'));
-        $this->assertSame('https://meet.google.com/abc-defg-hij', googlemeet_clear_url('https://MEET.google.com/abc-defg-hij'));
+        $this->assertNull(room_entry::clear_url('https://meetXgoogleYcom/abc-defg-hij'));
+        $this->assertSame('https://meet.google.com/abc-defg-hij', room_entry::clear_url('https://MEET.google.com/abc-defg-hij'));
     }
 
     // Tests of DB-backed code: schedule::construct_events_data_for_add() reads googlemeet_holidays.

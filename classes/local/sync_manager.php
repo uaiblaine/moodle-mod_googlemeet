@@ -211,9 +211,6 @@ class sync_manager {
      * @return array Stats.
      */
     private static function default_runner(stdClass $googlemeet): array {
-        global $CFG;
-        require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
-
         $client = new client();
         if (!$client->enabled || !$client->check_login()) {
             throw new \moodle_exception('sync_status_notlinked', 'googlemeet');

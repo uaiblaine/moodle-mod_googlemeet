@@ -20,7 +20,7 @@ use core_text;
 
 /**
  * Pure formatting helpers for recordings: durations, timestamps, chapters, date chips and groups,
- * summary truncation, accent folding, AI status flags and the key points label.
+ * summary truncation and paragraphs, accent folding, AI status flags and the key points label.
  *
  * @package     mod_googlemeet
  * @copyright   2026 Anderson Blaine
@@ -191,6 +191,23 @@ class recording_format {
             return $text;
         }
         return core_text::substr($text, 0, $length) . '…';
+    }
+
+    /**
+     * Split an AI summary into paragraphs (blank-line separated), dropping empty ones.
+     *
+     * Single line breaks inside a paragraph are kept (format_text turns them into <br>),
+     * so list-like summaries still read correctly.
+     *
+     * @param string $summary Plain-text summary.
+     * @return string[] Paragraphs, trimmed.
+     */
+    public static function summary_paragraphs(string $summary): array {
+        $summary = str_replace(["\r\n", "\r"], "\n", $summary);
+        $paragraphs = preg_split('/\n\s*\n/', $summary) ?: [];
+        return array_values(array_filter(array_map('trim', $paragraphs), static function (string $paragraph) {
+            return $paragraph !== '';
+        }));
     }
 
     /**

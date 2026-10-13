@@ -21,7 +21,8 @@ use context_module;
 use stdClass;
 
 /**
- * Recording listing, counts, the Drive sync entry point, display names and lesson titles.
+ * Recording listing, counts, the Drive sync entry point, display names, lesson titles and the
+ * lookup of one recording the current user may open.
  *
  * Also holds the course-module-viewed event and completion helper that view.php and the
  * mobile view call.
@@ -552,6 +553,33 @@ class recordings {
         );
         $cache->set($cachekey, $titles);
         return $titles;
+    }
+
+    /**
+     * Returns a recording the current user may open, or false.
+     *
+     * Trashed recordings, recordings of another activity and hidden recordings (for
+     * users without editrecording) are all reported identically as "not available".
+     *
+     * @param object $googlemeet Activity record.
+     * @param context_module $context Activity context.
+     * @param int $recordingid Recording id.
+     * @return object|false
+     */
+    public static function get_accessible_recording($googlemeet, $context, int $recordingid) {
+        global $DB;
+
+        $recording = $DB->get_record(
+            'googlemeet_recordings',
+            ['id' => $recordingid, 'googlemeetid' => $googlemeet->id, 'deleted' => 0]
+        );
+        if (!$recording) {
+            return false;
+        }
+        if (empty($recording->visible) && !has_capability('mod/googlemeet:editrecording', $context)) {
+            return false;
+        }
+        return $recording;
     }
 
     /**

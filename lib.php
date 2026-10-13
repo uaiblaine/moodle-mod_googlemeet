@@ -25,6 +25,8 @@
 use mod_googlemeet\client;
 use mod_googlemeet\local\creator;
 use mod_googlemeet\local\file_serving;
+use mod_googlemeet\local\materials;
+use mod_googlemeet\local\room_entry;
 use mod_googlemeet\local\schedule;
 
 /**
@@ -149,8 +151,7 @@ function googlemeet_pluginfile($course, $cm, $context, $filearea, $args, $forced
  * @return int The id of the newly inserted record.
  */
 function googlemeet_add_instance($googlemeet, $mform = null) {
-    global $DB, $CFG, $USER;
-    require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+    global $DB, $USER;
 
     // The creator is derived below from who linked or owns the organiser e-mail, never taken from the data.
     unset($googlemeet->creatoruserid);
@@ -159,7 +160,7 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
 
     // Not logged in to Google: keep the Meet URL typed in the form, normalised.
     if (!$client->check_login()) {
-        $url = googlemeet_clear_url($googlemeet->url);
+        $url = room_entry::clear_url($googlemeet->url);
         if ($url) {
             $googlemeet->url = $url;
         }
@@ -229,7 +230,7 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
     schedule::set_events($googlemeet, $events);
 
     // Save teacher attachments (files for students to download).
-    googlemeet_save_attachments($googlemeet);
+    materials::save_attachments($googlemeet);
 
     return $googlemeet->id;
 }
@@ -245,8 +246,7 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
  * @return bool True if successful, false otherwise.
  */
 function googlemeet_update_instance($googlemeet, $mform = null) {
-    global $DB, $CFG, $USER;
-    require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+    global $DB, $USER;
 
     $googlemeet->id = $googlemeet->instance;
     // The stored creator stays unless the organiser e-mail changes (below); the data never names it.
@@ -264,7 +264,7 @@ function googlemeet_update_instance($googlemeet, $mform = null) {
     }
 
     if (isset($googlemeet->url)) {
-        $url = googlemeet_clear_url($googlemeet->url);
+        $url = room_entry::clear_url($googlemeet->url);
         if ($url) {
             $googlemeet->url = $url;
         }
@@ -319,7 +319,7 @@ function googlemeet_update_instance($googlemeet, $mform = null) {
     schedule::merge_events($googlemeet, $events);
 
     // Save teacher attachments (files for students to download).
-    googlemeet_save_attachments($googlemeet);
+    materials::save_attachments($googlemeet);
 
     return $googlemeetupdated;
 }
@@ -331,8 +331,7 @@ function googlemeet_update_instance($googlemeet, $mform = null) {
  * @return bool True if successful, false on failure.
  */
 function googlemeet_delete_instance($id) {
-    global $DB, $CFG;
-    require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+    global $DB;
 
     $googlemeetrecord = $DB->get_record('googlemeet', ['id' => $id]);
     if (!$googlemeetrecord) {

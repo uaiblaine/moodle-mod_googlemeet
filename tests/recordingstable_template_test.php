@@ -16,13 +16,14 @@
 
 namespace mod_googlemeet;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\output\recordings_list;
+use PHPUnit\Framework\Attributes\CoversClass;
+
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * The recordings list template: URL-encoded sort and page links, JS-quoted lang strings.
@@ -32,7 +33,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 Anderson Blaine
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_print_recordings')]
+#[CoversClass(recordings_list::class)]
 final class recordingstable_template_test extends \advanced_testcase {
     /** @var string Search text with the characters a query string gives a meaning to. */
     private const QUERY = 'a&b #c';
@@ -119,7 +120,7 @@ final class recordingstable_template_test extends \advanced_testcase {
         $PAGE->set_cm($cm);
         $PAGE->set_context($context);
         ob_start();
-        googlemeet_print_recordings($googlemeet, $cm, $context, 1, null, self::QUERY, self::TOPIC);
+        recordings_list::print_recordings($googlemeet, $cm, $context, 1, null, self::QUERY, self::TOPIC);
         $html = ob_get_clean();
         $js = implode(";\n", (new \ReflectionProperty($PAGE->requires, 'amdjscode'))->getValue($PAGE->requires));
         return [$html, $js];

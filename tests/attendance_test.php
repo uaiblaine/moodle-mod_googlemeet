@@ -356,8 +356,7 @@ final class attendance_test extends \advanced_testcase {
      * Changing the schedule never drops a past session that has attendance.
      */
     public function test_schedule_change_keeps_sessions_with_attendance(): void {
-        global $CFG, $DB;
-        require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
+        global $DB;
 
         service::process($this->googlemeet, $this->sync_row(), $this->double($this->start), time());
         $empty = $this->create_session($this->start - 2 * DAYSECS);

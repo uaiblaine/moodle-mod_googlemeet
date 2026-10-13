@@ -23,7 +23,6 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * The site timezone decides the day of a session for every viewer and for cron.

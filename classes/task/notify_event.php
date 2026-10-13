@@ -26,10 +26,6 @@ namespace mod_googlemeet\task;
 
 use mod_googlemeet\local\reminders;
 
-defined('MOODLE_INTERNAL') || die();
-
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
-
 /**
  * Send notification about the start of the event.
  *

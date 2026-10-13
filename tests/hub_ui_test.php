@@ -17,13 +17,13 @@
 namespace mod_googlemeet;
 
 use mod_googlemeet\local\recording_format;
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\output\recording_hub;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Recording hub UI rules: which tabs are shown to whom.
@@ -33,8 +33,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_print_recording_hub')]
-#[CoversFunction('googlemeet_hub_resume_label')]
+#[CoversClass(recording_hub::class)]
 final class hub_ui_test extends \advanced_testcase {
     /**
      * Render the hub for the current user.
@@ -52,7 +51,7 @@ final class hub_ui_test extends \advanced_testcase {
         $PAGE->set_cm($cm);
         $PAGE->set_context($context);
         ob_start();
-        googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording);
+        recording_hub::print_recording_hub($googlemeet, $cm, $context, $recording);
         return ob_get_clean();
     }
 
@@ -137,14 +136,14 @@ final class hub_ui_test extends \advanced_testcase {
         ]));
         $this->assertSame(get_string('hub_resume_chapter', 'googlemeet', (object)[
             'title' => 'Derechos de los ciudadanos', 'time' => recording_format::format_seconds_timestamp(842),
-        ]), googlemeet_hub_resume_label(842, $chapters));
+        ]), recording_hub::hub_resume_label(842, $chapters));
         $this->assertSame(
             get_string('hub_resume_time', 'googlemeet', recording_format::format_seconds_timestamp(900)),
-            googlemeet_hub_resume_label(900, $chapters)
+            recording_hub::hub_resume_label(900, $chapters)
         );
         $this->assertSame(
             get_string('hub_resume_time', 'googlemeet', recording_format::format_seconds_timestamp(842)),
-            googlemeet_hub_resume_label(842, [])
+            recording_hub::hub_resume_label(842, [])
         );
     }
 }

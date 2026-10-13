@@ -22,7 +22,6 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * The activity-wide publish reports each recording name in its plain spelling.

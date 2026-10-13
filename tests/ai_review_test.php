@@ -20,14 +20,14 @@ use core_external\external_api;
 use mod_googlemeet\local\ai_review;
 use mod_googlemeet\local\recording_search;
 use mod_googlemeet\local\recordings;
+use mod_googlemeet\output\hero;
+use mod_googlemeet\output\recording_hub;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 require_once($CFG->dirroot . '/backup/util/includes/backup_includes.php');
 require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
@@ -44,8 +44,8 @@ require_once($CFG->dirroot . '/backup/util/includes/restore_includes.php');
 #[CoversClass(\mod_googlemeet\external\review_ai_analysis::class)]
 #[CoversClass(\mod_googlemeet\privacy\provider::class)]
 #[CoversClass(recordings::class)]
-#[CoversFunction('googlemeet_print_recording_hub')]
-#[CoversFunction('googlemeet_get_continue_watching_context')]
+#[CoversClass(recording_hub::class)]
+#[CoversClass(hero::class)]
 final class ai_review_test extends \advanced_testcase {
     /** @var \stdClass */
     private $course;
@@ -114,7 +114,7 @@ final class ai_review_test extends \advanced_testcase {
         $PAGE->set_cm($this->cm);
         $PAGE->set_context($this->context);
         ob_start();
-        googlemeet_print_recording_hub($this->googlemeet, $this->cm, $this->context, $recording);
+        recording_hub::print_recording_hub($this->googlemeet, $this->cm, $this->context, $recording);
         return ob_get_clean();
     }
 
@@ -232,12 +232,12 @@ final class ai_review_test extends \advanced_testcase {
     public function test_continue_watching_snippet(): void {
         $this->create_recording();
         $this->setUser($this->student);
-        $ctx = googlemeet_get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
+        $ctx = hero::get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
         $this->assertTrue($ctx['hascontinue']);
         $this->assertSame('', $ctx['continuesummary']);
 
         $this->setUser($this->teacher);
-        $ctx = googlemeet_get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
+        $ctx = hero::get_continue_watching_context($this->googlemeet, $this->cm, $this->context);
         $this->assertStringContainsString('Resumen secreto', $ctx['continuesummary']);
     }
 

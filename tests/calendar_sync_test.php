@@ -26,7 +26,6 @@ defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/tests/fixtures/calendar_sync_test_fake_rest.php');
 
 /**

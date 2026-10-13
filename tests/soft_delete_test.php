@@ -21,13 +21,11 @@ use mod_googlemeet\local\recordings;
 use mod_googlemeet\local\schedule;
 use mod_googlemeet\task\process_recording_enrichment;
 use PHPUnit\Framework\Attributes\CoversClass;
-use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 
 /**
@@ -41,7 +39,6 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 #[CoversClass(recordings::class)]
 #[CoversClass(recording_search::class)]
 #[CoversClass(schedule::class)]
-#[CoversFunction('googlemeet_get_accessible_recording')]
 #[CoversClass(\mod_googlemeet_external::class)]
 #[CoversClass(process_recording_enrichment::class)]
 final class soft_delete_test extends \advanced_testcase {
@@ -502,7 +499,7 @@ final class soft_delete_test extends \advanced_testcase {
         $this->setUser($student);
 
         foreach ([$trashed, $hidden, 999999] as $id) {
-            $this->assertFalse(googlemeet_get_accessible_recording($googlemeet, $context, $id));
+            $this->assertFalse(recordings::get_accessible_recording($googlemeet, $context, $id));
             try {
                 \mod_googlemeet_external::mark_recording_progress($id, $cm->id, 1, false);
                 $this->fail('Expected recordingnotfound.');
@@ -512,10 +509,10 @@ final class soft_delete_test extends \advanced_testcase {
                 $this->assertSame(get_string('recordingnotfound', 'googlemeet'), $e->getMessage());
             }
         }
-        $this->assertNotFalse(googlemeet_get_accessible_recording($googlemeet, $context, $ok));
+        $this->assertNotFalse(recordings::get_accessible_recording($googlemeet, $context, $ok));
 
         $this->setAdminUser();
-        $this->assertNotFalse(googlemeet_get_accessible_recording($googlemeet, $context, $hidden));
-        $this->assertFalse(googlemeet_get_accessible_recording($googlemeet, $context, $trashed));
+        $this->assertNotFalse(recordings::get_accessible_recording($googlemeet, $context, $hidden));
+        $this->assertFalse(recordings::get_accessible_recording($googlemeet, $context, $trashed));
     }
 }

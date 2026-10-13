@@ -26,10 +26,10 @@ defined('MOODLE_INTERNAL') || die();
 
 use mod_googlemeet\client;
 use mod_googlemeet\local\creator;
+use mod_googlemeet\local\room_entry;
 use mod_googlemeet\local\schedule;
 
 require_once($CFG->dirroot . '/course/moodleform_mod.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Module instance settings form.
@@ -619,7 +619,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
      *
      * The logout link of {@see client::print_user_info()} carries sesskey; without it a cross-site
      * link to the settings page would unlink the teacher's account. Mirrors the view page's check in
-     * googlemeet_handle_view_actions().
+     * \mod_googlemeet\local\view_page::handle_view_actions().
      *
      * @return bool
      */
@@ -874,7 +874,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
     }
 
     /**
-     * Add an error when the URL holds no Google Meet code (see googlemeet_clear_url()).
+     * Add an error when the URL holds no Google Meet code (see room_entry::clear_url()).
      *
      * @param string $url Url to validate.
      * @param array $errors Form errors.
@@ -882,7 +882,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
      * @return array Form errors.
      */
     private function validate_url(string $url, array $errors) {
-        if (googlemeet_clear_url($url) == null) {
+        if (room_entry::clear_url($url) == null) {
             $errors['url'] = get_string('url_failed', 'googlemeet');
         }
         return $errors;

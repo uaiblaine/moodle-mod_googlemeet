@@ -17,13 +17,13 @@
 namespace mod_googlemeet;
 
 use mod_googlemeet\local\schedule;
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\output\hero;
+use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * The hero's course calendar link is built from wwwroot, so a site under a path keeps it.
@@ -33,7 +33,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 Anderson Blaine
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_get_classroom_hero_context')]
+#[CoversClass(hero::class)]
 final class hero_calendar_url_test extends \advanced_testcase {
     /**
      * On a site served from /moodle the rendered schedule link points into /moodle/calendar.
@@ -60,7 +60,7 @@ final class hero_calendar_url_test extends \advanced_testcase {
 
         $upcoming = schedule::get_upcoming_events($googlemeet->id, 3);
         $schedule = schedule::get_upcoming_events($googlemeet->id, 0, true);
-        $hero = googlemeet_get_classroom_hero_context($googlemeet, $cm, $context, $upcoming, true, $schedule);
+        $hero = hero::get_classroom_hero_context($googlemeet, $cm, $context, $upcoming, true, $schedule);
         // Control: the schedule section that carries the link is rendered.
         $this->assertTrue($hero['hasscheduleevents']);
 

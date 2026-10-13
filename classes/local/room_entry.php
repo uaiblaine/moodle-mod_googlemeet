@@ -17,7 +17,8 @@
 namespace mod_googlemeet\local;
 
 /**
- * "Join the live class" entry point: logs the intention to join and resolves the Meet URL.
+ * "Join the live class" entry point: logs the intention to join, resolves the Meet URL and
+ * normalises a typed one.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -105,5 +106,23 @@ class room_entry {
      */
     public static function entry_url(int $cmid): \moodle_url {
         return new \moodle_url('/mod/googlemeet/enter.php', ['id' => $cmid, 'sesskey' => sesskey()]);
+    }
+
+    /**
+     * Extract the Google Meet room from a URL as https://meet.google.com/xxx-xxxx-xxx.
+     *
+     * Every non-null result matches {@see self::MEET_URL_PATTERN}, which room_url() checks; that
+     * pattern is the wider one (anchored, but it also admits @:%._+~#= inside the code).
+     *
+     * @param string $url
+     * @return string|null The normalised URL, or null when the text holds no Meet room code.
+     */
+    public static function clear_url($url) {
+        // Literal dots and a URL rebuilt from the code alone: the host of the result is always meet.google.com.
+        if (preg_match('~meet\.google\.com/([a-z0-9]{3}-[a-z0-9]{4}-[a-z0-9]{3})~i', (string)$url, $matches)) {
+            return 'https://meet.google.com/' . $matches[1];
+        }
+
+        return null;
     }
 }

@@ -26,11 +26,6 @@ namespace mod_googlemeet\task;
 
 use mod_googlemeet\local\stale_recurrence;
 
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
-
 /**
  * Weekly check that warns site admins when a googlemeet recurrence looks abandoned.
  */

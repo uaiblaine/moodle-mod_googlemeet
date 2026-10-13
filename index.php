@@ -25,7 +25,6 @@
 require(__DIR__ . '/../../config.php');
 
 require_once(__DIR__ . '/lib.php');
-require_once(__DIR__ . '/locallib.php');
 require_once($CFG->dirroot . '/course/lib.php');
 
 $id = required_param('id', PARAM_INT);
@@ -106,7 +105,7 @@ foreach ($cms as $instanceid => $cm) {
     $progress = '';
     if (!$isteacher && $recordingcount > 0) {
         $showprogress = true;
-        $summary = googlemeet_get_progress_summary($googlemeet, $context);
+        $summary = \mod_googlemeet\output\hero::get_progress_summary($googlemeet, $context);
         $progress = get_string('index_myprogress_value', 'mod_googlemeet', (object)[
             'watched' => $summary['watched'],
             'total' => $summary['total'],

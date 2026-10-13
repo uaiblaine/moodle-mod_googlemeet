@@ -66,7 +66,6 @@ class reminders {
      */
     public static function get_due_events(int $now): array {
         global $DB;
-        self::require_libs();
 
         $select = "SELECT me.id,
                           me.eventdate,
@@ -130,7 +129,6 @@ class reminders {
      * @return int Number of reminders sent.
      */
     public static function run(int $now): int {
-        self::require_libs();
         $sent = 0;
         foreach (self::get_due_events($now) as $event) {
             $users = self::get_users_to_notify((int)$event->id, (int)$event->kind);
@@ -163,7 +161,6 @@ class reminders {
      * @return \core\message\message
      */
     public static function build_message(stdClass $user, stdClass $event): \core\message\message {
-        self::require_libs();
         $previouslang = null;
         if (!empty($user->lang) && get_string_manager()->translation_exists($user->lang, false)) {
             $previouslang = force_current_language($user->lang);
@@ -402,16 +399,5 @@ class reminders {
         $emailcontent = str_replace(array_keys($templatevars), array_values($templatevars), $template);
 
         return $emailcontent;
-    }
-
-    /**
-     * Load the plugin libraries the reminder helpers rely on.
-     *
-     * @return void
-     */
-    private static function require_libs(): void {
-        global $CFG;
-        require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-        require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
     }
 }

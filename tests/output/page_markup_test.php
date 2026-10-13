@@ -16,13 +16,14 @@
 
 namespace mod_googlemeet\output;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
+use mod_googlemeet\local\materials;
+use PHPUnit\Framework\Attributes\CoversClass;
+
 
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
 require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 
 /**
  * Markup of the page fragments rendered through templates instead of html_writer.
@@ -36,7 +37,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  * @copyright   2026 Anderson Blaine
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_print_attachments')]
+#[CoversClass(materials::class)]
 final class page_markup_test extends \advanced_testcase {
     /**
      * Run a plugin page script as the current user and return its output.
@@ -77,7 +78,7 @@ final class page_markup_test extends \advanced_testcase {
         $PAGE->set_context($context);
         $OUTPUT = $PAGE->get_renderer('core', null, RENDERER_TARGET_GENERAL);
         ob_start();
-        googlemeet_print_attachments($context);
+        materials::print_attachments($context);
         return ob_get_clean();
     }
 
