@@ -124,7 +124,7 @@ if ($mform->is_cancelled()) {
 }
 
 echo $OUTPUT->header();
-echo html_writer::link($redirecturl, '&lsaquo; ' . get_string('back'), ['class' => 'btn btn-link px-0']);
+echo $OUTPUT->render_from_template('mod_googlemeet/material_back_link', ['url' => $redirecturl->out(false)]);
 echo $OUTPUT->heading(get_string('materials_upload', 'googlemeet') . ': ' . format_string($recording->name), 3);
 $mform->display();
 echo $OUTPUT->footer();

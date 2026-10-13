@@ -167,11 +167,9 @@ echo $OUTPUT->render_from_template('mod_googlemeet/hero', $herocontext);
 
 if (has_capability('mod/googlemeet:editrecording', $context)) {
     if ($googlemeet->eventid != null) {
-        echo html_writer::link(
-            'https://calendar.google.com/calendar/u/0/r/eventedit/' . $googlemeet->eventid,
-            get_string('eventdetails', 'googlemeet'),
-            ['class' => 'btn btn-outline-primary ms-2', 'target' => '_blank', 'title' => get_string('eventdetails', 'googlemeet')]
-        );
+        echo $OUTPUT->render_from_template('mod_googlemeet/event_details_link', [
+            'url' => 'https://calendar.google.com/calendar/u/0/r/eventedit/' . $googlemeet->eventid,
+        ]);
     }
 }
 

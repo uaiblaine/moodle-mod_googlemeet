@@ -827,10 +827,12 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
  */
 function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $context): array {
     global $DB, $USER;
-    static $cache = [];
-    $key = (int)$googlemeet->id . ':' . (int)$USER->id;
-    if (isset($cache[$key])) {
-        return $cache[$key];
+    // A request cache rather than a static: it is per request too, and core purges it between unit tests.
+    $cache = \cache::make_from_params(\cache_store::MODE_REQUEST, 'mod_googlemeet', 'progresssummary');
+    $key = (int)$googlemeet->id . '_' . (int)$USER->id;
+    $cached = $cache->get($key);
+    if ($cached !== false) {
+        return $cached;
     }
 
     $visiblewhere = has_capability('mod/googlemeet:editrecording', $context) ? '' : 'AND r.visible = 1';
@@ -859,7 +861,7 @@ function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $c
     );
     $pct = $total > 0 ? (int)round($watched * 100 / $total) : 0;
 
-    $cache[$key] = [
+    $summary = [
         'total' => $total,
         'watched' => $watched,
         'started' => $started,
@@ -869,7 +871,8 @@ function googlemeet_get_progress_summary(stdClass $googlemeet, context_module $c
         'startedpct' => $total > 0 ? min(100 - $pct, (int)round($started * 100 / $total)) : 0,
         'viewedids' => $viewedids,
     ];
-    return $cache[$key];
+    $cache->set($key, $summary);
+    return $summary;
 }
 
 /**
@@ -1733,10 +1736,7 @@ function googlemeet_print_attachments(context_module $context): void {
         return;
     }
 
-    echo html_writer::start_div('googlemeet-attachments mt-4');
-    echo $OUTPUT->heading(get_string('attachmentsheader', 'googlemeet'), 4);
-    echo html_writer::start_tag('ul', ['class' => 'list-unstyled mb-0']);
-
+    $items = [];
     foreach ($files as $file) {
         if ($file->is_directory()) {
             continue;
@@ -1751,21 +1751,15 @@ function googlemeet_print_attachments(context_module $context): void {
             $filename,
             true
         );
-        $icon = $OUTPUT->pix_icon(file_file_icon($file), '', 'moodle', ['class' => 'me-2']);
-        $size = html_writer::tag(
-            'span',
-            ' (' . display_size($file->get_filesize()) . ')',
-            ['class' => 'text-muted small']
-        );
-        echo html_writer::tag(
-            'li',
-            html_writer::link($url, $icon . s($filename) . $size),
-            ['class' => 'mb-1']
-        );
+        $items[] = [
+            'url' => $url->out(false),
+            'icon' => $OUTPUT->pix_icon(file_file_icon($file), '', 'moodle', ['class' => 'me-2']),
+            'filename' => $filename,
+            'size' => display_size($file->get_filesize()),
+        ];
     }
 
-    echo html_writer::end_tag('ul');
-    echo html_writer::end_div();
+    echo $OUTPUT->render_from_template('mod_googlemeet/attachments', ['files' => $items]);
 }
 
 /**
