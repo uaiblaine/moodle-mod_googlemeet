@@ -21,13 +21,15 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import $ from 'jquery';
 import Ajax from 'core/ajax';
 import {getString} from 'core/str';
 import Notification from 'core/notification';
 
 let initialised = false;
 let countdownTimer = null;
+
+/** @var {WeakSet<HTMLFormElement>} Sync forms already submitted once. */
+const submittingForms = new WeakSet();
 
 /**
  * Format seconds remaining as a compact countdown.
@@ -55,25 +57,32 @@ const formatCountdown = seconds => {
 /**
  * Promote a room CTA from soon to live when its countdown reaches zero.
  *
- * @param {jQuery} countdown Countdown element inside the CTA.
+ * @param {HTMLElement} countdown Countdown element inside the CTA.
  * @returns {void}
  */
 const refreshRoomCtaOnLive = countdown => {
     const cta = countdown.closest('.googlemeet-room-cta');
-    if (!cta.length || cta.attr('data-googlemeet-room-live') === '1') {
+    if (!cta || cta.getAttribute('data-googlemeet-room-live') === '1') {
         return;
     }
 
-    const liveLabel = cta.attr('data-live-label') || '';
+    const liveLabel = cta.getAttribute('data-live-label') || '';
     if (liveLabel !== '') {
-        cta.find('.googlemeet-room-cta-label').text(liveLabel);
+        cta.querySelectorAll('.googlemeet-room-cta-label').forEach(label => {
+            label.textContent = liveLabel;
+        });
     }
-    cta.removeClass('googlemeet-room-cta-soon').addClass('googlemeet-room-cta-live');
-    if (!cta.find('.googlemeet-pulse').length) {
-        $('<span>').addClass('googlemeet-pulse').attr('aria-hidden', 'true').prependTo(cta);
+    cta.classList.remove('googlemeet-room-cta-soon');
+    cta.classList.add('googlemeet-room-cta-live');
+    if (!cta.querySelector('.googlemeet-pulse')) {
+        const pulse = document.createElement('span');
+        pulse.classList.add('googlemeet-pulse');
+        pulse.setAttribute('aria-hidden', 'true');
+        cta.prepend(pulse);
     }
-    countdown.text('').attr('hidden', 'hidden');
-    cta.attr('data-googlemeet-room-live', '1');
+    countdown.textContent = '';
+    countdown.setAttribute('hidden', 'hidden');
+    cta.setAttribute('data-googlemeet-room-live', '1');
 };
 
 /**
@@ -82,30 +91,29 @@ const refreshRoomCtaOnLive = countdown => {
  * @returns {void}
  */
 const refreshCountdowns = () => {
-    $('[data-googlemeet-countdown]').each(function() {
-        const element = $(this);
-        const target = parseInt(element.attr('data-target-ts'), 10);
+    document.querySelectorAll('[data-googlemeet-countdown]').forEach(element => {
+        const target = parseInt(element.getAttribute('data-target-ts'), 10);
         if (!target) {
             return;
         }
 
         const remaining = target - Math.floor(Date.now() / 1000);
         if (remaining <= 0) {
-            if (element.hasClass('googlemeet-room-cta-countdown')) {
+            if (element.classList.contains('googlemeet-room-cta-countdown')) {
                 refreshRoomCtaOnLive(element);
                 return;
             }
 
-            const expired = element.attr('data-countdown-expired') || '';
+            const expired = element.getAttribute('data-countdown-expired') || '';
             if (expired !== '') {
-                element.text(expired);
+                element.textContent = expired;
             }
             return;
         }
 
-        const prefix = element.attr('data-countdown-prefix') || '';
+        const prefix = element.getAttribute('data-countdown-prefix') || '';
         const value = formatCountdown(remaining);
-        element.text(prefix !== '' ? prefix + ' ' + value : value);
+        element.textContent = prefix !== '' ? prefix + ' ' + value : value;
     });
 };
 
@@ -115,7 +123,7 @@ const refreshCountdowns = () => {
  * @returns {void}
  */
 const initCountdowns = () => {
-    if (!$('[data-googlemeet-countdown]').length) {
+    if (!document.querySelector('[data-googlemeet-countdown]')) {
         return;
     }
 
@@ -136,39 +144,47 @@ export const init = () => {
     }
     initialised = true;
 
-    $(document).on('submit', 'form', event => {
-        const form = $(event.currentTarget);
-        const method = (form.attr('method') || '').toLowerCase();
-        const action = form.attr('action') || '';
+    document.addEventListener('submit', event => {
+        const form = event.target instanceof Element ? event.target.closest('form') : null;
+        if (!form) {
+            return;
+        }
+        const method = (form.getAttribute('method') || '').toLowerCase();
+        const action = form.getAttribute('action') || '';
         const isSyncForm = method === 'post' && (
-            form.find('input[name="sync"]').length || action.indexOf('sync=') !== -1
+            form.querySelector('input[name="sync"]') || action.indexOf('sync=') !== -1
         );
 
         if (!isSyncForm) {
             return;
         }
-        if (form.closest('[data-googlemeet-async-sync]').length) {
+        if (form.closest('[data-googlemeet-async-sync]')) {
             // Handled in the background by initSyncPanel().
             return;
         }
 
-        if (form.data('googlemeetSyncSubmitting')) {
-            // What "return false" did in a jQuery handler, kept explicit so every path returns nothing.
+        if (submittingForms.has(form)) {
             event.preventDefault();
             event.stopPropagation();
             return;
         }
 
-        form.data('googlemeetSyncSubmitting', true);
-        $('#googlemeet_syncimg').css('display', 'flex');
-        form.find('input[type="submit"], button[type="submit"], button:not([type])').prop('disabled', true);
-
-        return;
+        submittingForms.add(form);
+        const overlay = document.getElementById('googlemeet_syncimg');
+        if (overlay) {
+            overlay.style.display = 'flex';
+        }
+        form.querySelectorAll('input[type="submit"], button[type="submit"], button:not([type])').forEach(button => {
+            button.disabled = true;
+        });
     });
 
-    $('#googlemeet-topic-select').on('change', function() {
-        this.form.submit();
-    });
+    const topicSelect = document.getElementById('googlemeet-topic-select');
+    if (topicSelect) {
+        topicSelect.addEventListener('change', () => {
+            topicSelect.form.submit();
+        });
+    }
 
     initCountdowns();
 };
@@ -186,24 +202,36 @@ let pollTimer = null;
  * @returns {void}
  */
 const renderSyncStatus = status => {
-    const region = $('[data-region="googlemeet-sync-progress"]');
-    if (!region.length) {
+    const regions = document.querySelectorAll('[data-region="googlemeet-sync-progress"]');
+    if (!regions.length) {
         return;
     }
     if (status.status === 'none' || !status.message) {
-        region.attr('hidden', 'hidden');
+        regions.forEach(region => region.setAttribute('hidden', 'hidden'));
         return;
     }
-    region.removeAttr('hidden')
-        .toggleClass('alert-info', status.active)
-        .toggleClass('alert-success', status.status === 'success')
-        .toggleClass('alert-danger', status.status === 'error');
-    region.find('[data-region="googlemeet-sync-progress-text"]').text(status.message);
-    region.find('[data-action="googlemeet-sync-reload"]').prop('hidden', !(status.status === 'success' && status.haschanges));
+    regions.forEach(region => {
+        region.removeAttribute('hidden');
+        region.classList.toggle('alert-info', !!status.active);
+        region.classList.toggle('alert-success', status.status === 'success');
+        region.classList.toggle('alert-danger', status.status === 'error');
+        region.querySelectorAll('[data-region="googlemeet-sync-progress-text"]').forEach(text => {
+            text.textContent = status.message;
+        });
+        region.querySelectorAll('[data-action="googlemeet-sync-reload"]').forEach(link => {
+            link.hidden = !(status.status === 'success' && status.haschanges);
+        });
+    });
     if (status.lastsync) {
-        $('#id_lastsync').text(status.lastsync);
+        const lastsync = document.getElementById('id_lastsync');
+        if (lastsync) {
+            lastsync.textContent = status.lastsync;
+        }
     }
-    $('[data-googlemeet-async-sync]').find('button, input[type="submit"]').prop('disabled', !!status.active);
+    document.querySelectorAll('[data-googlemeet-async-sync] button, [data-googlemeet-async-sync] input[type="submit"]')
+        .forEach(button => {
+            button.disabled = !!status.active;
+        });
 };
 
 /**
@@ -241,14 +269,21 @@ export const initSyncPanel = (cmid, active) => {
     }
     syncPanelInitialised = true;
 
-    $(document).on('submit', '[data-googlemeet-async-sync] form', event => {
-        event.preventDefault();
-        const form = $(event.currentTarget);
-        const buttons = form.find('button, input[type="submit"]');
-        if (buttons.prop('disabled')) {
+    document.addEventListener('submit', event => {
+        const form = event.target instanceof Element ? event.target.closest('[data-googlemeet-async-sync] form') : null;
+        if (!form) {
             return;
         }
-        buttons.prop('disabled', true);
+        event.preventDefault();
+        const buttons = Array.from(form.querySelectorAll('button, input[type="submit"]'));
+        // The state of the first button stands for all of them.
+        if (buttons.length && buttons[0].disabled) {
+            return;
+        }
+        const setDisabled = disabled => buttons.forEach(button => {
+            button.disabled = disabled;
+        });
+        setDisabled(true);
         getString('sync_status_requesting', 'mod_googlemeet').then(text => {
             renderSyncStatus({status: 'queued', active: true, message: text, haschanges: false, lastsync: ''});
             return text;
@@ -263,12 +298,16 @@ export const initSyncPanel = (cmid, active) => {
                 return status;
             })
             .catch(error => {
-                buttons.prop('disabled', false);
+                setDisabled(false);
                 Notification.exception(error);
             });
     });
 
-    $(document).on('click', '[data-action="googlemeet-sync-reload"]', event => {
+    document.addEventListener('click', event => {
+        const link = event.target instanceof Element ? event.target.closest('[data-action="googlemeet-sync-reload"]') : null;
+        if (!link) {
+            return;
+        }
         event.preventDefault();
         window.location.reload();
     });

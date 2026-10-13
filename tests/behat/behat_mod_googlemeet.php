@@ -79,4 +79,106 @@ class behat_mod_googlemeet extends behat_base {
         }
         set_config('issuerid', $issuer->get('id'), 'googlemeet');
     }
+
+    // phpcs:disable moodle.Files.LineLength -- A step definition regex cannot be wrapped.
+    /**
+     * Open the activity-wide practice session of one topic (practice.php?mode=topic).
+     *
+     * @Given /^I visit the practice session of googlemeet "(?P<name_string>[^"]*)" for topic "(?P<topic_string>[^"]*)"$/
+     * @param string $name Activity name.
+     * @param string $topic Topic, as the AI analysis lists it.
+     */
+    public function i_visit_practice_session_of_googlemeet_for_topic(string $name, string $topic): void {
+        global $DB;
+        $instance = $DB->get_record('googlemeet', ['name' => $name], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('googlemeet', $instance->id, $instance->course, false, MUST_EXIST);
+        $url = new moodle_url('/mod/googlemeet/practice.php', ['id' => $cm->id, 'mode' => 'topic', 'topic' => $topic]);
+        $this->getSession()->visit($this->locate_path($url->out_as_local_url(false)));
+    }
+    // phpcs:enable
+
+    // phpcs:disable moodle.Files.LineLength -- A step definition regex cannot be wrapped.
+    /**
+     * Leave the AI analysis of a recording in 'processing' since long before the stuck threshold.
+     *
+     * Simulates a background worker that died, without running any task or calling Gemini.
+     *
+     * @Given /^the AI analysis of googlemeet recording "(?P<recording_string>[^"]*)" is stuck$/
+     * @param string $recording Recording name.
+     */
+    public function the_ai_analysis_of_googlemeet_recording_is_stuck(string $recording): void {
+        $this->rewrite_ai_analysis($recording, ['status' => 'processing', 'error' => null, 'timemodified' => 1]);
+    }
+
+    /**
+     * Mark the AI analysis of a recording as failed with a stored error.
+     *
+     * Simulates the outcome of a background worker, without running any task or calling Gemini.
+     *
+     * @Given /^the AI analysis of googlemeet recording "(?P<recording_string>[^"]*)" failed with "(?P<error_string>[^"]*)"$/
+     * @param string $recording Recording name.
+     * @param string $error Stored error (a message, or a special code such as ai_subtitles_unavailable).
+     */
+    public function the_ai_analysis_of_googlemeet_recording_failed_with(string $recording, string $error): void {
+        $this->rewrite_ai_analysis($recording, ['status' => 'failed', 'error' => $error, 'timemodified' => time()]);
+    }
+    // phpcs:enable
+
+    /**
+     * Overwrite fields of the AI analysis row of a recording.
+     *
+     * @param string $recording Recording name (the first match when names repeat).
+     * @param array $fields Column => value.
+     * @throws Exception When the recording or its analysis does not exist.
+     */
+    protected function rewrite_ai_analysis(string $recording, array $fields): void {
+        global $DB;
+        $recordingid = $DB->get_field('googlemeet_recordings', 'id', ['name' => $recording], IGNORE_MULTIPLE);
+        if (!$recordingid) {
+            throw new Exception('The recording "' . $recording . '" does not exist');
+        }
+        $analysis = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recordingid]);
+        if (!$analysis) {
+            throw new Exception('The recording "' . $recording . '" has no AI analysis');
+        }
+        foreach ($fields as $field => $value) {
+            $analysis->$field = $value;
+        }
+        $DB->update_record('googlemeet_ai_analysis', $analysis);
+    }
+
+    // phpcs:disable moodle.Files.LineLength -- A step definition regex cannot be wrapped.
+    /**
+     * Open the lesson hub of one recording (view.php?id=..&recording=..).
+     *
+     * @Given /^I open the recording hub of "(?P<recording_string>[^"]*)" in googlemeet "(?P<name_string>[^"]*)"$/
+     * @param string $recording Recording name.
+     * @param string $name Activity name.
+     */
+    public function i_open_the_recording_hub_of_in_googlemeet(string $recording, string $name): void {
+        $this->i_open_the_recording_hub_of_in_googlemeet_with($recording, $name, '');
+    }
+
+    /**
+     * Open the lesson hub of one recording with a suffix: more parameters ("&t=842") or a tab fragment ("#questions").
+     *
+     * @Given /^I open the recording hub of "(?P<recording_string>[^"]*)" in googlemeet "(?P<name_string>[^"]*)" with "(?P<suffix_string>[^"]*)"$/
+     * @param string $recording Recording name.
+     * @param string $name Activity name.
+     * @param string $suffix Text appended to the hub URL as it is.
+     */
+    public function i_open_the_recording_hub_of_in_googlemeet_with(string $recording, string $name, string $suffix): void {
+        global $DB;
+        $instance = $DB->get_record('googlemeet', ['name' => $name], '*', MUST_EXIST);
+        $cm = get_coursemodule_from_instance('googlemeet', $instance->id, $instance->course, false, MUST_EXIST);
+        $recordingid = $DB->get_field(
+            'googlemeet_recordings',
+            'id',
+            ['googlemeetid' => $instance->id, 'name' => $recording],
+            MUST_EXIST
+        );
+        $url = new moodle_url('/mod/googlemeet/view.php', ['id' => $cm->id, 'recording' => $recordingid]);
+        $this->getSession()->visit($this->locate_path($url->out_as_local_url(false) . $suffix));
+    }
+    // phpcs:enable
 }

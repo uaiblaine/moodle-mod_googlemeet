@@ -3,6 +3,20 @@
 All notable changes to `mod_googlemeet`. Versions up to 2.30.1 are the upstream
 (`hyukudan/moodle-mod_googlemeet`) releases this fork started from.
 
+## 2.30.1+uai.8 (unreleased)
+- The recordings list's sort toggle and page links are built in PHP with each parameter once: the
+  toggle used to add a second `rorder` to a URL that already had one, so the order did not change.
+- The practice "Review missed questions (n)" and live score labels show their number again (the
+  template rendered the strings without an argument, which emptied the `{$a}` placeholder).
+- No jQuery left: the recording hub, AI panel, question review, sync, practice and recordings-list
+  scripts use the DOM API, core/ajax promises with then/catch and Bootstrap 5 through
+  theme_boost/index (Tab, Modal). The recordings list's inline scripts moved into the new
+  `mod_googlemeet/recordings_table` AMD module. Behaviour and markup are unchanged.
+- First `@javascript` Behat coverage of the plugin's JavaScript: recording hub (tabs, chapters,
+  timestamps, transcript search, key points, mark as viewed, rename, show/hide, question discard
+  and edit, practice), AI panel and question review, recordings list (search, filters, sort,
+  rename, show/hide, trash and purge, practice session).
+
 ## 2.30.1+uai.7 (unreleased)
 - The per-user progress summary is cached in a request cache instead of a PHP static, so unit tests
   (which reuse ids after each reset) never read another test's counts.

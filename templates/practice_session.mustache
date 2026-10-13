@@ -31,7 +31,7 @@
     <div class="googlemeet-practice-head">
       <h3 class="googlemeet-hub-section-title mb-0">{{title}}</h3>
       <span class="googlemeet-practice-progress" aria-live="polite"></span>
-      <span class="googlemeet-practice-livescore d-none" data-template="{{# str }} practice_live_score, mod_googlemeet {{/ str }}"></span>
+      <span class="googlemeet-practice-livescore d-none" data-template="{{# str }} practice_live_score, mod_googlemeet, __a__ {{/ str }}"></span>
     </div>
     <div class="progress googlemeet-practice-meter d-none" role="progressbar" aria-label="{{title}}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
       <div class="progress-bar"></div>
@@ -61,7 +61,7 @@
          data-good="{{# str }} practice_result_good, mod_googlemeet {{/ str }}"
          data-low="{{# str }} practice_session_result_low, mod_googlemeet {{/ str }}"></p>
       <div class="googlemeet-practice-actions">
-        <button type="button" class="btn btn-primary googlemeet-practice-review d-none" data-template="{{# str }} practice_review_wrong, mod_googlemeet {{/ str }}"></button>
+        <button type="button" class="btn btn-primary googlemeet-practice-review d-none" data-template="{{# str }} practice_review_wrong, mod_googlemeet, __a__ {{/ str }}"></button>
         <button type="button" class="btn btn-outline-primary googlemeet-practice-retry">{{# str }} practice_retry_all, mod_googlemeet {{/ str }}</button>
         <a href="{{landingurl}}" class="btn btn-link">{{# str }} practice_back_landing, mod_googlemeet {{/ str }}</a>
       </div>

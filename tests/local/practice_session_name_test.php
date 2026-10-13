@@ -30,7 +30,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 /**
  * The practice session returns the recording name in its plain spelling.
  *
- * practice_session.js writes it with jQuery .text(), which escapes on its own: an already escaped name
+ * practice_session.js writes it as textContent, which escapes on its own: an already escaped name
  * shows as "A &amp; B".
  *
  * @package     mod_googlemeet

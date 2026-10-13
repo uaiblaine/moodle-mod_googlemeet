@@ -21,7 +21,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import $ from 'jquery';
 import Ajax from 'core/ajax';
 import * as Notification from 'core/notification';
 import {getStrings} from 'core/str';
@@ -68,24 +67,53 @@ const fill = (text, value) => String(text || '').split('{$a}').join(String(value
  * @param {string} text Raw text.
  * @returns {string}
  */
-const escapeHtml = text => $('<div>').text(text || '').html();
+const escapeHtml = text => {
+    const holder = document.createElement('div');
+    holder.textContent = text || '';
+    return holder.innerHTML;
+};
+
+/**
+ * Every element of the page matching a selector.
+ *
+ * @param {string} selector CSS selector.
+ * @returns {HTMLElement[]}
+ */
+const all = selector => Array.from(document.querySelectorAll(selector));
+
+/**
+ * Handle events on elements matching a selector, delegated from the document.
+ *
+ * A click on a disabled match is ignored.
+ *
+ * @param {string} type Event type.
+ * @param {string} selector CSS selector.
+ * @param {Function} handler Called with the matching element and the event.
+ * @returns {void}
+ */
+const delegate = (type, selector, handler) => {
+    document.addEventListener(type, event => {
+        const element = event.target instanceof Element ? event.target.closest(selector) : null;
+        if (element && !(type === 'click' && element.disabled === true)) {
+            handler(element, event);
+        }
+    });
+};
 
 /**
  * Selected draft question checkboxes.
  *
- * @returns {JQuery}
+ * @returns {HTMLInputElement[]}
  */
-const selectedDrafts = () => $('.googlemeet-question-select[data-isdraft="1"]:checked');
+const selectedDrafts = () => all('.googlemeet-question-select[data-isdraft="1"]:checked');
 
 /**
  * IDs of the given checkboxes.
  *
- * @param {JQuery} boxes Checkboxes.
+ * @param {HTMLInputElement[]} boxes Checkboxes.
  * @returns {number[]}
  */
-const idsOf = boxes => boxes.map(function() {
-    return parseInt(this.value, 10);
-}).get();
+const idsOf = boxes => boxes.map(box => parseInt(box.value, 10));
 
 /**
  * Show a status message under the bulk bar.
@@ -95,9 +123,10 @@ const idsOf = boxes => boxes.map(function() {
  * @returns {void}
  */
 const showStatus = (type, html) => {
-    $('.googlemeet-question-bulk-status')
-        .attr('class', 'googlemeet-question-bulk-status alert alert-' + type + ' mt-2 mb-3')
-        .html(html);
+    all('.googlemeet-question-bulk-status').forEach(element => {
+        element.setAttribute('class', 'googlemeet-question-bulk-status alert alert-' + type + ' mt-2 mb-3');
+        element.innerHTML = html;
+    });
 };
 
 /**
@@ -118,7 +147,9 @@ const showWorking = () => {
  */
 const setBusy = busy => {
     settings.busy = busy;
-    $('.googlemeet-question-bulkbar button, .googlemeet-question-publish-activity').prop('disabled', busy);
+    all('.googlemeet-question-bulkbar button, .googlemeet-question-publish-activity').forEach(button => {
+        button.disabled = busy;
+    });
     if (!busy) {
         refreshState();
     }
@@ -130,27 +161,33 @@ const setBusy = busy => {
  * @returns {void}
  */
 const refreshState = () => {
-    const all = $('.googlemeet-question-select');
-    const checked = all.filter(':checked');
+    const boxes = all('.googlemeet-question-select');
+    const checked = boxes.filter(box => box.checked);
     const drafts = selectedDrafts().length;
-    const selectAll = $('.googlemeet-question-select-all');
 
-    selectAll.prop('checked', all.length > 0 && checked.length === all.length);
-    selectAll.prop('indeterminate', checked.length > 0 && checked.length < all.length);
+    all('.googlemeet-question-select-all').forEach(selectAll => {
+        selectAll.checked = boxes.length > 0 && checked.length === boxes.length;
+        selectAll.indeterminate = checked.length > 0 && checked.length < boxes.length;
+    });
     // Once everything is ticked the same box clears the selection: say so in its label.
-    const allChecked = all.length > 0 && checked.length === all.length;
+    const allChecked = boxes.length > 0 && checked.length === boxes.length;
     const label = allChecked ? strings.question_deselect_all : strings.question_select_all;
     if (label) {
-        $('label[for="googlemeet-question-select-all"]').text(label);
+        all('label[for="googlemeet-question-select-all"]').forEach(element => {
+            element.textContent = label;
+        });
     }
 
     if (settings.busy) {
         return;
     }
-    $('.googlemeet-question-bulk-publish')
-        .text(fill(strings.question_bulk_publish_count, drafts))
-        .prop('disabled', drafts === 0);
-    $('.googlemeet-question-bulk-discard').prop('disabled', drafts === 0);
+    all('.googlemeet-question-bulk-publish').forEach(button => {
+        button.textContent = fill(strings.question_bulk_publish_count, drafts);
+        button.disabled = drafts === 0;
+    });
+    all('.googlemeet-question-bulk-discard').forEach(button => {
+        button.disabled = drafts === 0;
+    });
 };
 
 /**
@@ -185,7 +222,7 @@ const publishBatch = ids => {
         showStatus('success', escapeHtml(fill(strings.question_published_count, response.count)));
         setTimeout(reloadHub, 900);
         return;
-    }).fail(error => {
+    }).catch(error => {
         setBusy(false);
         showStatus('danger', batchError(error));
     });
@@ -241,7 +278,7 @@ const publishActivity = () => {
         setBusy(false);
         showActivityOutcome(response);
         return;
-    }).fail(error => {
+    }).catch(error => {
         setBusy(false);
         showStatus('danger', escapeHtml(error.message || strings.ai_error_unknown));
     });
@@ -253,20 +290,23 @@ const publishActivity = () => {
  * @returns {void}
  */
 const bindEvents = () => {
-    $(document).on('change', '.googlemeet-question-select-all', function() {
-        $('.googlemeet-question-select').prop('checked', this.checked);
+    delegate('change', '.googlemeet-question-select-all', selectAll => {
+        all('.googlemeet-question-select').forEach(box => {
+            box.checked = selectAll.checked;
+        });
         refreshState();
     });
-    $(document).on('change', '.googlemeet-question-select', refreshState);
+    delegate('change', '.googlemeet-question-select', refreshState);
 
-    $(document).on('click', '.googlemeet-question-publish', function() {
-        publishBatch([parseInt($(this).closest('.googlemeet-question-card').attr('data-questionid'), 10)]);
+    delegate('click', '.googlemeet-question-publish', button => {
+        const card = button.closest('.googlemeet-question-card');
+        publishBatch([parseInt(card ? card.getAttribute('data-questionid') : undefined, 10)]);
     });
 
-    $(document).on('click', '.googlemeet-question-bulk-publish', () => publishBatch(idsOf(selectedDrafts())));
+    delegate('click', '.googlemeet-question-bulk-publish', () => publishBatch(idsOf(selectedDrafts())));
 
-    $(document).on('click', '.googlemeet-question-publish-recording', function() {
-        const ids = idsOf($('.googlemeet-question-select[data-isdraft="1"]'));
+    delegate('click', '.googlemeet-question-publish-recording', button => {
+        const ids = idsOf(all('.googlemeet-question-select[data-isdraft="1"]'));
         if (!ids.length) {
             return;
         }
@@ -274,11 +314,11 @@ const bindEvents = () => {
             strings.question_publish_recording,
             escapeHtml(fill(strings.question_publish_recording_confirm, ids.length)),
             strings.question_publish_recording,
-            {triggerElement: this}
+            {triggerElement: button}
         ).then(() => publishBatch(ids)).catch(() => null);
     });
 
-    $(document).on('click', '.googlemeet-question-bulk-discard', function() {
+    delegate('click', '.googlemeet-question-bulk-discard', button => {
         const ids = idsOf(selectedDrafts());
         if (!ids.length) {
             return;
@@ -289,7 +329,7 @@ const bindEvents = () => {
             strings.question_bulk_discard,
             escapeHtml(strings.question_bulk_discard_confirm),
             strings.question_bulk_discard,
-            {triggerElement: this}
+            {triggerElement: button}
         ).then(() => {
             confirmed = true;
             setBusy(true);
@@ -310,17 +350,17 @@ const bindEvents = () => {
         });
     });
 
-    $(document).on('click', '.googlemeet-question-publish-activity', function() {
-        const count = parseInt($(this).attr('data-count'), 10) || 0;
+    delegate('click', '.googlemeet-question-publish-activity', button => {
+        const count = parseInt(button.getAttribute('data-count'), 10) || 0;
         Notification.saveCancelPromise(
             strings.question_publish_activity,
             escapeHtml(fill(strings.question_publish_activity_confirm, count)),
             strings.question_publish_activity,
-            {triggerElement: this}
+            {triggerElement: button}
         ).then(publishActivity).catch(() => null);
     });
 
-    $(document).on('click', '.googlemeet-question-reload', () => reloadHub());
+    delegate('click', '.googlemeet-question-reload', () => reloadHub());
 };
 
 /**

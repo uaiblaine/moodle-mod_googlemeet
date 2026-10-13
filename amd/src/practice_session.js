@@ -25,7 +25,6 @@
  * @license    http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 
-import $ from 'jquery';
 import Ajax from 'core/ajax';
 import {getStrings} from 'core/str';
 
@@ -45,7 +44,11 @@ const stringKeys = [
     'ai_error_unknown',
 ];
 
-const escapeHtml = value => $('<div>').text(value || '').html();
+const escapeHtml = value => {
+    const div = document.createElement('div');
+    div.textContent = value || '';
+    return div.innerHTML;
+};
 
 /**
  * Initialise the practice session.
@@ -57,11 +60,11 @@ const escapeHtml = value => $('<div>').text(value || '').html();
  * @param {string} config.hubbaseurl Activity view URL (the hub is view.php?id=..&recording=..).
  */
 export const init = async(config) => {
-    const player = $('.googlemeet-practice-session-player');
-    if (!player.length || player.attr('data-initialised') === '1') {
+    const player = document.querySelector('.googlemeet-practice-session-player');
+    if (!player || player.getAttribute('data-initialised') === '1') {
         return;
     }
-    player.attr('data-initialised', '1');
+    player.setAttribute('data-initialised', '1');
 
     const values = await getStrings(stringKeys.map(key => ({key, component: COMPONENT})));
     const strings = {};
@@ -79,49 +82,84 @@ export const init = async(config) => {
         reviewing: false,
     };
 
-    const find = selector => player.find(selector);
+    // Act on every match of a selector inside the player, not only the first.
+    const findAll = selector => Array.from(player.querySelectorAll(selector));
+    const find = selector => player.querySelector(selector);
+    const addClass = (selector, ...classes) => findAll(selector).forEach(el => el.classList.add(...classes));
+    const removeClass = (selector, ...classes) => findAll(selector).forEach(el => el.classList.remove(...classes));
+    const setDisabled = (selector, disabled) => findAll(selector).forEach(el => {
+        el.disabled = disabled;
+    });
+    const focus = selector => {
+        const el = find(selector);
+        if (el) {
+            el.focus();
+        }
+    };
 
     const showError = message => {
-        find('.googlemeet-practice-loading').addClass('d-none');
-        find('.googlemeet-practice-error').removeClass('d-none').text(message || strings.ai_error_unknown);
+        addClass('.googlemeet-practice-loading', 'd-none');
+        findAll('.googlemeet-practice-error').forEach(el => {
+            el.classList.remove('d-none');
+            el.textContent = message || strings.ai_error_unknown;
+        });
     };
 
     const updateHeader = answered => {
         const total = state.queue.length;
         const current = Math.min(state.index + 1, total);
         const done = state.index + (answered ? 1 : 0);
-        const label = (player.attr('data-progress-tpl') || '{$a->current} / {$a->total}')
+        const label = (player.getAttribute('data-progress-tpl') || '{$a->current} / {$a->total}')
             .replace('{$a->current}', current)
             .replace('{$a->total}', total);
-        find('.googlemeet-practice-progress').text((state.reviewing ? strings.practice_round_review + ' · ' : '') + label);
-        const live = find('.googlemeet-practice-livescore');
-        live.removeClass('d-none').text((live.attr('data-template') || '{$a}').replace('{$a}', state.correct));
+        findAll('.googlemeet-practice-progress').forEach(el => {
+            el.textContent = (state.reviewing ? strings.practice_round_review + ' · ' : '') + label;
+        });
+        findAll('.googlemeet-practice-livescore').forEach(live => {
+            live.classList.remove('d-none');
+            live.textContent = (live.getAttribute('data-template') || '__a__').replace('__a__', state.correct);
+        });
         const pct = total ? Math.round((done / total) * 100) : 0;
-        find('.googlemeet-practice-meter').removeClass('d-none').attr('aria-valuenow', pct)
-            .find('.progress-bar').css('width', pct + '%');
+        findAll('.googlemeet-practice-meter').forEach(meter => {
+            meter.classList.remove('d-none');
+            meter.setAttribute('aria-valuenow', pct);
+            meter.querySelectorAll('.progress-bar').forEach(bar => {
+                bar.style.width = pct + '%';
+            });
+        });
     };
 
     const renderQuestion = () => {
         const question = state.queue[state.index];
         let optionsHtml = '';
         state.checked = false;
-        find('.googlemeet-practice-loading, .googlemeet-practice-complete, .googlemeet-practice-error, ' +
-            '.googlemeet-practice-empty').addClass('d-none');
-        find('.googlemeet-practice-question').removeClass('d-none');
-        find('.googlemeet-practice-options').removeClass('googlemeet-practice-options-answered');
+        addClass('.googlemeet-practice-loading, .googlemeet-practice-complete, .googlemeet-practice-error, ' +
+            '.googlemeet-practice-empty', 'd-none');
+        removeClass('.googlemeet-practice-question', 'd-none');
+        removeClass('.googlemeet-practice-options', 'googlemeet-practice-options-answered');
         updateHeader(false);
 
         const sourceUrl = new URL(config.hubbaseurl, window.location.href);
         sourceUrl.searchParams.set('recording', question.recordingid);
-        find('.googlemeet-practice-source')
-            .attr('href', sourceUrl.toString())
-            .text(strings.practice_session_from.replace('{$a}', question.recordingname));
+        findAll('.googlemeet-practice-source').forEach(source => {
+            source.setAttribute('href', sourceUrl.toString());
+            source.textContent = strings.practice_session_from.replace('{$a}', question.recordingname);
+        });
 
         // Stem/options are sanitised server-side with format_text() (same contract as the hub player).
-        find('.googlemeet-practice-stem').html(question.stem);
-        find('.googlemeet-practice-feedback').addClass('d-none').removeClass('alert alert-success alert-warning').empty();
-        find('.googlemeet-practice-check').prop('disabled', true).removeClass('d-none');
-        find('.googlemeet-practice-next').addClass('d-none');
+        findAll('.googlemeet-practice-stem').forEach(stem => {
+            stem.innerHTML = question.stem;
+        });
+        findAll('.googlemeet-practice-feedback').forEach(feedback => {
+            feedback.classList.add('d-none');
+            feedback.classList.remove('alert', 'alert-success', 'alert-warning');
+            feedback.replaceChildren();
+        });
+        findAll('.googlemeet-practice-check').forEach(check => {
+            check.disabled = true;
+            check.classList.remove('d-none');
+        });
+        addClass('.googlemeet-practice-next', 'd-none');
 
         question.options.forEach((option, index) => {
             const inputid = 'googlemeet-practice-' + question.questionid + '-' + option.answerid;
@@ -133,15 +171,15 @@ export const init = async(config) => {
                 '<span class="googlemeet-practice-option-state"></span>' +
                 '</label>';
         });
-        find('.googlemeet-practice-options').html(optionsHtml);
+        findAll('.googlemeet-practice-options').forEach(options => {
+            options.innerHTML = optionsHtml;
+        });
     };
 
     const showComplete = () => {
         const total = state.queue.length;
         const pct = total ? Math.round((state.correct / total) * 100) : 0;
         const complete = find('.googlemeet-practice-complete');
-        const message = complete.find('.googlemeet-practice-message');
-        const scoreText = complete.find('.googlemeet-practice-score-text');
         let level = 'low';
         if (pct >= 80) {
             level = 'great';
@@ -149,18 +187,34 @@ export const init = async(config) => {
             level = 'good';
         }
         updateHeader(true);
-        find('.googlemeet-practice-question, .googlemeet-practice-loading, .googlemeet-practice-error').addClass('d-none');
-        complete.removeClass('d-none googlemeet-practice-level-great googlemeet-practice-level-good googlemeet-practice-level-low')
-            .addClass('googlemeet-practice-level-' + level);
-        complete.find('.googlemeet-practice-score-value').text(pct + '%');
-        scoreText.text((scoreText.attr('data-template') || '{$a->correct}/{$a->total}')
-            .replace('{$a->correct}', state.correct)
-            .replace('{$a->total}', total));
-        message.text(message.attr('data-' + level) || '');
-        const review = complete.find('.googlemeet-practice-review');
-        review.toggleClass('d-none', state.wrong.length === 0)
-            .text((review.attr('data-template') || '{$a}').replace('{$a}', state.wrong.length));
-        complete.trigger('focus');
+        addClass('.googlemeet-practice-question, .googlemeet-practice-loading, .googlemeet-practice-error', 'd-none');
+        if (!complete) {
+            return;
+        }
+        complete.classList.remove('d-none', 'googlemeet-practice-level-great', 'googlemeet-practice-level-good',
+            'googlemeet-practice-level-low');
+        complete.classList.add('googlemeet-practice-level-' + level);
+        complete.querySelectorAll('.googlemeet-practice-score-value').forEach(el => {
+            el.textContent = pct + '%';
+        });
+        complete.querySelectorAll('.googlemeet-practice-score-text').forEach(scoreText => {
+            scoreText.textContent = (scoreText.getAttribute('data-template') || '{$a->correct}/{$a->total}')
+                .replace('{$a->correct}', state.correct)
+                .replace('{$a->total}', total);
+        });
+        complete.querySelectorAll('.googlemeet-practice-message').forEach(message => {
+            message.textContent = message.getAttribute('data-' + level) || '';
+        });
+        complete.querySelectorAll('.googlemeet-practice-review').forEach(review => {
+            review.classList.toggle('d-none', state.wrong.length === 0);
+            review.textContent = (review.getAttribute('data-template') || '__a__').replace('__a__', state.wrong.length);
+        });
+        complete.focus();
+    };
+
+    const focusStem = () => {
+        findAll('.googlemeet-practice-stem').forEach(stem => stem.setAttribute('tabindex', '-1'));
+        focus('.googlemeet-practice-stem');
     };
 
     const startRound = (queue, reviewing) => {
@@ -170,26 +224,34 @@ export const init = async(config) => {
         state.wrong = [];
         state.reviewing = reviewing;
         renderQuestion();
-        find('.googlemeet-practice-stem').attr('tabindex', '-1').trigger('focus');
+        focusStem();
     };
 
-    player.on('change', '.googlemeet-practice-answer', function() {
-        find('.googlemeet-practice-option').removeClass('googlemeet-practice-option-selected');
-        $(this).closest('.googlemeet-practice-option').addClass('googlemeet-practice-option-selected');
-        find('.googlemeet-practice-check').prop('disabled', false);
+    player.addEventListener('change', event => {
+        const answer = event.target instanceof Element ? event.target.closest('.googlemeet-practice-answer') : null;
+        if (!answer || !player.contains(answer)) {
+            return;
+        }
+        removeClass('.googlemeet-practice-option', 'googlemeet-practice-option-selected');
+        const option = answer.closest('.googlemeet-practice-option');
+        if (option) {
+            option.classList.add('googlemeet-practice-option-selected');
+        }
+        setDisabled('.googlemeet-practice-check', false);
     });
 
-    find('.googlemeet-practice-check').on('click', () => {
+    const checkAnswer = () => {
         if (state.checked) {
             return;
         }
         const question = state.queue[state.index];
-        const answerid = parseInt(find('.googlemeet-practice-answer:checked').val(), 10);
+        const checkedInput = find('.googlemeet-practice-answer:checked');
+        const answerid = parseInt(checkedInput ? checkedInput.value : '', 10);
         if (!answerid) {
             return;
         }
-        find('.googlemeet-practice-error').addClass('d-none');
-        find('.googlemeet-practice-check').prop('disabled', true);
+        addClass('.googlemeet-practice-error', 'd-none');
+        setDisabled('.googlemeet-practice-check', true);
         Ajax.call([{
             methodname: 'mod_googlemeet_check_practice_answer',
             args: {
@@ -205,58 +267,71 @@ export const init = async(config) => {
             } else {
                 state.wrong.push(question);
             }
-            find('.googlemeet-practice-answer').prop('disabled', true);
-            find('.googlemeet-practice-options').addClass('googlemeet-practice-options-answered');
+            setDisabled('.googlemeet-practice-answer', true);
+            addClass('.googlemeet-practice-options', 'googlemeet-practice-options-answered');
             let correctText = '';
-            find('.googlemeet-practice-answer').each(function() {
-                const option = $(this).closest('.googlemeet-practice-option');
-                const stateEl = option.find('.googlemeet-practice-option-state');
-                if (parseInt($(this).val(), 10) === parseInt(response.correctanswerid, 10)) {
-                    option.addClass('googlemeet-practice-option-correct');
-                    correctText = option.find('.googlemeet-practice-option-text').html();
-                    stateEl.html('<span aria-hidden="true">&#10003;</span><span class="visually-hidden">' +
-                        escapeHtml(strings.practice_right_option) + '</span>');
-                } else if ($(this).is(':checked')) {
-                    option.addClass('googlemeet-practice-option-incorrect');
-                    stateEl.html('<span aria-hidden="true">&#10007;</span><span class="visually-hidden">' +
-                        escapeHtml(strings.practice_your_answer) + '</span>');
+            findAll('.googlemeet-practice-answer').forEach(input => {
+                const option = input.closest('.googlemeet-practice-option');
+                if (!option) {
+                    return;
+                }
+                const stateEl = option.querySelector('.googlemeet-practice-option-state');
+                if (parseInt(input.value, 10) === parseInt(response.correctanswerid, 10)) {
+                    option.classList.add('googlemeet-practice-option-correct');
+                    const optionText = option.querySelector('.googlemeet-practice-option-text');
+                    correctText = optionText ? optionText.innerHTML : undefined;
+                    if (stateEl) {
+                        stateEl.innerHTML = '<span aria-hidden="true">&#10003;</span><span class="visually-hidden">' +
+                            escapeHtml(strings.practice_right_option) + '</span>';
+                    }
+                } else if (input.checked) {
+                    option.classList.add('googlemeet-practice-option-incorrect');
+                    if (stateEl) {
+                        stateEl.innerHTML = '<span aria-hidden="true">&#10007;</span><span class="visually-hidden">' +
+                            escapeHtml(strings.practice_your_answer) + '</span>';
+                    }
                 }
             });
             const feedbackClass = response.correct ? 'alert-success' : 'alert-warning';
             const statusText = response.correct ? strings.practice_correct : strings.practice_incorrect;
             const icon = response.correct ? '&#10003;' : '&#10007;';
-            find('.googlemeet-practice-feedback')
-                .removeClass('d-none alert-success alert-warning')
-                .addClass('alert ' + feedbackClass)
-                .html('<div class="fw-bold"><span aria-hidden="true">' + icon + '</span> ' +
+            findAll('.googlemeet-practice-feedback').forEach(feedback => {
+                feedback.classList.remove('d-none', 'alert-success', 'alert-warning');
+                feedback.classList.add('alert', feedbackClass);
+                feedback.innerHTML = '<div class="fw-bold"><span aria-hidden="true">' + icon + '</span> ' +
                     escapeHtml(statusText) + '</div>' +
                     (response.correct ? '' : '<div class="mt-2"><strong>' + escapeHtml(strings.practice_correct_answer) +
                         '</strong> ' + correctText + '</div>') +
-                    (response.explanation ? '<div class="mt-2">' + response.explanation + '</div>' : ''));
+                    (response.explanation ? '<div class="mt-2">' + response.explanation + '</div>' : '');
+            });
             updateHeader(true);
-            find('.googlemeet-practice-check').addClass('d-none');
-            find('.googlemeet-practice-next').removeClass('d-none').text(
-                state.index + 1 >= state.queue.length ? strings.practice_finish : strings.practice_next
-            ).trigger('focus');
+            addClass('.googlemeet-practice-check', 'd-none');
+            findAll('.googlemeet-practice-next').forEach(next => {
+                next.classList.remove('d-none');
+                next.textContent = state.index + 1 >= state.queue.length ? strings.practice_finish : strings.practice_next;
+            });
+            focus('.googlemeet-practice-next');
             return response;
         }).catch(error => {
-            find('.googlemeet-practice-check').prop('disabled', false);
+            setDisabled('.googlemeet-practice-check', false);
             showError(error.message);
         });
-    });
+    };
 
-    find('.googlemeet-practice-next').on('click', () => {
+    const goNext = () => {
         state.index++;
         if (state.index >= state.queue.length) {
             showComplete();
         } else {
             renderQuestion();
-            find('.googlemeet-practice-stem').attr('tabindex', '-1').trigger('focus');
+            focusStem();
         }
-    });
+    };
 
-    find('.googlemeet-practice-review').on('click', () => startRound(state.wrong, true));
-    find('.googlemeet-practice-retry').on('click', () => startRound(state.questions, false));
+    findAll('.googlemeet-practice-check').forEach(el => el.addEventListener('click', checkAnswer));
+    findAll('.googlemeet-practice-next').forEach(el => el.addEventListener('click', goNext));
+    findAll('.googlemeet-practice-review').forEach(el => el.addEventListener('click', () => startRound(state.wrong, true)));
+    findAll('.googlemeet-practice-retry').forEach(el => el.addEventListener('click', () => startRound(state.questions, false)));
 
     Ajax.call([{
         methodname: 'mod_googlemeet_get_practice_session',
@@ -268,8 +343,8 @@ export const init = async(config) => {
     }])[0].then(response => {
         state.questions = response.questions || [];
         if (!state.questions.length) {
-            find('.googlemeet-practice-loading').addClass('d-none');
-            find('.googlemeet-practice-empty').removeClass('d-none');
+            addClass('.googlemeet-practice-loading', 'd-none');
+            removeClass('.googlemeet-practice-empty', 'd-none');
             return response;
         }
         startRound(state.questions, false);

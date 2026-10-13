@@ -78,7 +78,7 @@ classes/local/               sync_manager, calendar_sync, attendance/*, ai_revie
                              recording_cleanup (cascade delete, trash), reminders, impersonation
 classes/task/                13 scheduled/adhoc tasks (autosync, notifications, AI, attendance)
 classes/privacy/provider.php metadata + request + userlist providers for all user tables
-templates/, amd/src/         recording hub, recordings table, practice, AI review UI (jQuery-based)
+templates/, amd/src/         recording hub, recordings table, practice, AI review UI (DOM API, no jQuery)
 backup/moodle2/              backup/restore (AI content travels without user data)
 ```
 

@@ -141,6 +141,10 @@ final class recordingstable_template_test extends \advanced_testcase {
             if (!isset($params['rorder']) || isset($params['rview']) || isset($params['recording'])) {
                 continue;
             }
+            // A repeated parameter is resolved by the server, not by us: each name must appear once.
+            $query = (string)parse_url($href, PHP_URL_QUERY);
+            $this->assertSame(1, preg_match_all('/(^|&)rorder=/', $query), $href);
+            $this->assertLessThanOrEqual(1, preg_match_all('/(^|&)rpage=/', $query), $href);
             $this->assertSame(self::QUERY, $params['rq'] ?? null, $href);
             $this->assertSame(self::TOPIC, $params['topic'] ?? null, $href);
             if (isset($params['rpage'])) {
