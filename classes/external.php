@@ -260,7 +260,7 @@ class mod_googlemeet_external extends external_api {
         // teacher can restore them, a later sync restores in place those still in Drive (keeping
         // their AI analysis and questions), and the retention task purges the rest. Practice
         // questions are never deleted here.
-        // The ids are read first so each trashed recording gets its own event.
+        // The ids are read first so the event can report how many recordings were trashed.
         $now = time();
         $ids = array_map('intval', $DB->get_fieldset_select(
             'googlemeet_recordings',
@@ -280,11 +280,11 @@ class mod_googlemeet_external extends external_api {
         }
 
         $DB->set_field('googlemeet', 'lastsync', time(), ['id' => $googlemeetid]);
-        foreach ($ids as $id) {
-            \mod_googlemeet\event\recording_trashed::create([
+        // One summary event: a per-recording event would write thousands of log rows in one request.
+        if ($ids) {
+            \mod_googlemeet\event\recordings_bulk_trashed::create([
                 'context' => $context,
-                'objectid' => $id,
-                'other' => ['bulk' => true],
+                'other' => ['count' => count($ids)],
             ])->trigger();
         }
 
@@ -1519,12 +1519,12 @@ class mod_googlemeet_external extends external_api {
             throw new \moodle_exception('ai_not_configured', 'googlemeet');
         }
         $service->queue_question_generation($params['recordingid'], $cm->id, $params['count'], $USER->id);
-        // The count the task was queued with: the same clamp as ai_service::queue_question_generation().
+        // The count the task was queued with.
         \mod_googlemeet\event\questions_changed::trigger_for(
             $context,
             (int)$params['recordingid'],
             'queued',
-            max(1, min(20, (int)$params['count']))
+            \mod_googlemeet\ai_service::clamp_question_count((int)$params['count'])
         );
 
         return ['success' => true, 'count' => 0];

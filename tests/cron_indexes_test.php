@@ -16,23 +16,17 @@
 
 namespace mod_googlemeet;
 
-use PHPUnit\Framework\Attributes\CoversFunction;
-
-defined('MOODLE_INTERNAL') || die();
-
-global $CFG;
-require_once($CFG->libdir . '/upgradelib.php');
-require_once($CFG->dirroot . '/mod/googlemeet/db/upgrade.php');
+use PHPUnit\Framework\Attributes\CoversNothing;
 
 /**
- * Indexes behind the cron queries, on a fresh install and after the upgrade step that adds them.
+ * Indexes behind the cron queries that scan every activity, as install.xml creates them.
  *
  * @package     mod_googlemeet
  * @category    test
  * @copyright   2026 Anderson Blaine
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('xmldb_googlemeet_upgrade')]
+#[CoversNothing]
 final class cron_indexes_test extends \advanced_testcase {
     /**
      * The cron indexes, keyed by table.
@@ -43,7 +37,7 @@ final class cron_indexes_test extends \advanced_testcase {
         return [
             // Old-event cleanup and reminders: eventdate < now / eventdate > now.
             'googlemeet_events' => new \xmldb_index('eventdate', XMLDB_INDEX_NOTUNIQUE, ['eventdate']),
-            // Trash purge: deleted = 1 AND trashreason = ? AND timedeleted (= 0 | range).
+            // Trash purge: deleted = 1 AND trashreason = ? AND timedeleted range.
             'googlemeet_recordings' => new \xmldb_index(
                 'deleted_trashreason_timedeleted',
                 XMLDB_INDEX_NOTUNIQUE,
@@ -55,8 +49,8 @@ final class cron_indexes_test extends \advanced_testcase {
     }
 
     /**
-     * A fresh install (install.xml) has every cron index, and no longer the single-column status
-     * index the composite one starts with.
+     * The installed schema has every cron index and no single-column status index, which the
+     * composite status_nextretry index makes redundant.
      */
     public function test_install_declares_the_cron_indexes(): void {
         global $DB;
@@ -66,37 +60,5 @@ final class cron_indexes_test extends \advanced_testcase {
         }
         $status = new \xmldb_index('status', XMLDB_INDEX_NOTUNIQUE, ['status']);
         $this->assertFalse($dbman->index_exists(new \xmldb_table('googlemeet_ai_analysis'), $status));
-    }
-
-    /**
-     * From the schema before the step (no cron index, the single status index), the upgrade step
-     * adds the three indexes and drops the redundant one.
-     */
-    public function test_upgrade_step_adds_the_cron_indexes(): void {
-        global $DB;
-        $this->resetAfterTest();
-        $dbman = $DB->get_manager();
-
-        foreach ($this->cron_indexes() as $tablename => $index) {
-            $table = new \xmldb_table($tablename);
-            if ($dbman->index_exists($table, $index)) {
-                $dbman->drop_index($table, $index);
-            }
-            $this->assertFalse($dbman->index_exists($table, $index));
-        }
-        $aitable = new \xmldb_table('googlemeet_ai_analysis');
-        $status = new \xmldb_index('status', XMLDB_INDEX_NOTUNIQUE, ['status']);
-        if (!$dbman->index_exists($aitable, $status)) {
-            $dbman->add_index($aitable, $status);
-        }
-
-        set_config('version', 2026101399, 'mod_googlemeet');
-        $this->assertTrue(xmldb_googlemeet_upgrade(2026101399));
-
-        foreach ($this->cron_indexes() as $tablename => $index) {
-            $this->assertTrue($dbman->index_exists(new \xmldb_table($tablename), $index), $tablename);
-        }
-        $this->assertFalse($dbman->index_exists($aitable, $status));
-        $this->assertEquals(2026101400, get_config('mod_googlemeet', 'version'));
     }
 }

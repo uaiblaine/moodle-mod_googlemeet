@@ -148,24 +148,62 @@ class ai_review {
         if (!empty($row->reviewed)) {
             return true;
         }
-        $fields = self::reviewed_fields($userid);
-        $params = ['id' => $analysisid, 'reviewed' => $fields['reviewed'], 'timereviewed' => $fields['timereviewed'],
-            'reviewedby' => $fields['reviewedby'], 'status' => 'completed'];
-        $where = 'id = :id AND status = :status';
-        if ($seen > 0) {
-            // Atomic with the check above: nothing may rewrite the row between reading and publishing.
-            $where .= ' AND timemodified = :seen';
-            $params['seen'] = $seen;
-        }
-        $DB->execute("UPDATE {googlemeet_ai_analysis}
-                         SET reviewed = :reviewed, timereviewed = :timereviewed, reviewedby = :reviewedby
-                       WHERE {$where}", $params);
-        $reviewed = (bool)$DB->get_field('googlemeet_ai_analysis', 'reviewed', ['id' => $analysisid]);
-        if ($reviewed) {
+        // Only the request that flips the row logs the publication: a concurrent second one reads it as reviewed.
+        $claimed = self::claim_review($analysisid, $userid, $seen);
+        if ($claimed) {
             $googlemeetid = (int)$DB->get_field('googlemeet_recordings', 'googlemeetid', ['id' => $row->recordingid]);
             self::trigger_reviewed($googlemeetid, [(int)$row->id => (int)$row->recordingid], false);
         }
-        return $reviewed;
+        return $claimed || (bool)$DB->get_field('googlemeet_ai_analysis', 'reviewed', ['id' => $analysisid]);
+    }
+
+    /**
+     * Publish one completed, unreviewed analysis, telling whether this call is the one that did it.
+     *
+     * Moodle's DML reports no affected-row count, so the check and the write run under a lock on the
+     * row and the state is re-read inside it: of two requests publishing at once exactly one gets true.
+     *
+     * @param int $analysisid Row id.
+     * @param int $userid Reviewer.
+     * @param int $seen timemodified of the reviewed content, 0 = do not check.
+     * @return bool True only when this call changed the row from unreviewed to reviewed.
+     */
+    public static function claim_review(int $analysisid, int $userid, int $seen = 0): bool {
+        global $DB;
+
+        $lock = \core\lock\lock_config::get_lock_factory('mod_googlemeet')->get_lock('ai_review_' . $analysisid, 10);
+        if (!$lock) {
+            // The holder is publishing the same row and logs it; this call changed nothing.
+            return false;
+        }
+        try {
+            $row = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid], 'id, status, reviewed, timemodified');
+            if (!$row || $row->status !== 'completed' || !empty($row->reviewed)) {
+                return false;
+            }
+            if ($seen > 0 && (int)$row->timemodified !== $seen) {
+                return false;
+            }
+            // The AI writers rewrite the row without this lock, so the write itself re-checks the state:
+            // a regeneration that landed after the read above leaves the row unpublished.
+            $fields = self::reviewed_fields($userid);
+            $params = ['id' => $analysisid, 'status' => 'completed', 'unreviewed' => 0] + $fields;
+            $where = 'id = :id AND status = :status AND reviewed = :unreviewed';
+            if ($seen > 0) {
+                $where .= ' AND timemodified = :seen';
+                $params['seen'] = $seen;
+            }
+            $DB->execute("UPDATE {googlemeet_ai_analysis}
+                             SET reviewed = :reviewed, timereviewed = :timereviewed, reviewedby = :reviewedby
+                           WHERE {$where}", $params);
+            // No affected-row count: this call flipped the row if it now carries exactly what it wrote.
+            $after = $DB->get_record('googlemeet_ai_analysis', ['id' => $analysisid], 'reviewed, timereviewed, reviewedby');
+            return $after && !empty($after->reviewed)
+                && (int)$after->reviewedby === (int)$fields['reviewedby']
+                && (int)$after->timereviewed === (int)$fields['timereviewed'];
+        } finally {
+            $lock->release();
+        }
     }
 
     /**

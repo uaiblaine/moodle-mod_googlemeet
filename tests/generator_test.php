@@ -16,6 +16,8 @@
 
 namespace mod_googlemeet;
 
+use PHPUnit\Framework\Attributes\CoversClass;
+
 /**
  * Tests for the plugin's test data generator helpers.
  *
@@ -23,8 +25,8 @@ namespace mod_googlemeet;
  * @category    test
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
- * @covers      \mod_googlemeet_generator
  */
+#[CoversClass(\mod_googlemeet_generator::class)]
 final class generator_test extends \advanced_testcase {
     /**
      * Recordings and AI analyses can be generated and linked.

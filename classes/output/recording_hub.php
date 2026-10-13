@@ -111,6 +111,11 @@ class recording_hub {
         if ($rorder) {
             $backparams['rorder'] = $rorder;
         }
+        // The list's search and topic filter come back with the way back and the previous/next links.
+        $backparams += \mod_googlemeet\local\recording_search::list_filter_params(
+            optional_param('rq', '', PARAM_TEXT),
+            optional_param('topic', '', PARAM_TEXT)
+        );
         // Previous/next are chronological whatever the list order (students think in class dates).
         [$previousrecording, $nextrecording] = \mod_googlemeet\local\list_aggregates::hub_neighbours(
             $recording,

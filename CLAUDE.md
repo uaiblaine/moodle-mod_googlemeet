@@ -19,9 +19,15 @@ CI is the moodle-an-hochschulen reusable workflow, one job per supported branch 
 `.github/workflows/ci.yml` — **update those jobs when `supported` changes**.
 
 **Lineage.** A fork of `hyukudan/moodle-mod_googlemeet` (itself a fork of
-`ronefel/moodle-mod_googlemeet`). The owner chose on 2026-10-12 to diverge: this repo follows
-the fleet standards, and upstream releases are merged by hand (expect conflicts). Keep every
-third-party `@copyright` line where it is; new files carry the fleet copyright.
+`ronefel/moodle-mod_googlemeet`), started from upstream 2.30.1, that diverged for good: no
+upstream releases are merged, and the repo follows the fleet standards only. Credits stay: keep
+every third-party `@copyright` line where it is and the README's Credits section; new files
+carry the fleet copyright. Clean installs only (owner decision 2026-10-13): nothing upgrades into
+`2026042000` (upstream sites uninstall first), so `install.xml` is the whole schema and no code
+may serve rows only an earlier build could write. Restores of older backups (upstream included)
+are still real input. GitHub
+releases only: the moodle.org entry of `mod_googlemeet` belongs to upstream, so no release
+workflow publishes there.
 
 ## Agent orchestration budget (fleet rule, repeated here on purpose)
 
@@ -89,9 +95,12 @@ backup/moodle2/              backup/restore (AI content travels without user dat
 
 ## Versions
 
-`$plugin->version` is date-based (`YYYYMMDDXX`) on the single `main` branch, which serves both
-5.2 and 5.3. Release strings carry the fork suffix (`<upstream release>+uai.<n>`). Version bump
-plus `CHANGELOG.md` in the same commit as JS rebuilds, services or DB changes.
+`$plugin->version` lives in the fleet's 5.2 namespace: `20260420XX` (first release
+`2026042000`), the counter `XX` raised by one per change that needs a bump, on the single `main`
+branch that serves both 5.2 and 5.3. Release strings are `v5.2-r<N>`. Version bump plus
+`CHANGELOG.md` in the same commit as JS rebuilds, services or DB changes. `db/upgrade.php` does
+not exist yet: the first schema change after v5.2-r1 creates it, with steps numbered in the
+`20260420XX` namespace above `2026042000`, and edits `install.xml` in the same commit.
 
 ## Architecture gotchas
 

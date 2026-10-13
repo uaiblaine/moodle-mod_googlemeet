@@ -187,7 +187,7 @@ function googlemeet_add_instance($googlemeet, $mform = null) {
 
     // Without a Calendar event the organiser e-mail was typed. It names the user whose Google token
     // background tasks will use, so it must be the editor's own account (an administrator may name
-    // anyone, and then the single active owner is recorded). Restore and the upgrade do not come here.
+    // anyone, and then the single active owner is recorded). Restore does not come here.
     if (!isset($googlemeet->creatoruserid)) {
         $typed = (string)($googlemeet->creatoremail ?? '');
         if (creator::is_editors_own_email($typed, creator::linked_email())) {
@@ -605,7 +605,8 @@ function googlemeet_reset_course_form_defaults($course) {
 }
 
 /**
- * Course reset: delete the students' data of every Google Meet activity of the course.
+ * Course reset: delete the students' data of every Google Meet activity of the course, and move the
+ * session dates with the course start date.
  *
  * Recordings, AI analysis and practice questions are course content and are kept.
  *
@@ -613,18 +614,43 @@ function googlemeet_reset_course_form_defaults($course) {
  * @return array Status rows.
  */
 function googlemeet_reset_userdata($data) {
-    global $DB;
+    global $DB, $USER;
 
     $status = [];
-    if (empty($data->reset_googlemeet_userdata)) {
-        return $status;
-    }
+    $componentstr = get_string('modulenameplural', 'googlemeet');
     $ids = $DB->get_fieldset_select('googlemeet', 'id', 'course = ?', [$data->courseid]);
-    \mod_googlemeet\local\recording_cleanup::delete_user_data($ids);
-    $status[] = [
-        'component' => get_string('modulenameplural', 'googlemeet'),
-        'item' => get_string('reset_userdata', 'googlemeet'),
-        'error' => false,
-    ];
+    if (!empty($data->reset_googlemeet_userdata)) {
+        \mod_googlemeet\local\recording_cleanup::delete_user_data($ids);
+        $status[] = [
+            'component' => $componentstr,
+            'item' => get_string('reset_userdata', 'googlemeet'),
+            'error' => false,
+        ];
+    }
+
+    // Shift may be negative too. The fields are the schedule dates the restore step offsets: keep the
+    // two lists in step ({@see restore_googlemeet_activity_structure_step::process_googlemeet()}).
+    if (!empty($data->timeshift)) {
+        $before = $DB->get_records('googlemeet', ['course' => $data->courseid]);
+        shift_course_mod_dates('googlemeet', ['eventdate', 'eventenddate'], $data->timeshift, $data->courseid);
+        \mod_googlemeet\local\schedule::shift_dates($ids, (int)$data->timeshift, time());
+        // The organiser's Google Calendar event follows the new dates as after an edit: queued, never
+        // called from the reset request, and patched by cron as the organiser from the shifted record
+        // ({@see \mod_googlemeet\local\calendar_sync::apply_update()}). A failure to queue never fails the reset.
+        foreach ($DB->get_records('googlemeet', ['course' => $data->courseid]) as $after) {
+            try {
+                if (isset($before[$after->id]) && \mod_googlemeet\local\calendar_sync::needs_patch($before[$after->id], $after)) {
+                    \mod_googlemeet\local\calendar_sync::queue_update($before[$after->id], (int)($USER->id ?? 0));
+                }
+            } catch (\Throwable $e) {
+                debugging('mod_googlemeet: could not queue the Google Calendar update: ' . $e->getMessage(), DEBUG_DEVELOPER);
+            }
+        }
+        $status[] = [
+            'component' => $componentstr,
+            'item' => get_string('date'),
+            'error' => false,
+        ];
+    }
     return $status;
 }

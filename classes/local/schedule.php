@@ -520,6 +520,74 @@ class schedule {
     }
 
     /**
+     * Move the sessions, holiday periods, cancelled dates and calendar mirrors of activities by a course reset's shift.
+     *
+     * The plugin-table half of moving a course start date; the googlemeet columns themselves are moved by
+     * shift_course_mod_dates() in googlemeet_reset_userdata(). The fields are the schedule dates the
+     * restore step offsets ({@see \restore_googlemeet_activity_structure_step}): the two lists must stay
+     * in step. Restore also offsets bookkeeping stamps (timecreated, timemodified) and the attendance join
+     * and leave times; reset leaves those, as core modules do: they record when something happened.
+     *
+     * Core moves no activity calendar event on reset, so the mirrors are moved here. As in restore, a
+     * session moved into the future has not been synced yet: its auto-sync state is cleared, and an
+     * attendance fetch state with no attendance stored is dropped so the new session gets read (a state
+     * that still holds attendance is kept, or a fetch would replace that attendance).
+     *
+     * @param int[] $googlemeetids Activity ids.
+     * @param int $timeshift Seconds to add (negative moves back).
+     * @param int $now Current time.
+     * @return void
+     */
+    public static function shift_dates(array $googlemeetids, int $timeshift, int $now): void {
+        global $DB;
+
+        $googlemeetids = array_map('intval', $googlemeetids);
+        if (!$googlemeetids || !$timeshift) {
+            return;
+        }
+        [$insql, $params] = $DB->get_in_or_equal($googlemeetids, SQL_PARAMS_NAMED);
+        $columns = [
+            'googlemeet_events' => ['eventdate'],
+            'googlemeet_holidays' => ['startdate', 'enddate'],
+            'googlemeet_cancelled' => ['cancelleddate'],
+        ];
+        foreach ($columns as $table => $fields) {
+            foreach ($fields as $field) {
+                $DB->execute(
+                    "UPDATE {{$table}} SET $field = $field + :shift WHERE googlemeetid $insql AND $field <> 0",
+                    ['shift' => $timeshift] + $params
+                );
+            }
+        }
+        $DB->execute(
+            "UPDATE {event}
+                SET timestart = timestart + :shift, timesort = timesort + :shiftsort
+              WHERE modulename = :modulename AND eventtype = :eventtype AND instance $insql",
+            ['shift' => $timeshift, 'shiftsort' => $timeshift, 'modulename' => 'googlemeet',
+                'eventtype' => helper::GOOGLEMEET_EVENT_START] + $params
+        );
+
+        $future = $DB->get_fieldset_select(
+            'googlemeet_events',
+            'id',
+            "googlemeetid $insql AND eventdate + duration > :now",
+            ['now' => $now] + $params
+        );
+        foreach (array_chunk(array_map('intval', $future), 1000) as $chunk) {
+            [$esql, $eparams] = $DB->get_in_or_equal($chunk, SQL_PARAMS_NAMED, 'ev');
+            $DB->execute("UPDATE {googlemeet_events}
+                             SET autosynced = 0, syncattempts = 0, nextsyncattempt = 0
+                           WHERE id $esql", $eparams);
+            $read = $DB->get_fieldset_select('googlemeet_attendance', 'DISTINCT eventid', "eventid $esql", $eparams);
+            $unread = array_diff($chunk, array_map('intval', $read));
+            if ($unread) {
+                [$usql, $uparams] = $DB->get_in_or_equal($unread, SQL_PARAMS_NAMED, 'un');
+                $DB->delete_records_select('googlemeet_attendance_sync', "eventid $usql", $uparams);
+            }
+        }
+    }
+
+    /**
      * Let auto-sync retry exhausted events after a teacher manually syncs the activity.
      *
      * @param int $googlemeetid Activity instance id.

@@ -41,8 +41,17 @@ class ai_service {
     /** @var int retrycount sentinel meaning "permanent failure, never retry". */
     const PERMANENT_RETRYCOUNT = 99;
 
-    /** @var int[] Back-off schedule in seconds, indexed by (retrycount - 1): 2h, 4h, 8h, 24h. */
-    const TRANSIENT_BACKOFF = [7200, 14400, 28800, 86400];
+    /**
+     * @var int[] Back-off schedule in seconds, indexed by (retrycount - 1): 2h, 4h, 8h. One entry per retry
+     *      that is still scheduled, so MAX_TRANSIENT_RETRIES - 1 entries: the last failure ends the retries.
+     */
+    const TRANSIENT_BACKOFF = [7200, 14400, 28800];
+
+    /** @var int Fewest practice questions one generation request may ask for. */
+    const MIN_QUESTIONS = 1;
+
+    /** @var int Most practice questions one generation request may ask for. */
+    const MAX_QUESTIONS = 20;
 
     /** @var int Default minutes after which a 'processing' analysis counts as stuck. */
     const DEFAULT_STUCK_MINUTES = 60;
@@ -111,16 +120,11 @@ class ai_service {
     ): stdClass {
         global $DB;
 
-        debugging("AI Service: Starting analysis for recording {$recordingid}, regenerate=" . ($regenerate ? 'true' : 'false')
-            . ", forcedownload=" . ($forcedownload ? 'true' : 'false')
-            . ", alreadyclaimed=" . ($alreadyclaimed ? 'true' : 'false'), DEBUG_DEVELOPER);
-
         // Get the recording.
         $recording = $DB->get_record('googlemeet_recordings', ['id' => $recordingid, 'deleted' => 0], '*', IGNORE_MISSING);
         if (!$recording) {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
-        debugging("AI Service: Found recording '{$recording->name}'", DEBUG_DEVELOPER);
 
         // Check if analysis already exists.
         $existing = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recordingid]);
@@ -169,8 +173,6 @@ class ai_service {
             $analysis->id = $DB->insert_record('googlemeet_ai_analysis', $analysis);
         }
 
-        debugging("AI Service: Queueing background task for analysis {$analysis->id}", DEBUG_DEVELOPER);
-
         // Queue the adhoc task to process in background.
         $task = new \mod_googlemeet\task\process_video_analysis();
         $task->set_custom_data([
@@ -180,8 +182,6 @@ class ai_service {
         ]);
         \core\task\manager::queue_adhoc_task($task, true); // The true argument checks for duplicates.
 
-        debugging("AI Service: Background task queued successfully", DEBUG_DEVELOPER);
-
         // Return the analysis with processing status.
         $analysis->keypoints = [];
         $analysis->topics = [];
@@ -190,6 +190,18 @@ class ai_service {
         $analysis->transcript = '';
 
         return $analysis;
+    }
+
+    /**
+     * Bring a requested question count into the range one generation request accepts.
+     *
+     * The queued task, the Gemini prompt and the audit event all report this value, so they share it.
+     *
+     * @param int $count Number of questions requested.
+     * @return int The count within MIN_QUESTIONS and MAX_QUESTIONS.
+     */
+    public static function clamp_question_count(int $count): int {
+        return max(self::MIN_QUESTIONS, min(self::MAX_QUESTIONS, $count));
     }
 
     /**
@@ -206,7 +218,7 @@ class ai_service {
         $task->set_custom_data([
             'recordingid' => $recordingid,
             'cmid' => $cmid,
-            'count' => max(1, min(20, $count)),
+            'count' => self::clamp_question_count($count),
             'userid' => $userid,
         ]);
         $task->set_userid($userid);
@@ -379,7 +391,7 @@ class ai_service {
             $newrc = self::MAX_TRANSIENT_RETRIES;
             $nextretry = 0;
         } else {
-            $backoff = self::TRANSIENT_BACKOFF[$newrc - 1] ?? 86400;
+            $backoff = self::TRANSIENT_BACKOFF[$newrc - 1];
             $nextretry = $now + $backoff;
         }
 

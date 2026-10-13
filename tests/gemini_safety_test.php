@@ -108,11 +108,11 @@ final class gemini_safety_test extends \advanced_testcase {
     }
 
     /**
-     * Every parser recognises the block (questions, chapters, plain text).
+     * Every parser recognises the block (questions, chapters).
      */
     public function test_all_parsers_detect_safety(): void {
         $this->resetAfterTest();
-        foreach (['parse_questions_response', 'parse_chapters_response', 'extract_text_from_response'] as $method) {
+        foreach (['parse_questions_response', 'parse_chapters_response'] as $method) {
             try {
                 $this->parse($method, $this->safety_response());
                 $this->fail("{$method} must throw on SAFETY");

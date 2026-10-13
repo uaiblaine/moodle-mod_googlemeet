@@ -164,6 +164,27 @@ final class recordingstable_template_test extends \advanced_testcase {
     }
 
     /**
+     * The links into a class (hub and its materials tab) carry the list's search and topic.
+     */
+    public function test_hub_links_carry_the_filters(): void {
+        [$html] = $this->render();
+
+        preg_match_all('/<a [^>]*href="([^"]*)"[^>]*>/', $html, $matches);
+        $hublinks = 0;
+        foreach ($matches[1] as $href) {
+            $href = html_entity_decode($href, ENT_QUOTES);
+            parse_str((string)parse_url($href, PHP_URL_QUERY), $params);
+            if (!isset($params['recording']) || !str_contains($href, '/mod/googlemeet/view.php')) {
+                continue;
+            }
+            $hublinks++;
+            $this->assertSame(self::QUERY, $params['rq'] ?? null, $href);
+            $this->assertSame(self::TOPIC, $params['topic'] ?? null, $href);
+        }
+        $this->assertGreaterThan(0, $hublinks);
+    }
+
+    /**
      * Lang strings inside the inline script are JSON-quoted literals, so an apostrophe cannot end them.
      */
     public function test_inline_script_quotes_lang_strings(): void {

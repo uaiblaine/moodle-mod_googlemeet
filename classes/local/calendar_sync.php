@@ -455,8 +455,7 @@ class calendar_sync {
             'id' => (int)($data['googlemeetid'] ?? 0),
             'eventid' => (string)($data['eventid'] ?? ''),
             'creatoremail' => (string)($data['creatoremail'] ?? ''),
-            // Tasks queued before creatoruserid existed carry none: creator::resolve() falls back
-            // to the e-mail.
+            // An activity with no organiser id (0) makes creator::resolve() fall back to the e-mail.
             'creatoruserid' => (int)($data['creatoruserid'] ?? 0),
             'name' => (string)($data['name'] ?? ''),
             'course' => (int)($data['course'] ?? 0),

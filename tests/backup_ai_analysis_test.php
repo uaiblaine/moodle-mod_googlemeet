@@ -105,7 +105,7 @@ final class backup_ai_analysis_test extends \advanced_testcase {
         global $DB;
         [$course, $cm] = $this->create_fixture();
 
-        $newcm = duplicate_module($course, get_fast_modinfo($course)->get_cm($cm->id));
+        $newcm = \core_courseformat\formatactions::cm((int)$course->id)->duplicate((int)$cm->id);
 
         $analysis = $this->copied_analysis((int)$newcm->instance, 'done');
         $this->assertNotEmpty($analysis);

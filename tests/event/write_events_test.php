@@ -47,6 +47,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
 #[CoversClass(question_service::class)]
 #[CoversClass(recording_updated::class)]
 #[CoversClass(recording_trashed::class)]
+#[CoversClass(recordings_bulk_trashed::class)]
 #[CoversClass(recording_restored::class)]
 #[CoversClass(recording_deleted::class)]
 #[CoversClass(ai_analysis_updated::class)]
@@ -269,11 +270,11 @@ final class write_events_test extends \advanced_testcase {
     }
 
     /**
-     * "Delete all" logs one recording_trashed (bulk) per recording it trashed, none for those already in the trash.
+     * "Delete all" logs ONE recordings_bulk_trashed with the count, not one event per recording.
      */
     public function test_delete_all(): void {
-        $one = $this->recording();
-        $two = $this->recording();
+        $this->recording();
+        $this->recording();
         $this->recording(['deleted' => 1, 'timedeleted' => time()]);
 
         $sink = $this->redirectEvents();
@@ -282,15 +283,11 @@ final class write_events_test extends \advanced_testcase {
         ]);
         $events = $this->plugin_events($sink);
         $sink->close();
-        $this->assertCount(2, $events);
-        $ids = [];
-        foreach ($events as $event) {
-            $this->assertInstanceOf(recording_trashed::class, $event);
-            $this->assert_shape($event, (int)$event->objectid, 'u', ['bulk' => true]);
-            $ids[] = (int)$event->objectid;
-        }
-        sort($ids);
-        $this->assertSame([(int)$one->id, (int)$two->id], $ids);
+        $this->assertCount(1, $events);
+        $this->assertInstanceOf(recordings_bulk_trashed::class, $events[0]);
+        $this->assert_shape($events[0], null, 'u', ['count' => 2]);
+        $this->assertNull($events[0]->objecttable);
+        $this->assertStringContainsString('2 recording(s)', $events[0]->get_description());
 
         // Nothing left to trash: nothing logged.
         $sink = $this->redirectEvents();

@@ -206,6 +206,7 @@ class recordings_list {
                 $urlparams['rpage'] = $page;
             }
             $urlparams['rorder'] = $order;
+            $urlparams += recording_search::list_filter_params((string)$query, (string)$topic);
             $recording->huburl = (new moodle_url('/mod/googlemeet/view.php', $urlparams))->out(false);
             $materialsurlparams = $urlparams;
             $materialsurlparams['tab'] = 'materials';

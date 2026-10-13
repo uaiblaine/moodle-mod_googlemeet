@@ -173,50 +173,6 @@ class gemini_client {
     }
 
     /**
-     * Generate analysis for a video recording.
-     *
-     * @param string $videourl The Google Drive video URL
-     * @param string $videoname The name of the video
-     * @param string $duration The duration of the video
-     * @return stdClass Object containing summary, keypoints, topics, chapters, transcript and language
-     * @throws moodle_exception If the API call fails
-     */
-    public function analyze_video(string $videourl, string $videoname, string $duration): stdClass {
-        if (!$this->is_configured()) {
-            throw new moodle_exception('ai_not_configured', 'googlemeet');
-        }
-
-        $prompt = $this->build_analysis_prompt($videoname, $duration, $videourl);
-
-        $response = $this->call_api($prompt);
-
-        return $this->parse_analysis_response($response);
-    }
-
-    /**
-     * Generate only a summary for a video.
-     *
-     * @param string $videourl The Google Drive video URL
-     * @param string $videoname The name of the video
-     * @return string The summary
-     * @throws moodle_exception If the API call fails
-     */
-    public function generate_summary(string $videourl, string $videoname): string {
-        if (!$this->is_configured()) {
-            throw new moodle_exception('ai_not_configured', 'googlemeet');
-        }
-
-        $prompt = "Please watch this video and provide a concise summary (2-3 paragraphs) of the main content. "
-                . "The video is titled: '{$videoname}'. "
-                . "Video URL: {$videourl}\n\n"
-                . "Focus on the key topics discussed, main conclusions, and any important information shared.";
-
-        $response = $this->call_api($prompt);
-
-        return $this->extract_text_from_response($response);
-    }
-
-    /**
      * Generate single-answer multichoice questions from a transcript.
      *
      * @param string $transcript Transcript text.
@@ -233,7 +189,7 @@ class gemini_client {
             throw new moodle_exception('question_no_transcript_error', 'googlemeet');
         }
 
-        $count = max(1, min(20, $count));
+        $count = ai_service::clamp_question_count($count);
         $ctx = $this->context_line();
         $prompt = <<<PROMPT
 You are an expert teacher creating practice questions from a class transcript.
@@ -330,50 +286,6 @@ PROMPT;
 
         $response = $this->call_api($prompt);
         return $this->parse_chapters_response($response);
-    }
-
-    /**
-     * Build the full analysis prompt.
-     *
-     * @param string $videoname The video name
-     * @param string $duration The video duration
-     * @param string $videourl The video URL
-     * @return string The prompt
-     */
-    private function build_analysis_prompt(string $videoname, string $duration, string $videourl): string {
-        $ctx = $this->context_line();
-        // phpcs:disable moodle.Files.LineLength -- Prompt text: a line break would change the prompt.
-        return <<<PROMPT
-You are an educational assistant analyzing a recorded meeting/class video.
-
-{$ctx}CRITICAL RULE: You MUST write the summary, keypoints, topics, chapters, and transcript in the SAME language as the video/audio content. If the video is in Spanish, your entire response MUST be in Spanish. NEVER translate to English or any other language.
-
-Video Information:
-- Title: {$videoname}
-- Duration: {$duration}
-- URL: {$videourl}
-
-Please analyze this video and provide the following in a structured JSON format:
-
-1. **Summary**: A comprehensive summary of the video content (2-3 paragraphs) — in the language of the video
-2. **Key Points**: A list of 5-10 main takeaways or important points discussed — in the language of the video
-3. **Topics**: 3 to 6 SHORT study tags in the same language as the video. Each topic MUST be 1-3 words where possible and at most 40 characters. Do NOT write full sentences, procedural descriptions, or long headings — produce compact chip labels (e.g. "Photosynthesis", "Cell cycle", "Mitosis"). No duplicates or near-duplicates. Put any detailed description in the summary or keypoints, never in topics.
-4. **Chapters**: 4-10 timestamped lesson sections. Each chapter MUST use a real timestamp mark from the transcript/audio when available; do not invent timestamps. If timestamp marks are not available, return an empty array.
-5. **Transcript Summary**: If audio is available, provide a condensed transcript of the main discussions — in the language of the video
-
-IMPORTANT: Respond ONLY with valid JSON in the following format (no markdown, no code blocks):
-{
-    "summary": "Full summary here (in the language of the video)...",
-    "keypoints": ["Point 1", "Point 2", "Point 3", ...],
-    "topics": ["Photosynthesis", "Cell cycle", "Mitosis"],
-    "chapters": [{"title": "Introduction and questions", "start": "5:03"}],
-    "transcript": "Condensed transcript, or 'Not available'...",
-    "language": "detected language code (e.g., es, en, fr)"
-}
-
-If you cannot access the video, analyze based on the title and provide your best interpretation, noting that direct video analysis was not possible.
-PROMPT;
-        // phpcs:enable
     }
 
     /**
@@ -820,24 +732,6 @@ PROMPT;
         $hours = !empty($parts) ? array_pop($parts) : 0;
 
         return ($hours * 3600) + ($minutes * 60) + $seconds;
-    }
-
-    /**
-     * Extract plain text from API response.
-     *
-     * @param string $response The raw API response
-     * @return string The extracted text
-     * @throws moodle_exception If extraction fails
-     */
-    private function extract_text_from_response(string $response): string {
-        $decoded = json_decode($response);
-        self::assert_not_blocked($decoded);
-
-        if (!$decoded || !isset($decoded->candidates[0]->content->parts[0]->text)) {
-            throw new moodle_exception('ai_error', 'googlemeet', '', 'Invalid API response format');
-        }
-
-        return $decoded->candidates[0]->content->parts[0]->text;
     }
 
     /**

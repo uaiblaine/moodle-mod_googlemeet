@@ -19,11 +19,11 @@ namespace mod_googlemeet\event;
 /**
  * A teacher moved a recording to the activity's trash (soft delete, restorable).
  *
- * "Delete all recordings" triggers one event per recording it trashed, with other['bulk'] set, so
- * each recording's own log line tells when it went to the trash.
+ * "Delete all recordings" does not trigger it per recording: see {@see recordings_bulk_trashed}.
  *
  * @property-read array $other {
- *      - bool bulk: true when the recording was trashed by "Delete all recordings".
+ *      - bool bulk: true when the recording was trashed as part of a bulk trash (log rows written before
+ *        {@see recordings_bulk_trashed} existed); false for a single trash.
  * }
  *
  * @package     mod_googlemeet

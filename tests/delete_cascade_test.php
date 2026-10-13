@@ -319,11 +319,8 @@ final class delete_cascade_test extends \advanced_testcase {
         $manual = ['deleted' => 1, 'trashreason' => recording_cleanup::TRASH_MANUAL];
         $old = $this->create_recording($googlemeet->id, ['timedeleted' => $now - 31 * DAYSECS] + $manual);
         $recent = $this->create_recording($googlemeet->id, ['timedeleted' => $now - 10 * DAYSECS] + $manual);
-        $legacy = $this->create_recording($googlemeet->id, ['timedeleted' => 0] + $manual);
         // Trashed by the Drive sync (missing from the listing): never purged, whatever its age.
         $synctrashed = $this->create_recording($googlemeet->id, ['deleted' => 1, 'timedeleted' => $now - 400 * DAYSECS,
-            'trashreason' => recording_cleanup::TRASH_SYNC]);
-        $synclegacy = $this->create_recording($googlemeet->id, ['deleted' => 1, 'timedeleted' => 0,
             'trashreason' => recording_cleanup::TRASH_SYNC]);
         $active = $this->create_recording($googlemeet->id, ['createdtime' => $now - 100 * DAYSECS]);
         $this->add_dependents($googlemeet, $cm, $context, $old, $student->id);
@@ -342,11 +339,8 @@ final class delete_cascade_test extends \advanced_testcase {
         $this->assertSame(0, array_sum($this->count_dependents($old)));
         $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $recent]));
         $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $active]));
-        // A trashed row without timestamp starts its clock now instead of being purged.
-        $this->assertEquals($now, (int)$DB->get_field('googlemeet_recordings', 'timedeleted', ['id' => $legacy]));
         // Sync-trashed rows are left completely alone.
         $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $synctrashed]));
-        $this->assertEquals(0, (int)$DB->get_field('googlemeet_recordings', 'timedeleted', ['id' => $synclegacy]));
 
         // The scheduled task uses the same path.
         set_config('trashretentiondays', 5, 'googlemeet');
@@ -354,7 +348,6 @@ final class delete_cascade_test extends \advanced_testcase {
         (new task\purge_trash())->execute();
         ob_end_clean();
         $this->assertFalse($DB->record_exists('googlemeet_recordings', ['id' => $recent]));
-        $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $legacy]));
         $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $active]));
         $this->assertTrue($DB->record_exists('googlemeet_recordings', ['id' => $synctrashed]));
     }
