@@ -20,7 +20,8 @@ namespace mod_googlemeet\local;
  * Operational log of Google syncs, read by {@see sync_manager::get_status()} and {@see ops_status}.
  *
  * One row per run: manual Drive sync, autosync tick per activity, Calendar patch/delete. Rows hold
- * no user id; rows older than RETENTION_DAYS are purged whenever start() writes a new one.
+ * no user id, and finish() masks e-mail addresses in the message (the privacy provider declares the
+ * column); rows older than RETENTION_DAYS are purged whenever start() writes a new one.
  *
  * @package     mod_googlemeet
  * @copyright   2026 PreparaOposiciones
@@ -51,6 +52,9 @@ class sync_log {
 
     /** @var int Days rows are kept. */
     public const RETENTION_DAYS = 60;
+
+    /** @var string Matches an e-mail address; the domain is group 1. */
+    private const EMAIL_PATTERN = '/[^\s<>()\[\]"\',;:@]+@([a-z0-9-]+(?:\.[a-z0-9-]+)+)/i';
 
     /** @var string DB table. */
     public const TABLE = 'googlemeet_sync_log';
@@ -97,7 +101,8 @@ class sync_log {
      * @param int $id
      * @param string $status STATUS_*
      * @param array|null $stats Sync counters, stored as JSON.
-     * @param string $message Human readable result / error, truncated to 2000 characters.
+     * @param string $message Human readable result / error, truncated to 2000 characters. E-mail
+     *     addresses are stored masked ({@see self::mask_emails()}).
      * @return void
      */
     public static function finish(int $id, string $status, ?array $stats = null, string $message = ''): void {
@@ -107,8 +112,22 @@ class sync_log {
             'status' => $status,
             'timefinished' => time(),
             'stats' => $stats === null ? null : json_encode($stats),
-            'message' => \core_text::substr($message, 0, 2000),
+            'message' => \core_text::substr(self::mask_emails($message), 0, 2000),
         ]);
+    }
+
+    /**
+     * Replace the local part of every e-mail address with "***", keeping the domain.
+     *
+     * The messages are lang strings naming the organiser account and raw Google or exception text
+     * from callers that cannot vouch for its content; the organiser is on the activity
+     * (googlemeet.creatoremail), so the log does not need a second copy.
+     *
+     * @param string $message
+     * @return string
+     */
+    public static function mask_emails(string $message): string {
+        return (string)preg_replace(self::EMAIL_PATTERN, '***@$1', $message);
     }
 
     /**

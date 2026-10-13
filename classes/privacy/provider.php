@@ -99,6 +99,7 @@ class provider implements
         $collection->add_database_table(
             'googlemeet_practice_attempts',
             [
+                'googlemeetid' => 'privacy:metadata:googlemeet_practice_attempts:googlemeetid',
                 'recordingid' => 'privacy:metadata:googlemeet_practice_attempts:recordingid',
                 'questionid' => 'privacy:metadata:googlemeet_practice_attempts:questionid',
                 'userid' => 'privacy:metadata:googlemeet_practice_attempts:userid',
@@ -135,8 +136,10 @@ class provider implements
         // The googlemeet_ai_analysis table stores AI-generated material derived from the
         // recordings (summary, key points, topics, chapters and a transcript). The transcript may
         // incidentally contain the names or voices of session participants. That content is keyed
-        // only to a recording, so it cannot be exported or deleted per user; it is declared here
-        // for transparency. Only reviewedby links a row to a Moodle user.
+        // only to a recording, so it cannot be exported or deleted per user. Only reviewedby links a
+        // row to a Moodle user. The summary, key points, topics and chapters are generated from the
+        // participants' speech and may name them, so a context-wide deletion removes the whole
+        // analysis (course reset, which is not an erasure request, keeps it as course content).
         $collection->add_database_table(
             'googlemeet_ai_analysis',
             [
@@ -145,6 +148,7 @@ class provider implements
                 'topics' => 'privacy:metadata:googlemeet_ai_analysis:topics',
                 'chapters' => 'privacy:metadata:googlemeet_ai_analysis:chapters',
                 'transcript' => 'privacy:metadata:googlemeet_ai_analysis:transcript',
+                'error' => 'privacy:metadata:googlemeet_ai_analysis:error',
                 // The teacher who published the AI content to students (exported and anonymised per user).
                 'reviewedby' => 'privacy:metadata:googlemeet_ai_analysis:reviewedby',
                 'timereviewed' => 'privacy:metadata:googlemeet_ai_analysis:timereviewed',
@@ -168,6 +172,18 @@ class provider implements
                 'notesdocid' => 'privacy:metadata:googlemeet_recordings:notesdocid',
             ],
             'privacy:metadata:googlemeet_recordings'
+        );
+
+        // The operational log of Google syncs holds no user id, but its result text has carried the
+        // organiser's e-mail (calendar errors name the account). sync_log::finish() masks e-mail
+        // addresses before storing; rows expire after sync_log::RETENTION_DAYS and go with the context.
+        $collection->add_database_table(
+            'googlemeet_sync_log',
+            [
+                'message' => 'privacy:metadata:googlemeet_sync_log:message',
+                'timequeued' => 'privacy:metadata:googlemeet_sync_log:timequeued',
+            ],
+            'privacy:metadata:googlemeet_sync_log'
         );
 
         // Recording transcripts and, as a last-resort fallback, the full recording video are
@@ -374,8 +390,14 @@ class provider implements
 
         [$contextsql, $contextparams] = $DB->get_in_or_equal($contextlist->get_contextids(), SQL_PARAMS_NAMED);
 
-        $sql = "SELECT cm.id AS cmid,
-                       gnd.timesent
+        // All reminders of a context go into the one root file, beside the activity's own data:
+        // export_data() replaces the file of a (context, subcontext) pair, so one call per row would
+        // keep only the last reminder.
+        $sql = "SELECT gnd.id,
+                       cm.id AS cmid,
+                       gnd.kind,
+                       gnd.timesent,
+                       ge.eventdate
                   FROM {context} c
             INNER JOIN {course_modules} cm ON cm.id = c.instanceid AND c.contextlevel = :contextlevel
             INNER JOIN {modules} m ON m.id = cm.module AND m.name = :modname
@@ -384,7 +406,7 @@ class provider implements
             INNER JOIN {googlemeet_notify_done} gnd ON gnd.eventid = ge.id
                  WHERE c.id {$contextsql}
                    AND gnd.userid = :userid
-              ORDER BY cm.id";
+              ORDER BY cm.id, ge.eventdate, gnd.kind, gnd.id";
 
         $params = [
             'modname' => 'googlemeet',
@@ -392,22 +414,27 @@ class provider implements
             'userid' => $user->id,
         ] + $contextparams;
 
+        $reminders = [];
         $notifications = $DB->get_recordset_sql($sql, $params);
-
         foreach ($notifications as $notification) {
-            $notificationdata = [
+            $reminders[(int)$notification->cmid][] = [
+                'session' => \core_privacy\local\request\transform::datetime($notification->eventdate),
+                'kind' => self::reminder_kind_name((int)$notification->kind),
                 'timesent' => \core_privacy\local\request\transform::datetime($notification->timesent),
             ];
+        }
+        $notifications->close();
 
-            $context = \context_module::instance($notification->cmid);
-
+        foreach ($contextlist->get_contexts() as $context) {
+            if (!$context instanceof \context_module) {
+                continue;
+            }
             $contextdata = helper::get_context_data($context, $user);
-            $contextdata = (object)array_merge((array)$contextdata, $notificationdata);
-
+            if (isset($reminders[(int)$context->instanceid])) {
+                $contextdata->reminders = $reminders[(int)$context->instanceid];
+            }
             writer::with_context($context)->export_data([], $contextdata);
         }
-
-        $notifications->close();
 
         $sql = "SELECT cm.id AS cmid,
                        grs.timecreated
@@ -559,6 +586,20 @@ class provider implements
     }
 
     /**
+     * Name of a reminder kind as the activity settings call it.
+     *
+     * @param int $kind reminders::KIND_*.
+     * @return string
+     */
+    protected static function reminder_kind_name(int $kind): string {
+        return match ($kind) {
+            \mod_googlemeet\local\reminders::KIND_MINUTES => get_string('minutesbefore', 'googlemeet'),
+            \mod_googlemeet\local\reminders::KIND_HOURS => get_string('notifyhoursbefore', 'googlemeet'),
+            default => (string)$kind,
+        };
+    }
+
+    /**
      * Delete all personal data for all users in the specified context.
      *
      * @param context $context Context to delete data from.
@@ -584,12 +625,15 @@ class provider implements
         );
         $DB->delete_records('googlemeet_recording_subs', ['googlemeetid' => $cm->instance]);
         $DB->delete_records('googlemeet_practice_attempts', ['googlemeetid' => $cm->instance]);
+        // Every attendance row, the unmatched participants (userid 0) included.
         \mod_googlemeet\local\attendance\privacy::delete((int)$cm->instance);
+        $DB->delete_records(\mod_googlemeet\local\sync_log::TABLE, ['googlemeetid' => $cm->instance]);
 
         $recordingids = $DB->get_fieldset_select('googlemeet_recordings', 'id', 'googlemeetid = ?', [$cm->instance]);
         if (!empty($recordingids)) {
             [$insql, $inparams] = $DB->get_in_or_equal($recordingids, SQL_PARAMS_NAMED);
             $DB->delete_records_select('googlemeet_recording_progress', "recordingid $insql", $inparams);
+            // The analyses are generated from the participants' speech: an erasure removes them whole.
             $DB->delete_records_select('googlemeet_ai_analysis', "recordingid $insql", $inparams);
             $names = [];
             foreach ($recordingids as $recordingid) {

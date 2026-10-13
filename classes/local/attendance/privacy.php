@@ -33,18 +33,31 @@ class privacy {
     /**
      * Declare the stored data.
      *
+     * A participant no Moodle user matched is stored with userid 0 beside the name, e-mail and
+     * Google id Google returned. Per-user requests read only the recorded userid, never an e-mail
+     * match: Moodle e-mails need not be unique and change, the matcher already compared e-mails
+     * when it stored the row, and a teacher may have unlinked that participant on purpose
+     * ({@see service::match()}, {@see service::MATCH_UNLINKED}). Those rows go with the activity,
+     * a course reset or a context-wide privacy deletion.
+     *
      * @param collection $collection Collection.
      * @return void
      */
     public static function add_metadata(collection $collection): void {
         $collection->add_database_table('googlemeet_attendance', [
             'userid' => 'privacy:metadata:googlemeet_attendance:userid',
+            'eventid' => 'privacy:metadata:googlemeet_attendance:eventid',
             'email' => 'privacy:metadata:googlemeet_attendance:email',
             'displayname' => 'privacy:metadata:googlemeet_attendance:displayname',
             'googleuserid' => 'privacy:metadata:googlemeet_attendance:googleuserid',
+            'participanttype' => 'privacy:metadata:googlemeet_attendance:participanttype',
+            'matchedby' => 'privacy:metadata:googlemeet_attendance:matchedby',
             'timejoined' => 'privacy:metadata:googlemeet_attendance:timejoined',
             'timeleft' => 'privacy:metadata:googlemeet_attendance:timeleft',
             'durationseconds' => 'privacy:metadata:googlemeet_attendance:durationseconds',
+            'sessions' => 'privacy:metadata:googlemeet_attendance:sessions',
+            'timecreated' => 'privacy:metadata:googlemeet_attendance:timecreated',
+            'timemodified' => 'privacy:metadata:googlemeet_attendance:timemodified',
         ], 'privacy:metadata:googlemeet_attendance');
         $collection->add_external_location_link('googlemeet_meetapi', [
             'displayname' => 'privacy:metadata:googlemeet_meetapi:displayname',
@@ -151,6 +164,10 @@ class privacy {
     /**
      * Delete attendance of an activity, optionally only for some users.
      *
+     * For everyone, the unmatched participants (userid 0) go too, and the fetch state is marked
+     * done and emptied as course reset does ({@see \mod_googlemeet\local\recording_cleanup::delete_user_data()}),
+     * so the task does not read the deleted sessions from Google again.
+     *
      * @param int $googlemeetid Activity id.
      * @param int[]|null $userids Users, or null for everyone.
      * @return void
@@ -160,6 +177,12 @@ class privacy {
 
         if ($userids === null) {
             $DB->delete_records('googlemeet_attendance', ['googlemeetid' => $googlemeetid]);
+            $DB->execute(
+                "UPDATE {googlemeet_attendance_sync}
+                    SET status = :done, participants = 0, matched = 0, message = NULL, nextattempt = 0
+                  WHERE googlemeetid = :googlemeetid",
+                ['done' => service::STATUS_DONE, 'googlemeetid' => $googlemeetid]
+            );
             return;
         }
         if (!$userids) {
