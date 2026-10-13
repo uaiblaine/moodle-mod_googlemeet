@@ -181,4 +181,38 @@ class behat_mod_googlemeet extends behat_base {
         $this->getSession()->visit($this->locate_path($url->out_as_local_url(false) . $suffix));
     }
     // phpcs:enable
+
+    // phpcs:disable moodle.Files.LineLength -- A step definition regex cannot be wrapped.
+    /**
+     * Create a one-hour session of an activity that starts a number of seconds from now.
+     *
+     * @Given /^a googlemeet session of "(?P<name_string>[^"]*)" starts in "(?P<seconds_number>\d+)" seconds$/
+     * @param string $name Activity name.
+     * @param int $seconds Seconds from now until the session starts.
+     */
+    public function a_googlemeet_session_starts_in(string $name, int $seconds): void {
+        global $DB;
+        $instance = $DB->get_record('googlemeet', ['name' => $name], '*', MUST_EXIST);
+        $DB->insert_record('googlemeet_events', (object)[
+            'googlemeetid' => $instance->id,
+            'eventdate' => time() + $seconds,
+            'duration' => HOURSECS,
+            'timemodified' => time(),
+        ]);
+    }
+
+    /**
+     * Replace navigator.clipboard.writeText in the open page, so the copy feedback does not depend on the browser's permission.
+     *
+     * @Given /^the browser clipboard (?P<outcome_string>accepts|refuses) writes$/
+     * @param string $outcome accepts (the promise resolves) or refuses (it rejects, as a denied permission does).
+     */
+    public function the_browser_clipboard_writes(string $outcome): void {
+        $result = $outcome === 'accepts' ? 'Promise.resolve()' : "Promise.reject(new Error('denied'))";
+        $this->getSession()->executeScript(
+            "Object.defineProperty(navigator, 'clipboard', {configurable: true, " .
+            "value: {writeText: function() { return " . $result . "; }}});"
+        );
+    }
+    // phpcs:enable
 }
