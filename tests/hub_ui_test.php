@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recording_format;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
@@ -130,19 +131,19 @@ final class hub_ui_test extends \advanced_testcase {
      * The continue label names the chapter when the remembered second is a chapter start.
      */
     public function test_resume_label(): void {
-        $chapters = googlemeet_normalise_chapters(json_encode([
+        $chapters = recording_format::normalise_chapters(json_encode([
             ['title' => 'Introducción', 'start' => '4:01'],
             ['title' => 'Derechos de los ciudadanos', 'start' => '14:02'],
         ]));
         $this->assertSame(get_string('hub_resume_chapter', 'googlemeet', (object)[
-            'title' => 'Derechos de los ciudadanos', 'time' => googlemeet_format_seconds_timestamp(842),
+            'title' => 'Derechos de los ciudadanos', 'time' => recording_format::format_seconds_timestamp(842),
         ]), googlemeet_hub_resume_label(842, $chapters));
         $this->assertSame(
-            get_string('hub_resume_time', 'googlemeet', googlemeet_format_seconds_timestamp(900)),
+            get_string('hub_resume_time', 'googlemeet', recording_format::format_seconds_timestamp(900)),
             googlemeet_hub_resume_label(900, $chapters)
         );
         $this->assertSame(
-            get_string('hub_resume_time', 'googlemeet', googlemeet_format_seconds_timestamp(842)),
+            get_string('hub_resume_time', 'googlemeet', recording_format::format_seconds_timestamp(842)),
             googlemeet_hub_resume_label(842, [])
         );
     }

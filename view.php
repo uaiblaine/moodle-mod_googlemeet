@@ -23,6 +23,7 @@
  */
 
 use mod_googlemeet\client;
+use mod_googlemeet\local\recordings;
 
 require(__DIR__ . '/../../config.php');
 require_once(__DIR__ . '/lib.php');
@@ -115,7 +116,7 @@ if ($recordingid > 0) {
 }
 
 // Completion and trigger events.
-googlemeet_view($googlemeet, $course, $cm, $context);
+recordings::view($googlemeet, $course, $cm, $context);
 
 if ($recording) {
     // Recording pages: the activity description (often a raw Meet link) belongs to the

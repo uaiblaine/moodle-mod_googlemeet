@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recordings;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
@@ -35,7 +36,7 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
  */
 #[CoversClass(ai_service::class)]
 #[CoversClass(\mod_googlemeet\task\process_ai_analysis::class)]
-#[CoversFunction('googlemeet_list_recordings')]
+#[CoversClass(recordings::class)]
 #[CoversFunction('googlemeet_print_recording_hub')]
 final class ai_stuck_test extends \advanced_testcase {
     /** @var \stdClass */
@@ -172,7 +173,7 @@ final class ai_stuck_test extends \advanced_testcase {
         };
 
         $this->setUser($teacher);
-        $list = googlemeet_list_recordings(['googlemeetid' => $this->googlemeet->id], true);
+        $list = recordings::list_recordings(['googlemeetid' => $this->googlemeet->id], true);
         $this->assertTrue($list[0]->aistatusisstuck);
         $this->assertFalse($list[0]->aistatusisprocessing);
         $html = $render();
@@ -180,7 +181,7 @@ final class ai_stuck_test extends \advanced_testcase {
         $this->assertStringContainsString(s(get_string('ai_status_stuck', 'googlemeet', 60)), $html);
 
         $this->setUser($student);
-        $list = googlemeet_list_recordings(['googlemeetid' => $this->googlemeet->id], true);
+        $list = recordings::list_recordings(['googlemeetid' => $this->googlemeet->id], true);
         $this->assertFalse($list[0]->aistatusisstuck);
         $this->assertTrue($list[0]->aistatusisprocessing);
         $this->assertStringNotContainsString('data-action="ai-stuck-retry"', $render());

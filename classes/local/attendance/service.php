@@ -16,6 +16,8 @@
 
 namespace mod_googlemeet\local\attendance;
 
+use mod_googlemeet\local\recording_format;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -333,14 +335,14 @@ class service {
     }
 
     /**
-     * Normalise a person name for matching: lower case, accents folded (those of {@see googlemeet_fold()}
+     * Normalise a person name for matching: lower case, accents folded (those of {@see recording_format::fold()}
      * plus grave accents, ç and ï; others are kept), punctuation removed.
      *
      * @param string $name Name.
      * @return string
      */
     public static function normalise_name(string $name): string {
-        $name = googlemeet_fold($name);
+        $name = recording_format::fold($name);
         $name = strtr($name, ['à' => 'a', 'è' => 'e', 'ì' => 'i', 'ò' => 'o', 'ù' => 'u', 'ç' => 'c', 'ï' => 'i']);
         $name = preg_replace('/[^\p{L}\p{N}]+/u', ' ', $name);
         return trim(preg_replace('/\s+/u', ' ', $name));

@@ -16,6 +16,10 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recording_search;
+use mod_googlemeet\local\recordings;
+use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversFunction;
 
 defined('MOODLE_INTERNAL') || die();
@@ -41,11 +45,10 @@ require_once($CFG->dirroot . '/mod/googlemeet/locallib.php');
 #[CoversFunction('googlemeet_clear_url')]
 #[CoversFunction('googlemeet_construct_events_data_for_add')]
 #[CoversFunction('googlemeet_set_events')]
-#[CoversFunction('googlemeet_display_name')]
-#[CoversFunction('googlemeet_assign_lesson_titles')]
+#[CoversClass(recordings::class)]
 #[CoversFunction('googlemeet_summary_paragraphs')]
 #[CoversFunction('googlemeet_get_recording_seek_url')]
-#[CoversFunction('googlemeet_format_seconds_timestamp')]
+#[CoversClass(recording_format::class)]
 final class locallib_test extends \advanced_testcase {
     // Helpers.
 
@@ -109,7 +112,7 @@ final class locallib_test extends \advanced_testcase {
         ];
 
         foreach ($cases as [$input, $expected]) {
-            $this->assertSame($expected, googlemeet_display_name($input));
+            $this->assertSame($expected, recordings::display_name($input));
         }
     }
 
@@ -118,7 +121,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_assign_lesson_titles(): void {
         $activity = 'Live classes course A';
-        $titles = googlemeet_assign_lesson_titles([
+        $titles = recordings::assign_lesson_titles([
             1 => ['name' => $activity . ' - 2026/06/25 17:00 CEST - Recording', 'topics' => ['Ley General Sanidad', 'SNS']],
             2 => ['name' => $activity, 'topics' => []],
             3 => ['name' => 'Tema 4: Estatuto de Autonomía', 'topics' => ['Parlament']],
@@ -170,12 +173,12 @@ final class locallib_test extends \advanced_testcase {
      * Seconds are formatted like chapter timestamps (M:SS or H:MM:SS).
      */
     public function test_format_seconds_timestamp(): void {
-        $this->assertSame('0:00', googlemeet_format_seconds_timestamp(0));
-        $this->assertSame('0:00', googlemeet_format_seconds_timestamp(-5));
-        $this->assertSame('1:30', googlemeet_format_seconds_timestamp(90));
-        $this->assertSame('26:03', googlemeet_format_seconds_timestamp(1563));
-        $this->assertSame('1:02:03', googlemeet_format_seconds_timestamp(3723));
-        $this->assertSame(1563, googlemeet_timestamp_to_seconds(googlemeet_format_seconds_timestamp(1563)));
+        $this->assertSame('0:00', recording_format::format_seconds_timestamp(0));
+        $this->assertSame('0:00', recording_format::format_seconds_timestamp(-5));
+        $this->assertSame('1:30', recording_format::format_seconds_timestamp(90));
+        $this->assertSame('26:03', recording_format::format_seconds_timestamp(1563));
+        $this->assertSame('1:02:03', recording_format::format_seconds_timestamp(3723));
+        $this->assertSame(1563, recording_format::timestamp_to_seconds(recording_format::format_seconds_timestamp(1563)));
     }
 
     // Tests of googlemeet_is_holiday().
@@ -690,13 +693,13 @@ final class locallib_test extends \advanced_testcase {
         $this->assertNotContains('Wed', $eventdates, 'Wednesday event must not appear.');
     }
 
-    // Tests of googlemeet_truncate_summary().
+    // Tests of recording_format::truncate_summary().
 
     /**
      * Text within the limit is returned unchanged.
      */
     public function test_truncate_summary_short_text_unchanged(): void {
-        $this->assertSame('hola', googlemeet_truncate_summary('hola', 200));
+        $this->assertSame('hola', recording_format::truncate_summary('hola', 200));
     }
 
     /**
@@ -704,7 +707,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_truncate_summary_adds_ellipsis_when_cut(): void {
         $text = str_repeat('a', 250);
-        $out = googlemeet_truncate_summary($text, 200);
+        $out = recording_format::truncate_summary($text, 200);
         $this->assertSame(201, \core_text::strlen($out)); // 200 chars + ellipsis.
         $this->assertStringEndsWith('…', $out);
     }
@@ -715,19 +718,19 @@ final class locallib_test extends \advanced_testcase {
     public function test_truncate_summary_does_not_split_multibyte(): void {
         // 201 'é' (2 bytes each in UTF-8). A byte-based substr(0, 200) would keep only 100 characters.
         $text = str_repeat('é', 201);
-        $out = googlemeet_truncate_summary($text, 200);
+        $out = recording_format::truncate_summary($text, 200);
         $this->assertSame(201, \core_text::strlen($out));
         // No U+FFFD replacement char from a broken byte sequence.
         $this->assertStringNotContainsString("\xEF\xBF\xBD", $out);
     }
 
-    // Tests of googlemeet_ai_status_flags().
+    // Tests of recording_format::ai_status_flags().
 
     /**
      * A completed status sets the row and completed flags, not the failed one.
      */
     public function test_ai_status_flags_completed(): void {
-        $f = googlemeet_ai_status_flags('completed');
+        $f = recording_format::ai_status_flags('completed');
         $this->assertSame('completed', $f['aistatus']);
         $this->assertTrue($f['hasanalysisrow']);
         $this->assertTrue($f['aistatusiscompleted']);
@@ -738,7 +741,7 @@ final class locallib_test extends \advanced_testcase {
      * A failed status sets the failed flag and not the completed one.
      */
     public function test_ai_status_flags_failed(): void {
-        $f = googlemeet_ai_status_flags('failed');
+        $f = recording_format::ai_status_flags('failed');
         $this->assertTrue($f['aistatusisfailed']);
         $this->assertFalse($f['aistatusiscompleted']);
     }
@@ -747,7 +750,7 @@ final class locallib_test extends \advanced_testcase {
      * A null status means there is no analysis row.
      */
     public function test_ai_status_flags_null_means_no_row(): void {
-        $f = googlemeet_ai_status_flags(null);
+        $f = recording_format::ai_status_flags(null);
         $this->assertFalse($f['hasanalysisrow']);
         $this->assertSame('', $f['aistatus']);
     }
@@ -756,11 +759,11 @@ final class locallib_test extends \advanced_testcase {
      * An unknown status is treated as no analysis row.
      */
     public function test_ai_status_flags_unknown_treated_as_no_row(): void {
-        $f = googlemeet_ai_status_flags('banana');
+        $f = recording_format::ai_status_flags('banana');
         $this->assertFalse($f['hasanalysisrow']);
     }
 
-    // Tests of googlemeet_recording_is_new().
+    // Tests of recording_format::recording_is_new().
 
     /**
      * A recording younger than the threshold counts as new.
@@ -768,7 +771,7 @@ final class locallib_test extends \advanced_testcase {
     public function test_recording_is_new_within_threshold(): void {
         $now = mktime(12, 0, 0, 6, 10, 2026);
         $created = mktime(12, 0, 0, 6, 8, 2026); // 2 days earlier.
-        $this->assertTrue(googlemeet_recording_is_new($created, $now, 7));
+        $this->assertTrue(recording_format::recording_is_new($created, $now, 7));
     }
 
     /**
@@ -777,7 +780,7 @@ final class locallib_test extends \advanced_testcase {
     public function test_recording_is_new_outside_threshold(): void {
         $now = mktime(12, 0, 0, 6, 10, 2026);
         $created = mktime(12, 0, 0, 5, 20, 2026); // About 21 days earlier.
-        $this->assertFalse(googlemeet_recording_is_new($created, $now, 7));
+        $this->assertFalse(recording_format::recording_is_new($created, $now, 7));
     }
 
     /**
@@ -785,12 +788,12 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_recording_date_group_is_month_year(): void {
         $ts = mktime(12, 0, 0, 5, 27, 2026);
-        $out = googlemeet_recording_date_group($ts);
+        $out = recording_format::recording_date_group($ts);
         $this->assertNotSame('', $out);
         $this->assertStringContainsString('2026', $out);
     }
 
-    // Tests of the recording filters by query and by topic, and of googlemeet_collect_topics().
+    // Tests of the recording filters by query and by topic, and of recording_search::collect_topics().
 
     /**
      * Build a minimal recording stdClass for filter tests.
@@ -815,7 +818,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_filter_by_query_matches_name_case_insensitive(): void {
         $recs = [$this->rec('Clase de Contratos'), $this->rec('Clase de Personal')];
-        $out = googlemeet_filter_recordings_by_query($recs, 'contratos');
+        $out = recording_search::filter_recordings_by_query($recs, 'contratos');
         $this->assertCount(1, $out);
         $this->assertSame('Clase de Contratos', $out[0]->name);
     }
@@ -825,7 +828,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_filter_by_query_matches_ai_topic(): void {
         $recs = [$this->rec('Sesión 1', true, ['Silencio administrativo'])];
-        $out = googlemeet_filter_recordings_by_query($recs, 'silencio');
+        $out = recording_search::filter_recordings_by_query($recs, 'silencio');
         $this->assertCount(1, $out);
     }
 
@@ -834,7 +837,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_filter_by_query_empty_returns_all(): void {
         $recs = [$this->rec('a'), $this->rec('b')];
-        $this->assertCount(2, googlemeet_filter_recordings_by_query($recs, '  '));
+        $this->assertCount(2, recording_search::filter_recordings_by_query($recs, '  '));
     }
 
     /**
@@ -842,7 +845,7 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_filter_by_topic_exact(): void {
         $recs = [$this->rec('a', true, ['LPAC']), $this->rec('b', true, ['LCSP'])];
-        $out = googlemeet_filter_recordings_by_topic($recs, 'LPAC');
+        $out = recording_search::filter_recordings_by_topic($recs, 'LPAC');
         $this->assertCount(1, $out);
         $this->assertSame('a', $out[0]->name);
     }
@@ -852,16 +855,16 @@ final class locallib_test extends \advanced_testcase {
      */
     public function test_collect_topics_unique_sorted(): void {
         $recs = [$this->rec('a', true, ['LCSP', 'LPAC']), $this->rec('b', true, ['LPAC'])];
-        $this->assertSame(['LCSP', 'LPAC'], googlemeet_collect_topics($recs));
+        $this->assertSame(['LCSP', 'LPAC'], recording_search::collect_topics($recs));
     }
 
-    // Tests of googlemeet_topic_preview().
+    // Tests of recording_search::topic_preview().
 
     /**
      * The preview keeps the first $max topics and counts the rest as overflow.
      */
     public function test_topic_preview_caps_and_counts_overflow(): void {
-        $p = googlemeet_topic_preview(['a', 'b', 'c', 'd', 'e'], 3);
+        $p = recording_search::topic_preview(['a', 'b', 'c', 'd', 'e'], 3);
         $this->assertSame(['a', 'b', 'c'], $p['visible']);
         $this->assertSame(2, $p['overflow']);
     }
@@ -870,7 +873,7 @@ final class locallib_test extends \advanced_testcase {
      * A list within the cap has no overflow.
      */
     public function test_topic_preview_no_overflow(): void {
-        $p = googlemeet_topic_preview(['a', 'b'], 3);
+        $p = recording_search::topic_preview(['a', 'b'], 3);
         $this->assertSame(['a', 'b'], $p['visible']);
         $this->assertSame(0, $p['overflow']);
     }

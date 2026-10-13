@@ -19,6 +19,7 @@ namespace mod_googlemeet;
 use mod_googlemeet\completion\custom_completion;
 use mod_googlemeet\local\completion_updater;
 use mod_googlemeet\local\practice_attempts;
+use mod_googlemeet\local\recording_progress;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
@@ -233,7 +234,7 @@ final class custom_completion_test extends \advanced_testcase {
 
         // Heartbeats up to the threshold (8 minutes for a one-hour class), each capped at 60 seconds
         // and at the time elapsed since the previous write, so the row is aged before every call.
-        $threshold = googlemeet_recording_completion_threshold('1:00:00');
+        $threshold = recording_progress::recording_completion_threshold('1:00:00');
         for ($sent = 0; $sent < $threshold; $sent += 60) {
             $DB->set_field(
                 'googlemeet_recording_progress',

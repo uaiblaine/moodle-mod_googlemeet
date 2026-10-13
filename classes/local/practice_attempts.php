@@ -112,7 +112,7 @@ class practice_attempts {
      *
      * @param stdClass $googlemeet Activity record.
      * @param \context_module $context Module context.
-     * @return stdClass[] Recordings (googlemeet_list_recordings() shape, with aitopics) keyed by id.
+     * @return stdClass[] Recordings (recordings::list_recordings() shape, with aitopics) keyed by id.
      */
     public static function get_practice_recordings(stdClass $googlemeet, \context_module $context): array {
         $params = ['googlemeetid' => $googlemeet->id];
@@ -120,7 +120,7 @@ class practice_attempts {
             $params['visible'] = 1;
         }
         $recordings = [];
-        foreach (googlemeet_list_recordings($params, true, 'ASC') as $recording) {
+        foreach (recordings::list_recordings($params, true, 'ASC') as $recording) {
             $recordings[(int)$recording->id] = $recording;
         }
         return $recordings;
@@ -241,7 +241,7 @@ class practice_attempts {
             $seen = [];
             foreach (($recording->aitopics ?? []) as $topic) {
                 $topic = trim((string)$topic);
-                $key = googlemeet_fold($topic);
+                $key = recording_format::fold($topic);
                 if ($topic === '' || isset($seen[$key])) {
                     continue;
                 }
@@ -304,7 +304,7 @@ class practice_attempts {
             }
             $recordingids = array_map(static function ($r) {
                 return (int)$r->id;
-            }, googlemeet_filter_recordings_by_topic(array_values($recordings), $topic));
+            }, recording_search::filter_recordings_by_topic(array_values($recordings), $topic));
         } else {
             throw new \moodle_exception('invalidparameter', 'debug');
         }
@@ -320,7 +320,7 @@ class practice_attempts {
                 $question['recordingid'] = $recordingid;
                 // Plain spelling: a PARAM_TEXT field that practice_session.js writes as textContent.
                 $question['recordingname'] = format_string(
-                    googlemeet_display_name((string)$recordings[$recordingid]->name),
+                    recordings::display_name((string)$recordings[$recordingid]->name),
                     true,
                     ['context' => $context, 'escape' => false]
                 );

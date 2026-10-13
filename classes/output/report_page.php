@@ -17,6 +17,7 @@
 namespace mod_googlemeet\output;
 
 use mod_googlemeet\local\practice_attempts;
+use mod_googlemeet\local\recordings;
 use moodle_url;
 use renderer_base;
 
@@ -92,7 +93,7 @@ class report_page implements \renderable, \templatable {
             $headers[] = [
                 'index' => $index,
                 'name' => format_string(
-                    googlemeet_display_name((string)$recording->name),
+                    recordings::display_name((string)$recording->name),
                     true,
                     ['context' => $this->context, 'escape' => false]
                 ),
@@ -188,7 +189,7 @@ class report_page implements \renderable, \templatable {
             }
             $failedsections[] = [
                 'name' => format_string(
-                    googlemeet_display_name((string)$recording->name),
+                    recordings::display_name((string)$recording->name),
                     true,
                     ['context' => $this->context, 'escape' => false]
                 ),

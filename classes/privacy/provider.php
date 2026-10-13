@@ -30,6 +30,7 @@ use core_privacy\local\request\contextlist;
 use core_privacy\local\request\helper;
 use core_privacy\local\request\userlist;
 use core_privacy\local\request\writer;
+use mod_googlemeet\local\recording_format;
 
 /**
  * Privacy provider for mod_googlemeet.
@@ -829,7 +830,7 @@ class provider implements
             writer::export_user_preference(
                 'mod_googlemeet',
                 $preference->name,
-                googlemeet_format_seconds_timestamp((int)$preference->value),
+                recording_format::format_seconds_timestamp((int)$preference->value),
                 get_string('privacy:metadata:preference:lastjump', 'mod_googlemeet') .
                     ($recordingname !== false ? ' (' . format_string($recordingname) . ')' : '')
             );

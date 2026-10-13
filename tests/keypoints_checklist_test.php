@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recording_progress;
 use mod_googlemeet\privacy\provider;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -38,13 +39,13 @@ final class keypoints_checklist_test extends \advanced_testcase {
      * The hash ignores whitespace and changes with the key points; a state saved for another list or length is ignored.
      */
     public function test_hash_and_state(): void {
-        $hash = googlemeet_keypoints_hash(['A  point', 'B']);
-        $this->assertSame($hash, googlemeet_keypoints_hash(['A point ', 'B']));
-        $this->assertNotSame($hash, googlemeet_keypoints_hash(['A point', 'C']));
-        $this->assertSame('101', googlemeet_keypoints_state($hash . ':101', $hash, 3));
-        $this->assertSame('', googlemeet_keypoints_state($hash . ':101', $hash, 2));
-        $this->assertSame('', googlemeet_keypoints_state('00000000:101', $hash, 3));
-        $this->assertSame('', googlemeet_keypoints_state('garbage', $hash, 3));
+        $hash = recording_progress::keypoints_hash(['A  point', 'B']);
+        $this->assertSame($hash, recording_progress::keypoints_hash(['A point ', 'B']));
+        $this->assertNotSame($hash, recording_progress::keypoints_hash(['A point', 'C']));
+        $this->assertSame('101', recording_progress::keypoints_state($hash . ':101', $hash, 3));
+        $this->assertSame('', recording_progress::keypoints_state($hash . ':101', $hash, 2));
+        $this->assertSame('', recording_progress::keypoints_state('00000000:101', $hash, 3));
+        $this->assertSame('', recording_progress::keypoints_state('garbage', $hash, 3));
     }
 
     /**
@@ -73,7 +74,7 @@ final class keypoints_checklist_test extends \advanced_testcase {
                 $this->assertInstanceOf(\invalid_parameter_exception::class, $e);
             }
         }
-        $this->assertSame('mod_googlemeet_kp_7', googlemeet_keypoints_preference_name(7));
+        $this->assertSame('mod_googlemeet_kp_7', recording_progress::keypoints_preference_name(7));
     }
 
     /**

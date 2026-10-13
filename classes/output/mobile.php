@@ -23,6 +23,9 @@
  */
 namespace mod_googlemeet\output;
 
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recordings;
+
 defined('MOODLE_INTERNAL') || die();
 
 global $CFG;
@@ -90,7 +93,7 @@ class mobile {
 
         // Completion and trigger events (first page only: paging is not a new view).
         if ($page === 0) {
-            googlemeet_view($googlemeet, $course, $cm, $context);
+            recordings::view($googlemeet, $course, $cm, $context);
         }
 
         return [
@@ -119,13 +122,13 @@ class mobile {
         global $DB, $USER;
 
         $params = ['googlemeetid' => $googlemeet->id, 'visible' => 1];
-        $total = googlemeet_count_recordings($params + ['deleted' => 0]);
+        $total = recordings::count_recordings($params + ['deleted' => 0]);
         $pages = max(1, (int)ceil($total / self::PERPAGE));
         $page = min($page, $pages - 1);
         $order = ($googlemeet->recordingsorder ?? 'DESC') === 'ASC' ? 'ASC' : 'DESC';
-        $recordings = googlemeet_list_recordings($params, false, $order, self::PERPAGE, $page * self::PERPAGE);
+        $recordings = recordings::list_recordings($params, false, $order, self::PERPAGE, $page * self::PERPAGE);
 
-        $titles = googlemeet_get_lesson_titles($googlemeet, false);
+        $titles = recordings::get_lesson_titles($googlemeet, false);
         $watched = [];
         if ($recordings) {
             [$insql, $inparams] = $DB->get_in_or_equal(array_column($recordings, 'id'), SQL_PARAMS_NAMED);
@@ -263,8 +266,8 @@ class mobile {
             throw new \moodle_exception('recordingnotfound', 'googlemeet');
         }
 
-        $titles = googlemeet_get_lesson_titles($googlemeet, false);
-        $title = $titles[$recording->id]['title'] ?? googlemeet_display_name((string)$recording->name);
+        $titles = recordings::get_lesson_titles($googlemeet, false);
+        $title = $titles[$recording->id]['title'] ?? recordings::display_name((string)$recording->name);
 
         $analysis = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recording->id]);
         $summary = [];
@@ -280,7 +283,7 @@ class mobile {
                     $keypoints[] = ['text' => format_string((string)$keypoint, true, ['context' => $context, 'escape' => false])];
                 }
             }
-            foreach (googlemeet_normalise_chapters($analysis->chapters ?? '') as $index => $chapter) {
+            foreach (recording_format::normalise_chapters($analysis->chapters ?? '') as $index => $chapter) {
                 $chapters[] = [
                     'index' => $index,
                     'title' => format_string($chapter['title'], true, ['context' => $context, 'escape' => false]),

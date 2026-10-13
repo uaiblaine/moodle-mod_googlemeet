@@ -17,6 +17,7 @@
 namespace mod_googlemeet;
 
 use DateTime;
+use mod_googlemeet\local\recordings;
 use moodle_url;
 use dml_missing_record_exception;
 use moodle_exception;
@@ -611,7 +612,7 @@ class client {
 
                         if (!$deferenrichment && !isset($existingids[$recording->id])) {
                             // Only fetch the transcript (and run yt-dlp) for recordings about to be inserted:
-                            // googlemeet_sync_recordings() never writes a transcript to an existing row.
+                            // recordings::sync_recordings() never writes a transcript to an existing row.
                             $transcriptdata = $this->find_transcript_for_recording($service, $parents, $recording->name);
                             if ($transcriptdata) {
                                 $recordings[$i]->transcriptfileid = $transcriptdata['fileid'];
@@ -653,7 +654,7 @@ class client {
                     }
                 }
 
-                $result = googlemeet_sync_recordings($googlemeet->id, $recordings, $deferenrichment);
+                $result = recordings::sync_recordings($googlemeet->id, $recordings, $deferenrichment);
                 $stats = $result['stats'];
             } else {
                 // No recordings found, but still update lastsync time.

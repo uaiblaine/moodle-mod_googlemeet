@@ -16,6 +16,8 @@
 
 namespace mod_googlemeet\task;
 
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recordings;
 use mod_googlemeet\local\reminders;
 
 defined('MOODLE_INTERNAL') || die();
@@ -202,7 +204,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
         $lessons = [];
         foreach ($recordings as $recording) {
             $id = (int)$recording->id;
-            $title = $titles[$id]['title'] ?? \googlemeet_display_name((string)$recording->name);
+            $title = $titles[$id]['title'] ?? recordings::display_name((string)$recording->name);
             $summary = '';
             $chapters = [];
             $analysis = $analyses[$id] ?? null;
@@ -210,7 +212,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
                 $summary = self::summary_excerpt((string)($analysis->summary ?? ''));
                 foreach (
                     array_slice(
-                        \googlemeet_normalise_chapters($analysis->chapters ?? null),
+                        recording_format::normalise_chapters($analysis->chapters ?? null),
                         0,
                         self::MAX_CHAPTERS
                     ) as $chapter
@@ -233,7 +235,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
     /**
      * Readable lesson titles for the visible recordings of the activity.
      *
-     * Computed directly instead of through googlemeet_get_lesson_titles(), whose per-request
+     * Computed directly instead of through recordings::get_lesson_titles(), whose per-request
      * cache could predate the recordings just synced when several tasks share a cron process.
      *
      * @param \stdClass $googlemeet Activity record.
@@ -257,7 +259,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
             }
             $items[$row->id] = ['name' => (string)$row->name, 'topics' => $topics];
         }
-        return \googlemeet_assign_lesson_titles(
+        return recordings::assign_lesson_titles(
             $items,
             [(string)($googlemeet->name ?? ''), (string)($googlemeet->originalname ?? '')]
         );
@@ -276,7 +278,7 @@ class notify_new_recordings extends \core\task\adhoc_task {
         if ($text === '') {
             return '';
         }
-        return \googlemeet_truncate_summary($text, self::SUMMARY_LENGTH);
+        return recording_format::truncate_summary($text, self::SUMMARY_LENGTH);
     }
 
     /**

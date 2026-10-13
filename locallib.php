@@ -26,6 +26,10 @@ defined('MOODLE_INTERNAL') || die();
 
 use mod_googlemeet\client;
 use mod_googlemeet\helper;
+use mod_googlemeet\local\recording_format;
+use mod_googlemeet\local\recording_progress;
+use mod_googlemeet\local\recording_search;
+use mod_googlemeet\local\recordings;
 use mod_googlemeet\question_service;
 
 require_once("$CFG->dirroot/mod/googlemeet/lib.php");
@@ -780,7 +784,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
             'markedviewed' => (int)($recording->usermarkedviewed ?? 0),
         ];
     }
-    $progressstate = googlemeet_recording_progress_state($recording, $progress);
+    $progressstate = recording_progress::recording_progress_state($recording, $progress);
     $latestclassfallback = $fallbackrecording && empty($progressstate['progresswatchedseconds']);
 
     return [
@@ -789,12 +793,13 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
             '/mod/googlemeet/view.php',
             ['id' => $cm->id, 'recording' => $recording->id]
         ))->out(false),
-        'continuetitle' => format_string(googlemeet_get_lesson_titles($googlemeet, $caneditrecording)[$recording->id]['title']
-            ?? googlemeet_display_name((string)$recording->name)),
+        'continuetitle' => format_string(recordings::get_lesson_titles($googlemeet, $caneditrecording)[$recording->id]['title']
+            ?? recordings::display_name((string)$recording->name)),
         'continueoriginaltitle' => $recording->name,
         'continuedate' => userdate($recording->createdtime, get_string('strftimedmy', 'googlemeet')),
         'continueduration' => $recording->duration,
-        'continuesummary' => !empty($recording->summary) ? googlemeet_truncate_summary((string)$recording->summary, 180) : '',
+        'continuesummary' => !empty($recording->summary)
+            ? recording_format::truncate_summary((string)$recording->summary, 180) : '',
         'continuelabel' => get_string($latestclassfallback ? 'continue_latest_label' : 'continue_watching_label', 'googlemeet'),
         'continuectalabel' => get_string($latestclassfallback ? 'continue_latest_cta' : 'continue_watching_cta', 'googlemeet'),
         'continueprogresslabel' => $progressstate['progressstatuslabel'],
@@ -816,7 +821,7 @@ function googlemeet_get_continue_watching_context($googlemeet, $cm, context_modu
  *
  * "watched" counts the recordings the user sees as viewed (measured completion or their own
  * "Mark as viewed") and "started" those with viewing time but not viewed, the same split as the
- * per-lesson badges of googlemeet_recording_progress_state(), so the hero summary never
+ * per-lesson badges of recording_progress::recording_progress_state(), so the hero summary never
  * contradicts them. Activity completion counts measured completion only
  * ({@see \mod_googlemeet\completion\custom_completion::count_watched()}), so the two may differ.
  *
@@ -1022,17 +1027,17 @@ function googlemeet_print_recordings(
     $page = max(0, (int) $page);
 
     // Fetch every recording (no SQL limit): the search and topic filters run in PHP before pagination.
-    $allrecordings = googlemeet_list_recordings($params, $aienabled, $order, 0, 0);
+    $allrecordings = recordings::list_recordings($params, $aienabled, $order, 0, 0);
 
     // Distinct topics for the filter chips come from the unfiltered set.
-    $alltopics = googlemeet_collect_topics($allrecordings);
+    $alltopics = recording_search::collect_topics($allrecordings);
 
     // Distinguishable lesson titles (computed over the whole activity so duplicates are detected).
     $titleitems = [];
     foreach ($allrecordings as $recording) {
         $titleitems[$recording->id] = ['name' => (string)$recording->name, 'topics' => $recording->aitopics ?? []];
     }
-    $lessontitles = googlemeet_assign_lesson_titles(
+    $lessontitles = recordings::assign_lesson_titles(
         $titleitems,
         [(string)$googlemeet->name, (string)($googlemeet->originalname ?? '')]
     );
@@ -1045,12 +1050,12 @@ function googlemeet_print_recordings(
     // Apply filters in PHP (topics are stored as JSON; this stays DB-portable).
     if (trim((string)$query) !== '') {
         if ($hascapability) {
-            $allrecordings = googlemeet_load_recording_search_content($allrecordings, true);
+            $allrecordings = recording_search::load_recording_search_content($allrecordings, true);
         }
-        $allrecordings = googlemeet_filter_recordings_by_query($allrecordings, (string)$query, $hascapability);
+        $allrecordings = recording_search::filter_recordings_by_query($allrecordings, (string)$query, $hascapability);
     }
     if (trim((string)$topic) !== '') {
-        $allrecordings = googlemeet_filter_recordings_by_topic($allrecordings, (string)$topic);
+        $allrecordings = recording_search::filter_recordings_by_topic($allrecordings, (string)$topic);
     }
     $progresssummary = googlemeet_get_progress_summary($googlemeet, $context);
     $showprogresssummary = !$hascapability && $progresssummary['total'] > 0;
@@ -1097,7 +1102,8 @@ function googlemeet_print_recordings(
     );
     $materialsbyrecording = \mod_googlemeet\local\list_aggregates::materials_by_recording($context, $pagerecordingids);
     foreach ($recordings as $recording) {
-        foreach (googlemeet_recording_progress_state($recording, $progressbyrecording[$recording->id] ?? null) as $key => $value) {
+        $recordingprogress = recording_progress::recording_progress_state($recording, $progressbyrecording[$recording->id] ?? null);
+        foreach ($recordingprogress as $key => $value) {
             $recording->$key = $value;
         }
         if ($hascapability) {
@@ -1149,7 +1155,7 @@ function googlemeet_print_recordings(
                 '/mod/googlemeet/view.php',
                 ['id' => $cm->id, 'topic' => $t, 'rorder' => $order]
             ))->out(false),
-            'active' => (googlemeet_fold($t) === googlemeet_fold((string)$topic)),
+            'active' => (recording_format::fold($t) === recording_format::fold((string)$topic)),
         ];
     }
     $cansubscriberecordings = has_capability('mod/googlemeet:subscriberecordings', $context);
@@ -1470,7 +1476,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
         $aienabled && has_capability('mod/googlemeet:generateai', $context)
     );
     $analysiscompleted = $analysis && $analysis->status === 'completed' && $aireview['aicontentvisible'];
-    $statusflags = googlemeet_ai_status_flags($analysis->status ?? null);
+    $statusflags = recording_format::ai_status_flags($analysis->status ?? null);
     // Teacher-only tab: never render the transcript into a student's page.
     $hubtranscript = $caneditrecording ? googlemeet_hub_transcript($analysis, $recording) : '';
     $keypoints = [];
@@ -1479,7 +1485,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
     if ($analysiscompleted) {
         $keypoints = json_decode($analysis->keypoints) ?: [];
         $topics = json_decode($analysis->topics) ?: [];
-        $chapters = googlemeet_normalise_chapters($analysis->chapters ?? '');
+        $chapters = recording_format::normalise_chapters($analysis->chapters ?? '');
     }
 
     $rpage = optional_param('rpage', 0, PARAM_INT);
@@ -1517,10 +1523,10 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
         ['recordingid' => $recording->id, 'userid' => $USER->id],
         'watchedseconds,completed,markedviewed'
     );
-    $progressstate = googlemeet_recording_progress_state($recording, $progress ?: null);
+    $progressstate = recording_progress::recording_progress_state($recording, $progress ?: null);
     $canembed = googlemeet_recording_can_embed((string)$recording->webviewlink);
     $embedurl = $canembed ? googlemeet_get_recording_embed_url((string)$recording->webviewlink) : '';
-    $durationseconds = googlemeet_recording_duration_to_seconds((string)$recording->duration);
+    $durationseconds = recording_format::recording_duration_to_seconds((string)$recording->duration);
     // Deep link: view.php?id=..&recording=..&t=<seconds> opens the Drive player at that second.
     $starttime = max(0, optional_param('t', 0, PARAM_INT));
     if ($durationseconds > 0) {
@@ -1528,18 +1534,18 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
     }
     $playerurl = $canembed ? googlemeet_get_recording_seek_url((string)$recording->webviewlink, $starttime) : '';
     // Approximate "continue where you left off": the last chapter/timestamp this user jumped to,
-    // not the real playback position (see googlemeet_lastjump_preference_name()).
+    // not the real playback position (see recording_progress::lastjump_preference_name()).
     $lastjump = 0;
     if ($canembed && $starttime === 0 && isloggedin() && !isguestuser()) {
-        $lastjump = max(0, (int)get_user_preferences(googlemeet_lastjump_preference_name((int)$recording->id), 0));
+        $lastjump = max(0, (int)get_user_preferences(recording_progress::lastjump_preference_name((int)$recording->id), 0));
         if ($durationseconds > 0 && $lastjump > $durationseconds) {
             $lastjump = 0;
         }
     }
 
-    $lessontitles = googlemeet_get_lesson_titles($googlemeet, $caneditrecording);
+    $lessontitles = recordings::get_lesson_titles($googlemeet, $caneditrecording);
     $lessontitle = $lessontitles[$recording->id] ?? [
-        'title' => googlemeet_display_name((string)$recording->name), 'subtitle' => '', 'hassubtitle' => false,
+        'title' => recordings::display_name((string)$recording->name), 'subtitle' => '', 'hassubtitle' => false,
     ];
     // The page header already shows the activity name: do not repeat it as the lesson subtitle.
     if (
@@ -1554,7 +1560,7 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
         if (!$navrecording) {
             return '';
         }
-        return format_string($lessontitles[$navrecording->id]['title'] ?? googlemeet_display_name((string)$navrecording->name));
+        return format_string($lessontitles[$navrecording->id]['title'] ?? recordings::display_name((string)$navrecording->name));
     };
     $navdate = static function (?stdClass $navrecording): string {
         return $navrecording ? userdate((int)$navrecording->createdtime, get_string('strftimedmy', 'googlemeet')) : '';
@@ -1617,11 +1623,11 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
             return ['text' => (string)$point, 'number' => $index + 1];
         }, array_values($keypoints), array_keys(array_values($keypoints))),
         'keypointcount' => count($keypoints),
-        'keypointshash' => googlemeet_keypoints_hash($keypoints),
+        'keypointshash' => recording_progress::keypoints_hash($keypoints),
         'keypointsstate' => (isloggedin() && !isguestuser())
-            ? googlemeet_keypoints_state(
-                (string)get_user_preferences(googlemeet_keypoints_preference_name((int)$recording->id), ''),
-                googlemeet_keypoints_hash($keypoints),
+            ? recording_progress::keypoints_state(
+                (string)get_user_preferences(recording_progress::keypoints_preference_name((int)$recording->id), ''),
+                recording_progress::keypoints_hash($keypoints),
                 count($keypoints)
             )
             : '',
@@ -1677,11 +1683,11 @@ function googlemeet_print_recording_hub($googlemeet, $cm, $context, $recording) 
  * "Continue with chapter «X» (14:02)" when the remembered second is a chapter start, else "Continue at 14:02".
  *
  * @param int $seconds Remembered offset (last jump), > 0.
- * @param array $chapters Normalised chapters (googlemeet_normalise_chapters()).
+ * @param array $chapters Normalised chapters (recording_format::normalise_chapters()).
  * @return string
  */
 function googlemeet_hub_resume_label(int $seconds, array $chapters): string {
-    $time = googlemeet_format_seconds_timestamp($seconds);
+    $time = recording_format::format_seconds_timestamp($seconds);
     foreach ($chapters as $chapter) {
         if (abs((int)$chapter['startseconds'] - $seconds) <= 2) {
             return get_string('hub_resume_chapter', 'googlemeet', (object)[
@@ -2157,7 +2163,7 @@ function googlemeet_get_upcoming_events($googlemeetid, $maxevents = 3, bool $nol
             $upcomingevent = new stdClass();
             $upcomingevent->today = (googlemeet_session_day($now) === googlemeet_session_day((int)$start));
             $upcomingevent->startdate = userdate($start, get_string('strftimedmy', 'googlemeet'), $USER->timezone);
-            $upcomingevent->compactdate = googlemeet_format_date_chip(
+            $upcomingevent->compactdate = recording_format::format_date_chip(
                 userdate($start, get_string('strftimedmweekday', 'googlemeet'), $USER->timezone)
             );
             $upcomingevent->starttime = userdate($start, get_string('strftimehm', 'googlemeet'), $USER->timezone);

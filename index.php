@@ -101,7 +101,7 @@ foreach ($cms as $instanceid => $cm) {
     if (!$isteacher) {
         $countparams['visible'] = 1;
     }
-    $recordingcount = googlemeet_count_recordings($countparams);
+    $recordingcount = \mod_googlemeet\local\recordings::count_recordings($countparams);
 
     $progress = '';
     if (!$isteacher && $recordingcount > 0) {

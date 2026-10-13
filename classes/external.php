@@ -30,6 +30,8 @@ use core_external\external_function_parameters;
 use core_external\external_multiple_structure;
 use core_external\external_single_structure;
 use core_external\external_value;
+use mod_googlemeet\local\recording_progress;
+use mod_googlemeet\local\recordings;
 
 require_once("$CFG->dirroot/mod/googlemeet/lib.php");
 
@@ -110,7 +112,7 @@ class mod_googlemeet_external extends external_api {
         return (object)[
             'name' => $recording->name,
             'displayname' => format_string(
-                googlemeet_display_name((string)$recording->name),
+                recordings::display_name((string)$recording->name),
                 true,
                 ['context' => $context, 'escape' => false]
             ),
@@ -1636,7 +1638,7 @@ class mod_googlemeet_external extends external_api {
      *
      * The stored seconds are a page-visibility proxy, not real playback seconds from Drive.
      * `completed` is measured progress only: it is set once watchedseconds reaches
-     * googlemeet_recording_completion_threshold() and is what the activity completion rules count
+     * recording_progress::recording_completion_threshold() and is what the activity completion rules count
      * ({@see \mod_googlemeet\completion\custom_completion::count_watched()}). The `completed`
      * parameter keeps its name for the Moodle App but only sets `markedviewed`, the student's own
      * "Viewed" mark, which never counts towards completion. Neither flag can be unset here.
@@ -1727,7 +1729,7 @@ class mod_googlemeet_external extends external_api {
         // (amd/src/recording_hub.js); timer drift costs at most a second per beat.
         $credit = $isnew ? 0 : min($delta, max(0, $now - (int)$progress->timemodified));
 
-        $threshold = googlemeet_recording_completion_threshold($recording->duration);
+        $threshold = recording_progress::recording_completion_threshold($recording->duration);
         $watchedseconds = max(0, (int)$progress->watchedseconds) + $credit;
         $iscompleted = !empty($progress->completed) || $watchedseconds >= $threshold;
         $ismarkedviewed = !empty($progress->markedviewed) || $markviewed;

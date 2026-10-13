@@ -16,6 +16,8 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recording_search;
+use mod_googlemeet\local\recordings;
 use mod_googlemeet\task\process_recording_enrichment;
 use PHPUnit\Framework\Attributes\CoversClass;
 use PHPUnit\Framework\Attributes\CoversFunction;
@@ -35,9 +37,8 @@ require_once($CFG->dirroot . '/mod/googlemeet/classes/external.php');
  * @copyright   2026 PreparaOposiciones
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
-#[CoversFunction('googlemeet_sync_recordings')]
-#[CoversFunction('googlemeet_list_recordings')]
-#[CoversFunction('googlemeet_filter_recordings_by_query')]
+#[CoversClass(recordings::class)]
+#[CoversClass(recording_search::class)]
 #[CoversFunction('googlemeet_reset_exhausted_autosync_events')]
 #[CoversFunction('googlemeet_get_accessible_recording')]
 #[CoversClass(\mod_googlemeet_external::class)]
@@ -117,7 +118,7 @@ final class soft_delete_test extends \advanced_testcase {
     }
 
     /**
-     * Build a processed Drive file object as googlemeet_sync_recordings() expects it.
+     * Build a processed Drive file object as recordings::sync_recordings() expects it.
      *
      * @param string $driveid Drive file id.
      * @param string|null $name Recording name.
@@ -144,7 +145,7 @@ final class soft_delete_test extends \advanced_testcase {
         $oldid = $this->create_recording($googlemeet->id, 'drive-old');
         $analysisid = $this->create_analysis($oldid);
 
-        $result = googlemeet_sync_recordings($googlemeet->id, [$this->drive_file('drive-new')]);
+        $result = recordings::sync_recordings($googlemeet->id, [$this->drive_file('drive-new')]);
 
         $old = $DB->get_record('googlemeet_recordings', ['id' => $oldid], '*', MUST_EXIST);
         $this->assertEquals(1, (int)$old->deleted);
@@ -173,7 +174,7 @@ final class soft_delete_test extends \advanced_testcase {
         ]);
         $analysisid = $this->create_analysis($recordingid);
 
-        $result = googlemeet_sync_recordings($googlemeet->id, [$this->drive_file('drive-back', 'Restored name')]);
+        $result = recordings::sync_recordings($googlemeet->id, [$this->drive_file('drive-back', 'Restored name')]);
 
         $recording = $DB->get_record('googlemeet_recordings', ['id' => $recordingid], '*', MUST_EXIST);
         $this->assertSame($recordingid, (int)$recording->id);
@@ -204,7 +205,7 @@ final class soft_delete_test extends \advanced_testcase {
         $user = $this->getDataGenerator()->create_user();
         $this->setUser($user);
 
-        $recordings = googlemeet_list_recordings(['googlemeetid' => $googlemeet->id, 'visible' => 1]);
+        $recordings = recordings::list_recordings(['googlemeetid' => $googlemeet->id, 'visible' => 1]);
 
         $this->assertCount(1, $recordings);
         $this->assertSame($activeid, (int)$recordings[0]->id);
@@ -341,8 +342,8 @@ final class soft_delete_test extends \advanced_testcase {
             'timedeleted' => time(),
         ]);
 
-        $recordings = googlemeet_list_recordings(['googlemeetid' => $googlemeet->id], false);
-        $filtered = googlemeet_filter_recordings_by_query($recordings, 'deleted needle');
+        $recordings = recordings::list_recordings(['googlemeetid' => $googlemeet->id], false);
+        $filtered = recording_search::filter_recordings_by_query($recordings, 'deleted needle');
 
         $this->assertCount(0, $filtered);
     }
@@ -464,7 +465,7 @@ final class soft_delete_test extends \advanced_testcase {
             'timecreated' => time(),
         ]);
 
-        $result = googlemeet_sync_recordings($googlemeet->id, [$this->drive_file('drive-deferred')], true);
+        $result = recordings::sync_recordings($googlemeet->id, [$this->drive_file('drive-deferred')], true);
 
         $this->assertSame(1, (int)$result['stats']['inserted']);
         $this->assertCount(1, $result['newrecordingids']);

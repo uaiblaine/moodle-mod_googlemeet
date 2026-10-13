@@ -198,7 +198,8 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $data->timemodified = $this->apply_date_offset($data->timemodified);
         // Not backed up: recompute durationseconds from the text duration (NULL when it cannot be parsed).
         require_once($CFG->dirroot . '/mod/googlemeet/lib.php');
-        $data->durationseconds = googlemeet_recording_duration_to_seconds($data->duration ?? '') ?: null;
+        $data->durationseconds = \mod_googlemeet\local\recording_format::recording_duration_to_seconds($data->duration ?? '')
+            ?: null;
 
         // Without user information, drop the participant-derived transcript and notes, also when the
         // backup carries them (made with user data, or by a version that always included them).

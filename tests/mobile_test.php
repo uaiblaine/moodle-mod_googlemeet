@@ -16,6 +16,7 @@
 
 namespace mod_googlemeet;
 
+use mod_googlemeet\local\recordings;
 use mod_googlemeet\output\mobile;
 use PHPUnit\Framework\Attributes\CoversClass;
 
@@ -137,7 +138,7 @@ final class mobile_test extends \advanced_testcase {
         $this->assertTrue($page['recordings'][1]['watched']);
         $this->assertFalse($page['recordings'][2]['watched']);
         // Titles come from the lesson display-title logic.
-        $titles = googlemeet_get_lesson_titles($this->googlemeet, false);
+        $titles = recordings::get_lesson_titles($this->googlemeet, false);
         $this->assertSame(format_string($titles[$ids[22]]['title']), $page['recordings'][0]['title']);
 
         $last = mobile::recordings_page($this->googlemeet, \context_module::instance($this->cm->id), 2);

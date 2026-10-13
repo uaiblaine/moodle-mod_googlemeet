@@ -1968,7 +1968,7 @@
 .googlemeet-recordings-topicfilter a {
     text-decoration: none;
 }
-/* Card topics: up to 3 chips (capped in PHP via googlemeet_topic_preview),
+/* Card topics: up to 3 chips (capped in PHP via recording_search::topic_preview),
    wrapping to two rows with a guaranteed-visible "+N" overflow chip. */
 .googlemeet-card-topics {
     flex-wrap: wrap;
@@ -2323,7 +2323,7 @@
     box-shadow: none;
 }
 
-/* Date chip: no capitalisation; googlemeet_format_date_chip() lowercases the value on purpose. */
+/* Date chip: no capitalisation; recording_format::format_date_chip() lowercases the value on purpose. */
 .googlemeet-listitem-date {
     text-transform: none;
 }

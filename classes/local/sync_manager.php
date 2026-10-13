@@ -75,7 +75,7 @@ class sync_manager {
      * Whether a user may ask for a manual sync and follow its status.
      *
      * The sync panel belongs to the recordings editing UI (mod/googlemeet:editrecording), and the task
-     * runs googlemeet_sync_recordings() as this user, which requires mod/googlemeet:syncgoogledrive.
+     * runs recordings::sync_recordings() as this user, which requires mod/googlemeet:syncgoogledrive.
      *
      * @param \context_module $context Module context.
      * @param int|null $userid User (defaults to the current user).

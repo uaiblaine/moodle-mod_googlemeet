@@ -19,6 +19,7 @@ namespace mod_googlemeet;
 use core_external\external_api;
 use core_question\local\bank\question_version_status;
 use mod_googlemeet\local\practice_attempts;
+use mod_googlemeet\local\recording_format;
 use PHPUnit\Framework\Attributes\CoversClass;
 
 defined('MOODLE_INTERNAL') || die();
@@ -299,13 +300,13 @@ final class practice_attempts_test extends \advanced_testcase {
         $topics = practice_attempts::get_practice_topics($this->googlemeet, $this->cm, $this->context);
         $bykey = [];
         foreach ($topics as $t) {
-            $bykey[googlemeet_fold($t['topic'])] = $t;
+            $bykey[recording_format::fold($t['topic'])] = $t;
         }
-        $this->assertArrayNotHasKey(googlemeet_fold('Sin preguntas'), $bykey);
-        $this->assertEquals(2, $bykey[googlemeet_fold('Constitución')]['recordings']);
-        $this->assertEquals(3, $bykey[googlemeet_fold('Constitución')]['questions']);
-        $this->assertEquals(1, $bykey[googlemeet_fold('Derechos')]['questions']);
-        $this->assertEquals(1, $bykey[googlemeet_fold('Otro tema')]['questions']);
+        $this->assertArrayNotHasKey(recording_format::fold('Sin preguntas'), $bykey);
+        $this->assertEquals(2, $bykey[recording_format::fold('Constitución')]['recordings']);
+        $this->assertEquals(3, $bykey[recording_format::fold('Constitución')]['questions']);
+        $this->assertEquals(1, $bykey[recording_format::fold('Derechos')]['questions']);
+        $this->assertEquals(1, $bykey[recording_format::fold('Otro tema')]['questions']);
         $this->assertEquals(
             [$reca => 1, $recb => 2, $recc => 1],
             practice_attempts::count_ready_questions_by_recording($this->googlemeet, $this->cm, $this->context)
