@@ -69,6 +69,7 @@ $capabilities = [
     ],
 
     'mod/googlemeet:removerecording' => [
+        'riskbitmask' => RISK_DATALOSS,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [
@@ -77,7 +78,9 @@ $capabilities = [
         ],
     ],
 
+    // Sends recording transcripts, and with the video fallback the video itself, to Google Gemini.
     'mod/googlemeet:generateai' => [
+        'riskbitmask' => RISK_PERSONAL,
         'captype' => 'write',
         'contextlevel' => CONTEXT_MODULE,
         'archetypes' => [

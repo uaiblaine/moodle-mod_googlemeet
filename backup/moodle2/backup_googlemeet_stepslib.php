@@ -152,8 +152,8 @@ class backup_googlemeet_activity_structure_step extends backup_activity_structur
         ];
         if ($userinfo) {
             $aifields[] = 'transcript';
-            // Error texts can hold exception details: only in full backups (without user data,
-            // restore keeps completed analyses only, so the error is irrelevant there).
+            // Error texts can hold exception details: only in full backups. Restore keeps completed
+            // analyses only, so a restored row carries no error either way.
             $aifields[] = 'error';
         }
         $aianalysis = new backup_nested_element('aianalysis', ['id'], $aifields);

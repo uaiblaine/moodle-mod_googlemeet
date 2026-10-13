@@ -35,7 +35,7 @@ use moodle_exception;
  * @license     http://www.gnu.org/copyleft/gpl.html GNU GPL v3 or later
  */
 class ai_service {
-    /** @var int Max transient retries before giving up (mirrors cli/process_transcripts.php). */
+    /** @var int Max transient retries before giving up (cli/process_transcripts.php applies it too). */
     const MAX_TRANSIENT_RETRIES = 4;
 
     /** @var int retrycount sentinel meaning "permanent failure, never retry". */
@@ -193,105 +193,6 @@ class ai_service {
     }
 
     /**
-     * Generate AI analysis synchronously from the recording's name, duration and Drive link only.
-     *
-     * Unlike the adhoc pipeline it sends no transcript and no video (no Gemini File API upload), so
-     * Gemini never sees the content of the recording.
-     *
-     * @param int $recordingid The recording ID
-     * @param bool $regenerate Whether to regenerate if analysis exists
-     * @return stdClass The analysis record
-     * @throws moodle_exception If generation fails
-     */
-    public function generate_analysis_sync(int $recordingid, bool $regenerate = false): stdClass {
-        global $DB;
-
-        // Get the recording.
-        $recording = $DB->get_record('googlemeet_recordings', ['id' => $recordingid, 'deleted' => 0], '*', IGNORE_MISSING);
-        if (!$recording) {
-            throw new \moodle_exception('recordingnotfound', 'googlemeet');
-        }
-
-        // Check if analysis already exists.
-        $existing = $DB->get_record('googlemeet_ai_analysis', ['recordingid' => $recordingid]);
-
-        if ($existing && !$regenerate) {
-            $existing->keypoints = json_decode($existing->keypoints) ?: [];
-            $existing->topics = json_decode($existing->topics) ?: [];
-            return $existing;
-        }
-
-        // Create or update the analysis record.
-        $analysis = new stdClass();
-        $analysis->recordingid = $recordingid;
-        $analysis->status = 'processing';
-        $analysis->timemodified = time();
-
-        if ($existing) {
-            $analysis->id = $existing->id;
-            $DB->update_record('googlemeet_ai_analysis', $analysis);
-        } else {
-            $analysis->timecreated = time();
-            $analysis->id = $DB->insert_record('googlemeet_ai_analysis', $analysis);
-        }
-
-        try {
-            // Call the Gemini API (text-only, won't actually analyze video content).
-            $result = $this->client->analyze_video(
-                $recording->webviewlink,
-                $recording->name,
-                $recording->duration
-            );
-
-            // Update the analysis with results.
-            $analysis->summary = $result->summary;
-            $analysis->keypoints = json_encode($result->keypoints);
-            $analysis->topics = json_encode($result->topics);
-            if ($this->chapters_field_exists()) {
-                $analysis->chapters = json_encode($result->chapters ?? []);
-            }
-            $analysis->transcript = $result->transcript;
-            $analysis->language = $result->language;
-            $analysis->status = 'completed';
-            $analysis->error = null;
-            $analysis->aimodel = $this->client->get_last_used_model() ?? $this->client->get_model();
-            $analysis->timemodified = time();
-            // New AI text waits for a teacher review.
-            foreach (\mod_googlemeet\local\ai_review::unreviewed_fields() as $key => $value) {
-                $analysis->$key = $value;
-            }
-
-            $DB->update_record('googlemeet_ai_analysis', $analysis);
-
-            // Return with decoded arrays.
-            $analysis->keypoints = $result->keypoints;
-            $analysis->topics = $result->topics;
-            $analysis->chapters = $result->chapters ?? [];
-
-            return $analysis;
-        } catch (\Exception $e) {
-            $analysis->status = 'failed';
-            $analysis->error = $e instanceof \mod_googlemeet\gemini_safety_exception ? $e->get_user_message() : $e->getMessage();
-            $analysis->timemodified = time();
-            $DB->update_record('googlemeet_ai_analysis', $analysis);
-
-            throw $e;
-        }
-    }
-
-    /**
-     * Delete the analysis for a recording.
-     *
-     * @param int $recordingid The recording ID
-     * @return bool True if deleted
-     */
-    public function delete_analysis(int $recordingid): bool {
-        global $DB;
-
-        return $DB->delete_records('googlemeet_ai_analysis', ['recordingid' => $recordingid]);
-    }
-
-    /**
      * Queue AI question generation for a recording.
      *
      * @param int $recordingid Recording id.
@@ -392,10 +293,6 @@ class ai_service {
         $lang = !empty($analysis->language) ? $analysis->language : current_language();
         $chapters = $this->client->generate_chapters($transcript, $lang, $recording->name, $recording->duration);
 
-        if (!$this->chapters_field_exists()) {
-            throw new moodle_exception('ai_invalid_analysis', 'googlemeet', '', 'Chapters field is not available');
-        }
-
         // Chapter-only (re)generation keeps the review state of the analysis. Resetting it here
         // would hide every published summary again when cli/backfill_chapters.php runs over a course.
         $DB->update_record('googlemeet_ai_analysis', (object) [
@@ -406,42 +303,6 @@ class ai_service {
         ]);
 
         return $chapters;
-    }
-
-    /**
-     * Whether googlemeet_ai_analysis has the chapters column (memoised for the PHP process).
-     *
-     * @return bool
-     */
-    private function chapters_field_exists(): bool {
-        global $DB;
-
-        static $exists = null;
-        if ($exists !== null) {
-            return $exists;
-        }
-
-        $columns = $DB->get_columns('googlemeet_ai_analysis');
-        $exists = array_key_exists('chapters', $columns);
-        return $exists;
-    }
-
-    /**
-     * Get all pending analyses that need processing.
-     *
-     * @param int $limit Maximum number to return
-     * @return array Array of analysis records
-     */
-    public function get_pending_analyses(int $limit = 10): array {
-        global $DB;
-
-        $sql = "SELECT aa.*
-                  FROM {googlemeet_ai_analysis} aa
-                  JOIN {googlemeet_recordings} r ON r.id = aa.recordingid
-                 WHERE aa.status = :pending
-                   AND r.deleted = 0
-              ORDER BY aa.timecreated ASC";
-        return $DB->get_records_sql($sql, ['pending' => 'pending'], 0, $limit);
     }
 
     /**
@@ -498,7 +359,7 @@ class ai_service {
      * Record a transient (retryable) failure with bounded back-off.
      *
      * Used by the background AI pipeline so that rate limits / overloads are retried instead of
-     * becoming permanent failures. Mirrors the policy in cli/process_transcripts.php: after
+     * becoming permanent failures; cli/process_transcripts.php records its failures here too. After
      * {@see self::MAX_TRANSIENT_RETRIES} attempts the row is left 'failed' with no further
      * nextretry (so the due-selection no longer picks it up).
      *
@@ -582,44 +443,6 @@ class ai_service {
         ];
 
         return $DB->get_records_sql($sql, $params, 0, $limit);
-    }
-
-    /**
-     * Revert analyses stuck in 'processing' for longer than $maxage back to 'pending'.
-     *
-     * The scheduled task does not use this: it calls fail_stale_processing(), which marks the stuck
-     * row failed and so keeps counting its retry budget.
-     *
-     * @param int $maxage Maximum allowed age in 'processing' state, in seconds
-     * @return int Number of rows reset
-     */
-    public function reset_stale_processing(int $maxage = 3600): int {
-        global $DB;
-
-        $threshold = time() - $maxage;
-
-        $stale = $DB->get_records_select(
-            'googlemeet_ai_analysis',
-            "status = 'processing' AND timemodified < :threshold",
-            ['threshold' => $threshold],
-            '',
-            'id'
-        );
-
-        if (empty($stale)) {
-            return 0;
-        }
-
-        $now = time();
-        [$insql, $inparams] = $DB->get_in_or_equal(array_keys($stale), SQL_PARAMS_NAMED);
-        $params = $inparams + ['now' => $now];
-
-        $sql = "UPDATE {googlemeet_ai_analysis}
-                   SET status = 'pending', timemodified = :now
-                 WHERE id $insql AND status = 'processing'";
-        $DB->execute($sql, $params);
-
-        return count($stale);
     }
 
     /**
@@ -715,38 +538,6 @@ class ai_service {
         $analysis->id = $DB->insert_record('googlemeet_ai_analysis', $analysis);
 
         return $analysis;
-    }
-
-    /**
-     * Get analysis status counts for a googlemeet instance.
-     *
-     * @param int $googlemeetid The googlemeet ID
-     * @return stdClass Object with counts for each status
-     */
-    public function get_status_counts(int $googlemeetid): stdClass {
-        global $DB;
-
-        $sql = "SELECT aa.status, COUNT(*) as count
-                FROM {googlemeet_ai_analysis} aa
-                JOIN {googlemeet_recordings} r ON r.id = aa.recordingid
-                WHERE r.googlemeetid = :googlemeetid
-                  AND r.deleted = 0
-                GROUP BY aa.status";
-
-        $records = $DB->get_records_sql($sql, ['googlemeetid' => $googlemeetid]);
-
-        $counts = new stdClass();
-        $counts->pending = 0;
-        $counts->processing = 0;
-        $counts->completed = 0;
-        $counts->failed = 0;
-
-        foreach ($records as $record) {
-            $status = $record->status;
-            $counts->$status = (int) $record->count;
-        }
-
-        return $counts;
     }
 
     /**

@@ -243,14 +243,14 @@ class restore_googlemeet_activity_structure_step extends restore_activity_struct
         $data->timereviewed = empty($data->timereviewed) ? 0 : $this->apply_date_offset($data->timereviewed);
         $data->reviewedby = empty($data->reviewedby) ? 0 : (int)($this->get_mappingid('user', $data->reviewedby) ?: 0);
 
+        // Only finished analyses are copied, with or without user information: a pending, processing
+        // or failed one would make the copy queue its own (paid) AI run against the same Drive file.
+        if (($data->status ?? '') !== 'completed') {
+            return;
+        }
         // The transcript is participant-derived personal data: never restore it without user
-        // information (also strips it from backups made with user data). Without user information
-        // only finished analyses are copied: a pending/failed one would make the copy queue its own
-        // (paid) AI run against the same Drive file.
+        // information (also strips it from backups made with user data).
         if (!$this->userinfo) {
-            if (($data->status ?? '') !== 'completed') {
-                return;
-            }
             $data->transcript = null;
         }
 

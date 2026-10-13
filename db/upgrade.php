@@ -800,5 +800,33 @@ function xmldb_googlemeet_upgrade($oldversion) {
         upgrade_mod_savepoint(true, 2026101302, 'googlemeet');
     }
 
+    if ($oldversion < 2026101400) {
+        // Indexes for the cron queries that scan every activity: reminders and the past-event cleanup
+        // (eventdate), the trash purge (equality columns first, then the timedeleted range) and the
+        // due AI analyses. status_nextretry starts with status, so the single-column index goes.
+        $indexes = [
+            'googlemeet_events' => new xmldb_index('eventdate', XMLDB_INDEX_NOTUNIQUE, ['eventdate']),
+            'googlemeet_recordings' => new xmldb_index(
+                'deleted_trashreason_timedeleted',
+                XMLDB_INDEX_NOTUNIQUE,
+                ['deleted', 'trashreason', 'timedeleted']
+            ),
+            'googlemeet_ai_analysis' => new xmldb_index('status_nextretry', XMLDB_INDEX_NOTUNIQUE, ['status', 'nextretry']),
+        ];
+        foreach ($indexes as $tablename => $index) {
+            $table = new xmldb_table($tablename);
+            if (!$dbman->index_exists($table, $index)) {
+                $dbman->add_index($table, $index);
+            }
+        }
+        $table = new xmldb_table('googlemeet_ai_analysis');
+        $index = new xmldb_index('status', XMLDB_INDEX_NOTUNIQUE, ['status']);
+        if ($dbman->index_exists($table, $index)) {
+            $dbman->drop_index($table, $index);
+        }
+
+        upgrade_mod_savepoint(true, 2026101400, 'googlemeet');
+    }
+
     return true;
 }

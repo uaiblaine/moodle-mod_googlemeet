@@ -49,6 +49,12 @@ class gemini_client {
     /** @var string The File Upload URL */
     private const UPLOAD_URL = 'https://generativelanguage.googleapis.com/upload/v1beta/files';
 
+    /** @var int First pause between two File API status polls, in seconds; each later pause doubles it. */
+    const POLL_FIRST_DELAY = 2;
+
+    /** @var int Longest pause between two File API status polls, in seconds. */
+    const POLL_MAX_DELAY = 30;
+
     /** @var string The API key */
     private $apikey;
 
@@ -376,7 +382,7 @@ PROMPT;
      * Any moodle_exception from the primary model (HTTP error, transient overload, connection
      * failure) is retried once on the fallback model before it is thrown. The caller parses the
      * response, so a safety block ({@see self::assert_not_blocked()}) surfaces after this method
-     * returns and is never retried on another model.
+     * returns and is never retried on another model; call_api_with_model() itself never throws one.
      *
      * @param string $prompt The prompt to send
      * @return string The API response
@@ -388,9 +394,6 @@ PROMPT;
         foreach ($chain as $model) {
             try {
                 return $this->call_api_with_model($prompt, $model);
-            } catch (gemini_safety_exception $e) {
-                // Same content, same filters: another model would be blocked too.
-                throw $e;
             } catch (moodle_exception $e) {
                 $lastexception = $e;
                 if (!$this->modelpolicy->has_fallback_after($model)) {
@@ -636,7 +639,9 @@ PROMPT;
         $result->topics = is_array($analysis->topics ?? null) ? $analysis->topics : [];
         $result->chapters = $this->normalise_chapters_for_storage($analysis->chapters ?? []);
         $result->transcript = is_string($analysis->transcript ?? null) ? $analysis->transcript : '';
-        $result->language = is_string($analysis->language ?? null) ? $analysis->language : 'es';
+        // Gemini detects the language; when it names none the language stays unknown (''), and readers
+        // such as ai_service::generate_questions_for_recording() fall back to current_language().
+        $result->language = is_string($analysis->language ?? null) ? $analysis->language : '';
 
         return $result;
     }
@@ -1008,9 +1013,9 @@ PROMPT;
     }
 
     /**
-     * Create the HTTP client used by the File API upload.
+     * Create the HTTP client used by the File API upload and status polls.
      *
-     * A seam for tests, which replace it with a double that answers the upload-start call.
+     * A seam for tests, which replace it with a double that answers without network access.
      *
      * @return \curl
      */
@@ -1019,7 +1024,82 @@ PROMPT;
     }
 
     /**
+     * Wait between two File API status polls. A seam for tests, which must not sleep.
+     *
+     * @param int $seconds Seconds to wait.
+     * @return void
+     */
+    protected function pause(int $seconds): void {
+        sleep($seconds);
+    }
+
+    /**
+     * Current time for the File API wait budget. A seam for tests, paired with {@see self::pause()}.
+     *
+     * @return int
+     */
+    protected function now(): int {
+        return time();
+    }
+
+    /**
+     * Seconds to wait before the next File API status poll.
+     *
+     * Capped exponential back-off: POLL_FIRST_DELAY after the first poll, doubled after each further
+     * one, never above POLL_MAX_DELAY. A Retry-After from the server replaces the schedule. The pause
+     * never runs past the remaining budget and is at least one second, so the loop cannot spin.
+     *
+     * @param int $attempt Polls made so far (1 after the first).
+     * @param int $remaining Seconds left in the wait budget.
+     * @param int|null $retryafter Seconds the server asked for (Retry-After), or null.
+     * @return int
+     */
+    public static function poll_delay(int $attempt, int $remaining, ?int $retryafter = null): int {
+        if ($retryafter !== null) {
+            $delay = $retryafter;
+        } else {
+            $exponent = min(max(0, $attempt - 1), 10);
+            $delay = min(self::POLL_MAX_DELAY, self::POLL_FIRST_DELAY * (2 ** $exponent));
+        }
+        return max(1, min($delay, $remaining));
+    }
+
+    /**
+     * The wait a Retry-After response header asks for.
+     *
+     * Read case-insensitively (HTTP/2 names are lower-case), as delta seconds or as an HTTP date;
+     * core \curl keeps a repeated header as an array, and the last value counts.
+     *
+     * @param array $headers Response headers as core \curl::getResponse() returns them.
+     * @param int $now Reference time for an HTTP date.
+     * @return int|null Seconds (0 for a date already past), or null when the header is absent or unreadable.
+     */
+    public static function retry_after_seconds(array $headers, int $now): ?int {
+        $value = null;
+        foreach ($headers as $name => $headervalue) {
+            if (strcasecmp((string)$name, 'Retry-After') === 0) {
+                $value = is_array($headervalue) ? end($headervalue) : $headervalue;
+            }
+        }
+        $value = trim((string)$value);
+        if ($value === '') {
+            return null;
+        }
+        if (ctype_digit($value)) {
+            return (int)$value;
+        }
+        $time = strtotime($value);
+        if ($time === false) {
+            return null;
+        }
+        return max(0, $time - $now);
+    }
+
+    /**
      * Wait for a file to be processed and ready.
+     *
+     * Polls with {@see self::poll_delay()} pauses within $maxwait seconds in total. A 429 or 503 is
+     * polled again after its Retry-After (or the schedule); any other error status fails at once.
      *
      * @param string $filename The file name (e.g., "files/abc123")
      * @param int $maxwait Maximum seconds to wait
@@ -1029,38 +1109,47 @@ PROMPT;
     public function wait_for_file_processing(string $filename, int $maxwait = 600): stdClass {
         // Key sent via header, never in the URL/query string.
         $url = self::FILE_API_URL . '/' . $filename;
-        $starttime = time();
+        $deadline = $this->now() + $maxwait;
+        $attempt = 0;
 
         debugging("Gemini File API: Waiting for file {$filename} to be processed...", DEBUG_DEVELOPER);
 
-        while (time() - $starttime < $maxwait) {
-            $curl = new \curl();
+        while (true) {
+            $curl = $this->create_curl();
             $curl->setHeader(['x-goog-api-key: ' . $this->apikey]);
             $response = $curl->get($url);
-            $info = $curl->get_info();
+            $httpcode = (int)($curl->get_info()['http_code'] ?? 0);
+            $attempt++;
 
-            if ($info['http_code'] !== 200) {
+            $retryafter = null;
+            if ($httpcode === 429 || $httpcode === 503) {
+                $retryafter = self::retry_after_seconds((array)$curl->getResponse(), $this->now());
+                debugging("Gemini File API: HTTP {$httpcode} while polling, waiting to poll again", DEBUG_DEVELOPER);
+            } else if ($httpcode !== 200) {
                 throw new moodle_exception('ai_error', 'googlemeet', '', 'Failed to check file status');
+            } else {
+                $filedata = json_decode($response);
+                if (!$filedata) {
+                    throw new moodle_exception('ai_error', 'googlemeet', '', 'Invalid file status response');
+                }
+
+                $state = $filedata->state ?? 'UNKNOWN';
+                debugging("Gemini File API: File state is {$state}", DEBUG_DEVELOPER);
+
+                if ($state === 'ACTIVE') {
+                    return $filedata;
+                }
+
+                if ($state === 'FAILED') {
+                    throw new moodle_exception('ai_error', 'googlemeet', '', 'File processing failed');
+                }
             }
 
-            $filedata = json_decode($response);
-            if (!$filedata) {
-                throw new moodle_exception('ai_error', 'googlemeet', '', 'Invalid file status response');
+            $remaining = $deadline - $this->now();
+            if ($remaining <= 0) {
+                break;
             }
-
-            $state = $filedata->state ?? 'UNKNOWN';
-            debugging("Gemini File API: File state is {$state}", DEBUG_DEVELOPER);
-
-            if ($state === 'ACTIVE') {
-                return $filedata;
-            }
-
-            if ($state === 'FAILED') {
-                throw new moodle_exception('ai_error', 'googlemeet', '', 'File processing failed');
-            }
-
-            // Wait before checking again.
-            sleep(5);
+            $this->pause(self::poll_delay($attempt, $remaining, $retryafter));
         }
 
         throw new moodle_exception('ai_error', 'googlemeet', '', 'File processing timed out');

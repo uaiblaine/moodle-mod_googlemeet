@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8" ?>
-<XMLDB PATH="mod/googlemeet/db" VERSION="20261013" COMMENT="XMLDB file for Moodle mod_googlemeet"
+<XMLDB PATH="mod/googlemeet/db" VERSION="20261014" COMMENT="XMLDB file for Moodle mod_googlemeet"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
     xsi:noNamespaceSchemaLocation="../../../lib/xmldb/xmldb.xsd"
 >
@@ -67,6 +67,7 @@
       <INDEXES>
         <INDEX NAME="googlemeetid" UNIQUE="false" FIELDS="googlemeetid"/>
         <INDEX NAME="autosynced" UNIQUE="false" FIELDS="autosynced" COMMENT="Used by process_autosync task"/>
+        <INDEX NAME="eventdate" UNIQUE="false" FIELDS="eventdate" COMMENT="Cron: due reminders and the cleanup of past events."/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="googlemeet_recordings" COMMENT="Stores references from Google Meet recordings.">
@@ -97,6 +98,7 @@
         <INDEX NAME="googlemeetid" UNIQUE="false" FIELDS="googlemeetid"/>
         <INDEX NAME="googlemeetid_createdtime" UNIQUE="false" FIELDS="googlemeetid, createdtime"/>
         <INDEX NAME="googlemeetid_deleted_createdtime" UNIQUE="false" FIELDS="googlemeetid, deleted, createdtime" COMMENT="Recording list and trash queries."/>
+        <INDEX NAME="deleted_trashreason_timedeleted" UNIQUE="false" FIELDS="deleted, trashreason, timedeleted" COMMENT="Cron: trash purge across all activities."/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="googlemeet_notify_done" COMMENT="Stores references from Google Meet recordings.">
@@ -211,7 +213,7 @@
         <KEY NAME="recordingidfk" TYPE="foreign-unique" FIELDS="recordingid" REFTABLE="googlemeet_recordings" REFFIELDS="id"/>
       </KEYS>
       <INDEXES>
-        <INDEX NAME="status" UNIQUE="false" FIELDS="status"/>
+        <INDEX NAME="status_nextretry" UNIQUE="false" FIELDS="status, nextretry" COMMENT="Cron: pending analyses and due transient retries."/>
       </INDEXES>
     </TABLE>
     <TABLE NAME="googlemeet_practice_attempts" COMMENT="Stores each student practice answer.">
