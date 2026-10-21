@@ -133,10 +133,10 @@ class recordings {
                 $recording->hasai = true;
                 $recording->aisummary = $ai->summary;
                 $recording->aisummarypreview = recording_format::truncate_summary((string)$ai->summary, 200);
-                $recording->aikeypoints = json_decode($ai->keypoints) ?: [];
+                $recording->aikeypoints = json_decode($ai->keypoints ?? '') ?: [];
                 $recording->aikeypointscount = count($recording->aikeypoints);
                 $recording->aikeypointslabel = recording_format::keypoints_label($recording->aikeypointscount);
-                $recording->aitopics = json_decode($ai->topics) ?: [];
+                $recording->aitopics = json_decode($ai->topics ?? '') ?: [];
                 $tp = recording_search::topic_preview($recording->aitopics, 3);
                 $recording->aitopicsvisible = $tp['visible'];
                 $recording->aitopicsoverflow = $tp['overflow'];

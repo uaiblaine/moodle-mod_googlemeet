@@ -6,6 +6,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
 ## [Unreleased]
 
+### Fixed
+
+- PHP 8.1+ deprecation "json_decode(): Passing null to parameter #1" when editing an activity
+  saved without recurrence (`googlemeet.days` is NULL), when reading an AI analysis still being
+  processed (the `get_ai_analysis` web service), and when listing or opening a recording whose
+  completed analysis has no key points or topics.
+
 ## [v5.2-r1] - 2026-10-13
 
 First release of this fork, version `2026042000`, for Moodle 5.2 and 5.3
