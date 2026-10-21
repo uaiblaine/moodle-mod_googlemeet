@@ -91,8 +91,8 @@ class ai_service {
 
         if ($analysis) {
             // Decode JSON fields.
-            $analysis->keypoints = json_decode($analysis->keypoints) ?: [];
-            $analysis->topics = json_decode($analysis->topics) ?: [];
+            $analysis->keypoints = json_decode($analysis->keypoints ?? '') ?: [];
+            $analysis->topics = json_decode($analysis->topics ?? '') ?: [];
             $analysis->chapters = json_decode($analysis->chapters ?? '') ?: [];
         }
 
@@ -131,8 +131,8 @@ class ai_service {
 
         // If exists and completed and not regenerating, return it.
         if ($existing && !$regenerate && $existing->status === 'completed') {
-            $existing->keypoints = json_decode($existing->keypoints) ?: [];
-            $existing->topics = json_decode($existing->topics) ?: [];
+            $existing->keypoints = json_decode($existing->keypoints ?? '') ?: [];
+            $existing->topics = json_decode($existing->topics ?? '') ?: [];
             $existing->chapters = json_decode($existing->chapters ?? '') ?: [];
             return $existing;
         }

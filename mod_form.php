@@ -450,7 +450,7 @@ class mod_googlemeet_mod_form extends moodleform_mod {
         $defaultvalues['attachments'] = $draftitemid;
 
         if ($this->current->instance) {
-            $defaultvalues['days'] = json_decode($defaultvalues['days'], true);
+            $defaultvalues['days'] = json_decode($defaultvalues['days'] ?? '', true);
 
             // Load holiday periods from database.
             global $DB;

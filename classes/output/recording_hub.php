@@ -97,8 +97,8 @@ class recording_hub {
         $topics = [];
         $chapters = [];
         if ($analysiscompleted) {
-            $keypoints = json_decode($analysis->keypoints) ?: [];
-            $topics = json_decode($analysis->topics) ?: [];
+            $keypoints = json_decode($analysis->keypoints ?? '') ?: [];
+            $topics = json_decode($analysis->topics ?? '') ?: [];
             $chapters = recording_format::normalise_chapters($analysis->chapters ?? '');
         }
 
