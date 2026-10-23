@@ -368,8 +368,10 @@ Translations
 
 Only the English strings ship in the release package, as the plugins directory requires. The
 Brazilian Portuguese (`lang/pt_br`) and Spanish (`lang/es`) translations are kept in this
-repository and left out of the package; on the plugins directory they would reach sites through
-[AMOS](https://lang.moodle.org/).
+repository for development and left out of the package. This fork has no moodle.org entry and no
+[AMOS](https://lang.moodle.org/) component of its own: both belong to the upstream
+`mod_googlemeet`. Sites in Brazilian Portuguese or Spanish therefore see this fork's own strings
+in English until AMOS carries them.
 
 
 Credits

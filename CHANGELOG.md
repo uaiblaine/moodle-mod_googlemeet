@@ -36,8 +36,10 @@ Version `2026042001`, brought to the Moodle plugins directory submission guideli
 
 ### Changed
 
-- Only English ships: `lang/pt_br` and `lang/es` are export-ignored and leave the release
-  package; on the plugins directory translations reach sites through AMOS.
+- Only English ships: `lang/pt_br` and `lang/es` stay in the repository but are export-ignored
+  and leave the release package. The moodle.org entry and the AMOS component belong to upstream,
+  so sites in Brazilian Portuguese or Spanish see this fork's own strings in English until AMOS
+  carries them.
 
 ## [v5.2-r1] - 2026-10-13
 
