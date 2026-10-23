@@ -45,13 +45,16 @@ class provider implements
         // This plugin is a core_user_data_provider.
     \core_privacy\local\request\plugin\provider,
 
-        // This plugin stores per-recording user preferences (last position jumped to, key points checklist).
+        // This plugin stores user preferences (per recording: last jump, key points; site-wide: recordings layout).
     \core_privacy\local\request\user_preference_provider {
     /** @var string Prefix of the per-recording "last jump" user preference. */
     const LASTJUMP_PREFIX = 'mod_googlemeet_lastjump_';
 
     /** @var string Prefix of the per-recording key points checklist preference. */
     const KEYPOINTS_PREFIX = 'mod_googlemeet_kp_';
+
+    /** @var string The recordings layout preference (cards or list), written by view.php's rview parameter. */
+    const RECORDINGSVIEW_PREFERENCE = 'mod_googlemeet_recordings_view';
 
     /**
      * Return the fields which contain personal data.
@@ -225,6 +228,10 @@ class provider implements
         $collection->add_user_preference(
             self::KEYPOINTS_PREFIX . '<recordingid>',
             'privacy:metadata:preference:keypoints'
+        );
+        $collection->add_user_preference(
+            self::RECORDINGSVIEW_PREFERENCE,
+            'privacy:metadata:preference:recordingsview'
         );
 
         // Attendance read from the Google Meet REST API.
@@ -805,6 +812,15 @@ class provider implements
             'id, name, value'
         );
         \mod_googlemeet\local\attendance\privacy::export_preferences($userid);
+        $recordingsview = get_user_preferences(self::RECORDINGSVIEW_PREFERENCE, null, $userid);
+        if ($recordingsview !== null) {
+            writer::export_user_preference(
+                'mod_googlemeet',
+                self::RECORDINGSVIEW_PREFERENCE,
+                $recordingsview,
+                get_string('privacy:metadata:preference:recordingsview', 'mod_googlemeet')
+            );
+        }
         $kppreferences = $DB->get_records_select(
             'user_preferences',
             'userid = :userid AND ' . $DB->sql_like('name', ':prefix'),

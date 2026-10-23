@@ -79,7 +79,7 @@ class recordings_list {
 
         // Recordings view preference (cards|list). Used both for the view modifier class on the
         // outer wrapper (so list view can use the full content width) and for the template branch.
-        $recordingsview = get_user_preferences('mod_googlemeet_recordings_view', 'list');
+        $recordingsview = get_user_preferences(\mod_googlemeet\privacy\provider::RECORDINGSVIEW_PREFERENCE, 'list');
         if ($recordingsview !== 'cards' && $recordingsview !== 'list') {
             $recordingsview = 'list';
         }
