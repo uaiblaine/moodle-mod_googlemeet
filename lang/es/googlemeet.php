@@ -627,6 +627,7 @@ $string['privacy:metadata:googlemeet_sync_log:timequeued'] = 'Cuándo se solicit
 $string['privacy:metadata:preference:keypoints'] = 'El estado de la lista de repaso de los puntos clave de cada grabación (una preferencia por grabación): qué puntos clave ha marcado el usuario como repasados.';
 $string['privacy:metadata:preference:lastjump'] = 'El último capítulo o marca de tiempo al que el usuario saltó en cada grabación (una preferencia por grabación), usado para ofrecer "Continuar en". No es la posición real de reproducción.';
 $string['privacy:metadata:preference:meetscope'] = 'Cuándo vinculó el usuario Google con acceso a la asistencia de Meet.';
+$string['privacy:metadata:preference:recordingsview'] = 'La presentación de las grabaciones que el usuario eligió en la página de la actividad (tarjetas o lista), común a todas las actividades Google Meet.';
 $string['privacy:practiceattempts'] = 'Respuestas de práctica';
 $string['process_autosync_task'] = 'Auto-sincronizar grabaciones de Google Meet tras finalizar las sesiones';
 $string['process_recording_enrichment_task'] = 'Procesar enriquecimiento de grabaciones de Google Meet';
@@ -708,9 +709,19 @@ $string['recording_trash_confirm'] = 'Se moverá a la papelera; podrás restaura
 $string['recording_view_summary'] = 'Ver resumen';
 $string['recording_watch'] = 'Ver grabación';
 $string['recording_watch_cta'] = 'Abrir clase';
-$string['recordingavailable_body'] = 'Hay {$a->count} nueva(s) grabación(es) disponible(s) en {$a->name}.' . "\n\n" . 'Abre la actividad: {$a->url}';
-$string['recordingavailable_body_many'] = 'Hola {$a->user},' . "\n\n" . 'Tienes {$a->count} grabaciones nuevas esperándote en «{$a->name}», perfectas para repasar a tu ritmo.' . "\n\n" . 'Verlas ahora: {$a->url}';
-$string['recordingavailable_body_one'] = 'Hola {$a->user},' . "\n\n" . '¿No pudiste asistir o quieres repasar con calma? Ya tienes disponible la grabación de la clase en «{$a->name}».' . "\n\n" . 'Verla ahora: {$a->url}';
+$string['recordingavailable_body'] = 'Hay {$a->count} nueva(s) grabación(es) disponible(s) en {$a->name}.
+
+Abre la actividad: {$a->url}';
+$string['recordingavailable_body_many'] = 'Hola {$a->user},
+
+Tienes {$a->count} grabaciones nuevas esperándote en «{$a->name}», perfectas para repasar a tu ritmo.
+
+Verlas ahora: {$a->url}';
+$string['recordingavailable_body_one'] = 'Hola {$a->user},
+
+¿No pudiste asistir o quieres repasar con calma? Ya tienes disponible la grabación de la clase en «{$a->name}».
+
+Verla ahora: {$a->url}';
 $string['recordingavailable_subject_many'] = '{$a->count} grabaciones nuevas te esperan en {$a->name}';
 $string['recordingavailable_subject_one'] = 'Ya puedes ver la grabación de {$a->name}';
 $string['recordingfilter'] = 'Filtro de nombre de grabación';

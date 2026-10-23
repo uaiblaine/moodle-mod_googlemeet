@@ -479,7 +479,8 @@
     flex-wrap: wrap;
 }
 
-.recording-name-text {
+.googlemeet-recordings-container .recording-name-text,
+.googlemeet-recording-hub .recording-name-text {
     font-weight: 500;
     color: var(--gm-text, #333);
     word-break: break-word;
@@ -828,8 +829,8 @@
 }
 
 .path-mod-googlemeet .items-center,
-#id_eventenddate_calendar,
-#id_eventdate_calendar {
+#page-mod-googlemeet-mod #id_eventenddate_calendar,
+#page-mod-googlemeet-mod #id_eventdate_calendar {
     display: flex;
     margin-right: .25em;
     align-items: center;
@@ -1893,8 +1894,10 @@
 .googlemeet-card-cta:focus-visible,
 .googlemeet-drive-link:focus-visible,
 .googlemeet-ai-toggle-btn:focus-visible,
-.recordinghowhide:focus-visible,
-.recordingeditname:focus-visible,
+.googlemeet-recordings-container .recordinghowhide:focus-visible,
+.googlemeet-recording-hub .recordinghowhide:focus-visible,
+.googlemeet-recordings-container .recordingeditname:focus-visible,
+.googlemeet-recording-hub .recordingeditname:focus-visible,
 .googlemeet-trash-recording:focus-visible,
 .googlemeet-material-more:focus-visible,
 .googlemeet-pagination .page-link:focus-visible {

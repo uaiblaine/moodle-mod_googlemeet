@@ -236,8 +236,75 @@ Capabilities
   Meet participants to Moodle users and refetch a session's attendance.
 
 
-Privacy
--------
+Settings
+--------
+
+*Site administration > Plugins > Activity modules > Google Meet*. Every setting is stored in
+`config_plugins` under the module name (`googlemeet/<name>`), the convention of core's own
+activity modules.
+
+- Google: `issuerid` (the OAuth 2 service; nothing works without it), `makerecordingspublic`
+  (share synced recordings by link, default on).
+- Activity form defaults: `multieventdateexpanded`, `roomurlexpanded`, `notificationexpanded`.
+- Reminders: `notify`, `minutesbefore`, `notifyhoursbefore`, `emailcontent`.
+- Recording sync: `autosynchours_default`, `maxsyncattempts`, `syncretryinterval`,
+  `trashretentiondays`, `stalerecurrence_enabled`, `stalerecurrence_weeks`,
+  `stalerecurrence_renotifydays`.
+- AI (Gemini): `enableai` (default off), `geminiapikey`, `aimodel`, `aicontext`,
+  `ai_autogenerate`, `requireaireview` (default on), `aisafetythreshold`, `aistuckminutes`,
+  `subtitlelanguage`, `ytdlppath`.
+- Attendance: `attendanceenabled` (default off).
+
+The sync status page (*Site administration > Plugins > Activity modules > Google Meet sync
+status*, `moodle/site:config`) lists failed automatic syncs, stuck AI analyses, failed Calendar
+updates and the last sync runs.
+
+
+External services
+-----------------
+
+The plugin works only with Google's services; it sends nothing anywhere else.
+
+| Service | Credentials (configured by the administrator) | What is sent | Without it |
+|---|---|---|---|
+| Google Calendar API | The core OAuth 2 Google service selected in `issuerid`; each teacher links a Google account | The activity name, the session dates, times, time zone and recurrence, as the organiser's Calendar event with its Meet room | No room can be created or updated |
+| Google Drive API | Same OAuth 2 service, `drive` scope | Queries for the recordings, transcripts and "Notes by Gemini" in the organiser's Drive; with `makerecordingspublic`, a link-sharing permission on each recording | No recording, transcript or notes are synced |
+| Google Meet REST API | Same OAuth 2 service, `meetings.space.readonly` scope, only with `attendanceenabled` | Requests for the conference records and participants of the organiser's meetings | No attendance report |
+| Google Gemini API | The API key in `geminiapikey`, only with `enableai` | The transcript, title and duration of a recording and the teaching context (`aicontext`); as a last resort the recording video | No AI summary, chapters or practice questions |
+
+Google's own terms and data handling apply to every request (see [AI features](#ai-features-google-gemini-optional)
+for the Gemini tier caveat).
+
+
+Data stored
+-----------
+
+The plugin owns 13 tables. A backup of the activity carries the content tables and, when user data
+is included, the per-user ones; the operational logs (`googlemeet_notify_done`,
+`googlemeet_sync_log`, `googlemeet_attendance_sync`) stay out of backups. Deleting the activity
+deletes its rows in every table, its files and its recording preferences.
+
+| Table | What it keeps | Kept until |
+|---|---|---|
+| `googlemeet` | The activity: schedule, room URL, sync options, the organiser's Google e-mail (`creatoremail`) and Moodle user (`creatoruserid`) | The activity is deleted |
+| `googlemeet_events` | One row per session date | The schedule changes or the activity is deleted |
+| `googlemeet_holidays` | Exclusion periods of a recurring schedule | The teacher removes them or the activity is deleted |
+| `googlemeet_cancelled` | Cancelled session dates and their reason | The teacher restores the date or the activity is deleted |
+| `googlemeet_recordings` | Synced recordings: Drive ids and links, name, duration, visibility, trash state, transcript and Gemini notes | Purged from the trash after `trashretentiondays`, or the activity is deleted |
+| `googlemeet_ai_analysis` | Gemini output per recording (summary, key points, topics, chapters, the transcript sent) and the teacher who published it (`reviewedby`) | The recording is purged |
+| `googlemeet_notify_done` | Which reminder was sent to which user for which session | The session is rescheduled or deleted, a course reset, or a privacy deletion |
+| `googlemeet_recording_subs` | Users subscribed to "new recording" notifications | The user unsubscribes, a course reset, or a privacy deletion |
+| `googlemeet_recording_progress` | Per user and recording: seconds viewed, "Mark as viewed", last view time | The recording is purged, a course reset, or a privacy deletion |
+| `googlemeet_practice_attempts` | Per user: each practice answer and whether it was right | The recording is purged, a course reset, or a privacy deletion |
+| `googlemeet_sync_log` | Operational log of Drive and Calendar syncs, e-mail addresses masked | 60 days (purged when a new run is logged) |
+| `googlemeet_attendance` | Meet participants of a session: the matched Moodle user, display name, Google id, e-mail, join and leave times | A refetch of the session, a course reset, or a privacy deletion |
+| `googlemeet_attendance_sync` | Per-session state of the attendance fetch (counts, last error) | The session or the activity is deleted |
+
+User preferences: `mod_googlemeet_lastjump_<recordingid>` (last jump point),
+`mod_googlemeet_kp_<recordingid>` (key-points checklist), `mod_googlemeet_recordings_view` (cards
+or list) and the time the user granted the Meet attendance scope.
+
+### Data requests
 
 The privacy provider (metadata, request, userlist and user preference providers) declares and
 handles:
@@ -258,6 +325,12 @@ handles:
 - **External locations**: Google Drive and Google Calendar (requests on behalf of the linked
   teacher account), the Google Meet REST API (attendance) and the Google Gemini API (transcripts
   and, as a fallback, the video). OAuth tokens belong to the `core_oauth2` subsystem.
+
+A data export carries, per activity, the user's reminders, subscription, viewing progress,
+practice answers, attendance and the AI analyses they published, plus the preferences above. A
+deletion for a user removes those rows and the recording preferences, and clears the user as
+the reviewer of an analysis (the analysis stays); a context-wide deletion also removes the attendance rows of
+participants who match no Moodle user.
 
 Recordings shared "anyone with the link" are reachable outside Moodle. Practice answers, viewing
 progress and attendance are personal data; set the site's data retention policy accordingly.
@@ -288,6 +361,15 @@ Troubleshooting
 
 Security problems: please do not open public issues; report them privately through
 [GitHub Security Advisories](https://github.com/uaiblaine/moodle-mod_googlemeet/security/advisories/new).
+
+
+Translations
+------------
+
+Only the English strings ship in the release package, as the plugins directory requires. The
+Brazilian Portuguese (`lang/pt_br`) and Spanish (`lang/es`) translations are kept in this
+repository and left out of the package; on the plugins directory they would reach sites through
+[AMOS](https://lang.moodle.org/).
 
 
 Credits

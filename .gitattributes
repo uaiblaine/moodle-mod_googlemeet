@@ -3,6 +3,7 @@
 # versioned for development/CI/collaboration but are NOT needed to run the
 # plugin on a Moodle site, so they are stripped from the release zip.
 # Note: tests/ SHIPS in the release (Moodle convention) — do not ignore it.
+# Only English strings ship: the plugins directory takes translations through AMOS.
 #
 # Verify with:  git check-attr export-ignore -- <path>
 # (a path marked "set" is excluded from the archive; "unspecified" ships).
@@ -18,5 +19,8 @@
 /.phpcsignore         export-ignore
 /CLAUDE.md            export-ignore
 /docs                 export-ignore
+/lang/es              export-ignore
+/lang/pt_br           export-ignore
+/mutations            export-ignore
 /phpcs.xml            export-ignore
 /phpunit.xml          export-ignore

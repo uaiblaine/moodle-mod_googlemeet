@@ -626,6 +626,7 @@ $string['privacy:metadata:googlemeet_sync_log:timequeued'] = 'Quando a execuçã
 $string['privacy:metadata:preference:keypoints'] = 'O estado da lista de revisão dos pontos-chave de cada gravação (uma preferência por gravação): quais pontos-chave o usuário marcou como revisados.';
 $string['privacy:metadata:preference:lastjump'] = 'O último capítulo ou marcação de tempo para o qual o usuário saltou em cada gravação (uma preferência por gravação), usado para oferecer "Continuar em". Não é a posição real de reprodução.';
 $string['privacy:metadata:preference:meetscope'] = 'Quando o usuário vinculou o Google com acesso à presença do Meet.';
+$string['privacy:metadata:preference:recordingsview'] = 'O layout das gravações que o usuário escolheu na página da atividade (cartões ou lista), comum a todas as atividades Google Meet.';
 $string['privacy:practiceattempts'] = 'Respostas de prática';
 $string['process_autosync_task'] = 'Auto-sincronizar gravações do Google Meet após o fim das sessões';
 $string['process_recording_enrichment_task'] = 'Processar enriquecimento das gravações do Google Meet';
@@ -707,9 +708,19 @@ $string['recording_trash_confirm'] = 'Esta gravação será movida para a lixeir
 $string['recording_view_summary'] = 'Ver resumo';
 $string['recording_watch'] = 'Assistir gravação';
 $string['recording_watch_cta'] = 'Abrir aula';
-$string['recordingavailable_body'] = '{$a->count} nova(s) gravação(ões) estão disponíveis em {$a->name}.' . "\n\n" . 'Abra a atividade: {$a->url}';
-$string['recordingavailable_body_many'] = 'Olá, {$a->user},' . "\n\n" . '{$a->count} novas gravações já estão disponíveis em "{$a->name}".' . "\n\n" . 'Assista aqui: {$a->url}';
-$string['recordingavailable_body_one'] = 'Olá, {$a->user},' . "\n\n" . 'Uma nova gravação já está disponível em "{$a->name}".' . "\n\n" . 'Assista aqui: {$a->url}';
+$string['recordingavailable_body'] = '{$a->count} nova(s) gravação(ões) estão disponíveis em {$a->name}.
+
+Abra a atividade: {$a->url}';
+$string['recordingavailable_body_many'] = 'Olá, {$a->user},
+
+{$a->count} novas gravações já estão disponíveis em "{$a->name}".
+
+Assista aqui: {$a->url}';
+$string['recordingavailable_body_one'] = 'Olá, {$a->user},
+
+Uma nova gravação já está disponível em "{$a->name}".
+
+Assista aqui: {$a->url}';
 $string['recordingavailable_subject_many'] = '{$a->count} novas gravações disponíveis em {$a->name}';
 $string['recordingavailable_subject_one'] = 'Nova gravação disponível em {$a->name}';
 $string['recordingfilter'] = 'Filtro de nome da gravação';

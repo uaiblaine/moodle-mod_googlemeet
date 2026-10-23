@@ -554,11 +554,11 @@ $string['practice_your_answer'] = 'Your answer';
 $string['privacy:aireviews'] = 'Published AI summaries';
 $string['privacy:attendance'] = 'Attendance';
 $string['privacy:metadata:core_oauth2'] = 'The Google Meet activity makes use of the OAuth 2 subsystem to authenticate users against Google services.';
-$string['privacy:metadata:google_calendar'] = 'Calendar events and the Meet room are created and read in the user' . "'" . 's Google Calendar on their behalf using their OAuth 2 authorisation.';
+$string['privacy:metadata:google_calendar'] = 'Calendar events and the Meet room are created and read in the user\'s Google Calendar on their behalf using their OAuth 2 authorisation.';
 $string['privacy:metadata:google_calendar:userid'] = 'The identity of the authenticated user is sent to Google Calendar to manage their events and Meet room.';
-$string['privacy:metadata:google_drive'] = 'Recordings are read from the user' . "'" . 's Google Drive on their behalf using their OAuth 2 authorisation.';
+$string['privacy:metadata:google_drive'] = 'Recordings are read from the user\'s Google Drive on their behalf using their OAuth 2 authorisation.';
 $string['privacy:metadata:google_drive:userid'] = 'The identity of the authenticated user is sent to Google Drive to access their recordings.';
-$string['privacy:metadata:google_gemini'] = 'Recording transcripts and, as a fallback, the full recording video are sent to the Google Gemini API to generate the analysis. These may contain personal data such as participants' . "'" . ' names and voices.';
+$string['privacy:metadata:google_gemini'] = 'Recording transcripts and, as a fallback, the full recording video are sent to the Google Gemini API to generate the analysis. These may contain personal data such as participants\' names and voices.';
 $string['privacy:metadata:google_gemini:transcript'] = 'The transcript text of the recording sent for analysis.';
 $string['privacy:metadata:google_gemini:video'] = 'The full recording video file, sent for analysis when no transcript is available.';
 $string['privacy:metadata:googlemeet'] = 'Information about the Google Meet activity instances.';
@@ -626,6 +626,7 @@ $string['privacy:metadata:googlemeet_sync_log:timequeued'] = 'When the run was r
 $string['privacy:metadata:preference:keypoints'] = 'The review checklist state of the key points in each recording (one preference per recording): which key points the user marked as reviewed.';
 $string['privacy:metadata:preference:lastjump'] = 'The last chapter or timestamp the user jumped to in each recording (one preference per recording), used to offer "Continue at". It is not the real playback position.';
 $string['privacy:metadata:preference:meetscope'] = 'When the user linked Google with access to Meet attendance.';
+$string['privacy:metadata:preference:recordingsview'] = 'The recordings layout the user chose on the activity page (cards or list), shared by every Google Meet activity.';
 $string['privacy:practiceattempts'] = 'Practice answers';
 $string['process_autosync_task'] = 'Auto-sync Google Meet recordings after sessions end';
 $string['process_recording_enrichment_task'] = 'Process Google Meet recording enrichment';
@@ -707,9 +708,19 @@ $string['recording_trash_confirm'] = 'This recording will be moved to the trash.
 $string['recording_view_summary'] = 'View summary';
 $string['recording_watch'] = 'Watch recording';
 $string['recording_watch_cta'] = 'Open class';
-$string['recordingavailable_body'] = '{$a->count} new recording(s) are available in {$a->name}.' . "\n\n" . 'Open the activity: {$a->url}';
-$string['recordingavailable_body_many'] = 'Hi {$a->user},' . "\n\n" . '{$a->count} new recordings are now available in "{$a->name}".' . "\n\n" . 'Watch them here: {$a->url}';
-$string['recordingavailable_body_one'] = 'Hi {$a->user},' . "\n\n" . 'A new recording is now available in "{$a->name}".' . "\n\n" . 'Watch it here: {$a->url}';
+$string['recordingavailable_body'] = '{$a->count} new recording(s) are available in {$a->name}.
+
+Open the activity: {$a->url}';
+$string['recordingavailable_body_many'] = 'Hi {$a->user},
+
+{$a->count} new recordings are now available in "{$a->name}".
+
+Watch them here: {$a->url}';
+$string['recordingavailable_body_one'] = 'Hi {$a->user},
+
+A new recording is now available in "{$a->name}".
+
+Watch it here: {$a->url}';
 $string['recordingavailable_subject_many'] = '{$a->count} new recordings available in {$a->name}';
 $string['recordingavailable_subject_one'] = 'New recording available in {$a->name}';
 $string['recordingfilter'] = 'Recording name filter';

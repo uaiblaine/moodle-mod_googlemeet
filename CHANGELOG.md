@@ -4,14 +4,40 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 
-## [Unreleased]
+## [v5.2-r2] - 2026-10-23
+
+Version `2026042001`, brought to the Moodle plugins directory submission guidelines.
 
 ### Fixed
 
+- The recordings layout preference (`mod_googlemeet_recordings_view`, cards or list) is declared
+  in the privacy metadata and exported with a data request; before, it was written but never
+  declared or exported.
+- Five stylesheet selectors applied outside the plugin's own markup: `.recording-name-text`, the
+  row-action focus outlines and the date-selector calendar icons (`#id_eventdate_calendar`,
+  `#id_eventenddate_calendar`, which matched the same ids in any other activity's form). They are
+  now scoped to the recordings panel, the recording page and the activity form.
+- Language files hold literal strings only: twelve strings built by concatenation (an apostrophe,
+  blank lines) in `lang/en`, `lang/es` and `lang/pt_br` are plain literals with the same text.
 - PHP 8.1+ deprecation "json_decode(): Passing null to parameter #1" when editing an activity
   saved without recurrence (`googlemeet.days` is NULL), when reading an AI analysis still being
   processed (the `get_ai_analysis` web service), and when listing or opening a recording whose
   completed analysis has no key points or topics.
+
+### Added
+
+- `LICENSE` (the GPL v3 text, a copy of `COPYING.txt`) in the release package.
+- `tests/marketplace_readiness_test.php`, which pins the directory's file-level rules (licence
+  files, English-only package, data-only lang files, README naming every table and capability,
+  per-plugin settings, scoped CSS, boilerplate), and `mutations/gates.conf` for the new guards.
+- README sections "Settings", "External services" (what each Google API receives, the
+  credentials it needs and what stops without them), "Data stored" (every table, what it keeps and
+  until when, what a data request exports and deletes) and "Translations".
+
+### Changed
+
+- Only English ships: `lang/pt_br` and `lang/es` are export-ignored and leave the release
+  package; on the plugins directory translations reach sites through AMOS.
 
 ## [v5.2-r1] - 2026-10-13
 

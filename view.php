@@ -72,7 +72,7 @@ view_page::handle_subscription_action($googlemeet, $cm);
 // list state without it. No sesskey: it only sets the viewer's own preference and is idempotent.
 $rview = optional_param('rview', '', PARAM_ALPHA);
 if ($rview === 'cards' || $rview === 'list') {
-    set_user_preference('mod_googlemeet_recordings_view', $rview);
+    set_user_preference(\mod_googlemeet\privacy\provider::RECORDINGSVIEW_PREFERENCE, $rview);
 
     $redirectparams = ['id' => $cm->id];
     $rviewpage = optional_param('rpage', 0, PARAM_INT);
